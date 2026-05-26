@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const EMPRESA_ID = 1;
@@ -73,10 +73,20 @@ export default function AgendamentoPublicoPage() {
   const [notificacaoRespondida, setNotificacaoRespondida] = useState(false);
   const [servicoConfirmado, setServicoConfirmado] = useState(false);
   const [horarioConfirmado, setHorarioConfirmado] = useState(false);
+  const fimDoFluxoRef = useRef<HTMLDivElement | null>(null);
 
   const primeiroNome = nome.trim().split(" ")[0] || "tudo bem";
   const servicoSelecionado = servicos.find((servico) => servico.id === servicoId);
   const diaSelecionado = useMemo(() => DIAS_AGENDA.find((dia) => dia.valor === data), [data]);
+
+  function rolarParaProximaEtapa() {
+    window.setTimeout(() => {
+      fimDoFluxoRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    }, 120);
+  }
 
   const carregarServicos = useCallback(async () => {
     if (!isSupabaseConfigured) return;
@@ -141,6 +151,7 @@ export default function AgendamentoPublicoPage() {
     }
 
     setNotificacaoRespondida(true);
+    rolarParaProximaEtapa();
   }
 
   async function confirmarAgendamento() {
@@ -198,6 +209,7 @@ export default function AgendamentoPublicoPage() {
     }
 
     setMensagem("Agendamento confirmado! A barbearia recebeu sua reserva.");
+    rolarParaProximaEtapa();
   }
 
   return (
@@ -220,6 +232,7 @@ export default function AgendamentoPublicoPage() {
 
               setNomeConfirmado(true);
               setMensagem("");
+              rolarParaProximaEtapa();
             }}
             onValueChange={setNome}
             placeholder="Seu nome e sobrenome"
@@ -241,7 +254,14 @@ export default function AgendamentoPublicoPage() {
                 <button className="chat-action-button" onClick={pedirNotificacao} type="button">
                   Ativar notificacoes
                 </button>
-                <button className="chat-secondary-button" onClick={() => setNotificacaoRespondida(true)} type="button">
+                <button
+                  className="chat-secondary-button"
+                  onClick={() => {
+                    setNotificacaoRespondida(true);
+                    rolarParaProximaEtapa();
+                  }}
+                  type="button"
+                >
                   Pular
                 </button>
               </div>
@@ -269,6 +289,7 @@ export default function AgendamentoPublicoPage() {
                       setServicoId(servico.id);
                       setServicoConfirmado(false);
                       setHorarioConfirmado(false);
+                      rolarParaProximaEtapa();
                     }}
                     type="button"
                   >
@@ -286,7 +307,10 @@ export default function AgendamentoPublicoPage() {
             <button
               className="chat-action-button"
               disabled={!servicoId}
-              onClick={() => setServicoConfirmado(true)}
+              onClick={() => {
+                setServicoConfirmado(true);
+                rolarParaProximaEtapa();
+              }}
               type="button"
             >
               Enviar
@@ -310,6 +334,7 @@ export default function AgendamentoPublicoPage() {
                     setData(dia.valor);
                     setHorario("");
                     setHorarioConfirmado(false);
+                    rolarParaProximaEtapa();
                   }}
                   type="button"
                 >
@@ -333,6 +358,7 @@ export default function AgendamentoPublicoPage() {
                     onClick={() => {
                       setHorario(hora);
                       setHorarioConfirmado(false);
+                      rolarParaProximaEtapa();
                     }}
                     type="button"
                   >
@@ -345,7 +371,10 @@ export default function AgendamentoPublicoPage() {
             <button
               className="chat-action-button"
               disabled={!data || !horario}
-              onClick={() => setHorarioConfirmado(true)}
+              onClick={() => {
+                setHorarioConfirmado(true);
+                rolarParaProximaEtapa();
+              }}
               type="button"
             >
               Enviar
@@ -383,6 +412,7 @@ export default function AgendamentoPublicoPage() {
         )}
 
         {mensagem && <p className="chat-status">{mensagem}</p>}
+        <div ref={fimDoFluxoRef} />
       </section>
     </main>
   );
