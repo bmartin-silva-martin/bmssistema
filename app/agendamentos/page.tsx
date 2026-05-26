@@ -1,12 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const EMPRESA_ID = 1;
-const HORARIOS = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"];
-const DATA_MINIMA = new Date().toISOString().slice(0, 10);
+const BARBEARIA_NOME = "Barbearia Teste";
+const HORARIOS = [
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "13:30",
+  "13:45",
+  "14:00",
+  "14:15",
+  "14:30",
+  "14:45",
+  "15:00",
+  "16:00",
+  "16:15",
+  "16:30",
+  "17:00",
+];
 const moeda = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
+const diasSemana = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+const meses = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
 type Servico = {
   id: number;
@@ -19,6 +38,25 @@ type HorarioOcupado = {
   data_agendamento: string;
 };
 
+function montarDiasAgenda() {
+  const hoje = new Date();
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const data = new Date(hoje);
+    data.setDate(hoje.getDate() + index);
+
+    return {
+      dia: String(data.getDate()).padStart(2, "0"),
+      label: index === 0 ? "HOJE" : String(data.getDate()).padStart(2, "0"),
+      mes: meses[data.getMonth()],
+      semana: diasSemana[data.getDay()],
+      valor: data.toISOString().slice(0, 10),
+    };
+  });
+}
+
+const DIAS_AGENDA = montarDiasAgenda();
+
 export default function AgendamentoPublicoPage() {
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [ocupados, setOcupados] = useState<string[]>([]);
@@ -26,13 +64,19 @@ export default function AgendamentoPublicoPage() {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [dataNascimento, setDataNascimento] = useState("");
-  const [data, setData] = useState("");
+  const [data, setData] = useState(DIAS_AGENDA[0]?.valor || "");
   const [horario, setHorario] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [nomeConfirmado, setNomeConfirmado] = useState(false);
+  const [notificacaoRespondida, setNotificacaoRespondida] = useState(false);
+  const [servicoConfirmado, setServicoConfirmado] = useState(false);
+  const [horarioConfirmado, setHorarioConfirmado] = useState(false);
 
+  const primeiroNome = nome.trim().split(" ")[0] || "tudo bem";
   const servicoSelecionado = servicos.find((servico) => servico.id === servicoId);
+  const diaSelecionado = useMemo(() => DIAS_AGENDA.find((dia) => dia.valor === data), [data]);
 
   const carregarServicos = useCallback(async () => {
     if (!isSupabaseConfigured) return;
@@ -91,6 +135,14 @@ export default function AgendamentoPublicoPage() {
     carregar();
   }, [carregarHorariosOcupados]);
 
+  async function pedirNotificacao() {
+    if ("Notification" in window) {
+      await Notification.requestPermission();
+    }
+
+    setNotificacaoRespondida(true);
+  }
+
   async function confirmarAgendamento() {
     const nomeLimpo = nome.trim();
     const telefoneLimpo = telefone.trim();
@@ -101,7 +153,7 @@ export default function AgendamentoPublicoPage() {
     }
 
     if (!nomeLimpo || !telefoneLimpo || !servicoId || !data || !horario) {
-      setMensagem("Preencha todos os campos para confirmar.");
+      setMensagem("Preencha telefone, nascimento, servico, dia e horario para confirmar.");
       return;
     }
 
@@ -146,139 +198,223 @@ export default function AgendamentoPublicoPage() {
     }
 
     setMensagem("Agendamento confirmado! A barbearia recebeu sua reserva.");
-    setNome("");
-    setTelefone("");
-    setDataNascimento("");
-    setServicoId(null);
-    setData("");
-    setHorario("");
-    setOcupados([]);
   }
 
   return (
-    <main className="booking-page public-booking-page">
-      <section className="booking-panel public-booking-panel">
-        <div className="section-heading stacked">
-          <div>
-            <p className="eyebrow">Barber Brothers</p>
-            <h1>Agende seu horario</h1>
-            <p className="muted">Escolha o servico, informe seus dados e reserve seu horario online.</p>
-          </div>
-        </div>
+    <main className="chat-booking-page">
+      <section className="chat-booking">
+        <AssistantBubble wide>
+          Ola, tudo bem? Sou a assistente virtual do(a) {BARBEARIA_NOME} e cuido do agendamento dos servicos, ok?
+        </AssistantBubble>
 
-        {!isSupabaseConfigured && (
-          <p className="notice notice-error">Agendamento indisponivel. Supabase nao configurado no sistema.</p>
+        <AssistantBubble>Qual o seu nome? Escreva seu nome e sobrenome, por favor.</AssistantBubble>
+
+        {!nomeConfirmado ? (
+          <ChatInput
+            buttonLabel="Enviar"
+            onSubmit={() => {
+              if (!nome.trim()) {
+                setMensagem("Informe seu nome completo para continuar.");
+                return;
+              }
+
+              setNomeConfirmado(true);
+              setMensagem("");
+            }}
+            onValueChange={setNome}
+            placeholder="Seu nome e sobrenome"
+            value={nome}
+          />
+        ) : (
+          <UserBubble>{nome}</UserBubble>
         )}
 
-        {carregando ? (
-          <div className="empty-state">Carregando servicos...</div>
-        ) : (
+        {nomeConfirmado && (
           <>
-            <div className="form-stack">
-              <label>
-                Seu nome
-                <input onChange={(event) => setNome(event.target.value)} placeholder="Nome completo" value={nome} />
-              </label>
+            <AssistantBubble>Como vai, {primeiroNome}! Tudo bem?</AssistantBubble>
+            <AssistantBubble wide>
+              Para que possamos lembra-lo de seu agendamento, ative suas notificacoes clicando abaixo:
+            </AssistantBubble>
 
-              <label>
-                WhatsApp
-                <input
-                  inputMode="tel"
-                  onChange={(event) => setTelefone(event.target.value)}
-                  placeholder="(00) 00000-0000"
-                  value={telefone}
-                />
-              </label>
+            {!notificacaoRespondida ? (
+              <div className="chat-action-stack">
+                <button className="chat-action-button" onClick={pedirNotificacao} type="button">
+                  Ativar notificacoes
+                </button>
+                <button className="chat-secondary-button" onClick={() => setNotificacaoRespondida(true)} type="button">
+                  Pular
+                </button>
+              </div>
+            ) : (
+              <UserBubble>Continuar</UserBubble>
+            )}
+          </>
+        )}
 
-              <label>
-                Data de nascimento
-                <input
-                  onChange={(event) => setDataNascimento(event.target.value)}
-                  type="date"
-                  value={dataNascimento}
-                />
-              </label>
-            </div>
+        {nomeConfirmado && notificacaoRespondida && (
+          <>
+            <AssistantBubble>Por qual servico voce esta procurando?</AssistantBubble>
+            <p className="chat-section-label">Selecione os servicos:</p>
 
-            <section className="choice-section">
-              <h2>Servico</h2>
-              <div className="choice-grid">
-                {servicos.map((servico) => (
+            {carregando ? (
+              <div className="chat-empty">Carregando servicos...</div>
+            ) : (
+              <div className="chat-service-carousel">
+                {servicos.map((servico, index) => (
                   <button
                     aria-pressed={servicoId === servico.id}
-                    className="choice-button"
+                    className="chat-service-card"
                     key={servico.id}
-                    onClick={() => setServicoId(servico.id)}
+                    onClick={() => {
+                      setServicoId(servico.id);
+                      setServicoConfirmado(false);
+                      setHorarioConfirmado(false);
+                    }}
                     type="button"
                   >
-                    <strong>{servico.nome}</strong>
-                    <span>
-                      {moeda.format(servico.preco)} - {servico.duracao || 30} min
+                    <span className={`chat-service-image service-tone-${index % 4}`} />
+                    <span className="chat-service-info">
+                      <strong>{servico.nome}</strong>
+                      <span>{moeda.format(servico.preco)}</span>
+                      <em>{servico.duracao || 30}min</em>
                     </span>
                   </button>
                 ))}
               </div>
-            </section>
-
-            <div className="form-stack">
-              <label>
-                Data
-                <input
-                  min={DATA_MINIMA}
-                  onChange={(event) => {
-                    const novaData = event.target.value;
-                    setData(novaData);
-                    setHorario("");
-                    if (!novaData) setOcupados([]);
-                  }}
-                  type="date"
-                  value={data}
-                />
-              </label>
-            </div>
-
-            <section className="choice-section">
-              <h2>Horario</h2>
-              <div className="hour-grid">
-                {HORARIOS.map((hora) => {
-                  const indisponivel = ocupados.includes(hora);
-
-                  return (
-                    <button
-                      aria-pressed={horario === hora}
-                      className="choice-button hour-button"
-                      disabled={indisponivel}
-                      key={hora}
-                      onClick={() => setHorario(hora)}
-                      type="button"
-                    >
-                      <strong>{hora}</strong>
-                      <span>{indisponivel ? "Indisponivel" : "Disponivel"}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="booking-summary">
-              <strong>Resumo</strong>
-              <span>{servicoSelecionado?.nome || "Escolha um servico"}</span>
-              <span>{data && horario ? `${data} as ${horario}` : "Escolha data e horario"}</span>
-            </section>
+            )}
 
             <button
-              className="button button-primary wide"
-              disabled={salvando || !isSupabaseConfigured}
-              onClick={confirmarAgendamento}
+              className="chat-action-button"
+              disabled={!servicoId}
+              onClick={() => setServicoConfirmado(true)}
               type="button"
             >
+              Enviar
+            </button>
+          </>
+        )}
+
+        {servicoConfirmado && servicoSelecionado && (
+          <>
+            <UserBubble>{servicoSelecionado.nome}</UserBubble>
+            <AssistantBubble>Certo, e qual o melhor dia e horario para voce ser atendido?</AssistantBubble>
+            <p className="chat-section-label">Selecione o dia e horario:</p>
+
+            <div className="chat-day-carousel">
+              {DIAS_AGENDA.map((dia) => (
+                <button
+                  aria-pressed={data === dia.valor}
+                  className="chat-day-card"
+                  key={dia.valor}
+                  onClick={() => {
+                    setData(dia.valor);
+                    setHorario("");
+                    setHorarioConfirmado(false);
+                  }}
+                  type="button"
+                >
+                  <span>{dia.semana}</span>
+                  <strong>{dia.label}</strong>
+                  <em>{dia.mes}</em>
+                </button>
+              ))}
+            </div>
+
+            <div className="chat-time-grid">
+              {HORARIOS.map((hora) => {
+                const indisponivel = ocupados.includes(hora);
+
+                return (
+                  <button
+                    aria-pressed={horario === hora}
+                    className="chat-time-button"
+                    disabled={indisponivel}
+                    key={hora}
+                    onClick={() => {
+                      setHorario(hora);
+                      setHorarioConfirmado(false);
+                    }}
+                    type="button"
+                  >
+                    {hora}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              className="chat-action-button"
+              disabled={!data || !horario}
+              onClick={() => setHorarioConfirmado(true)}
+              type="button"
+            >
+              Enviar
+            </button>
+          </>
+        )}
+
+        {horarioConfirmado && (
+          <>
+            <UserBubble>
+              {diaSelecionado?.label || data} - {horario}
+            </UserBubble>
+            <AssistantBubble wide>
+              Perfeito. Para finalizar, informe seu WhatsApp e sua data de nascimento.
+            </AssistantBubble>
+
+            <div className="chat-final-form">
+              <input
+                inputMode="tel"
+                onChange={(event) => setTelefone(event.target.value)}
+                placeholder="Seu WhatsApp"
+                value={telefone}
+              />
+              <input
+                onChange={(event) => setDataNascimento(event.target.value)}
+                type="date"
+                value={dataNascimento}
+              />
+            </div>
+
+            <button className="chat-action-button" disabled={salvando} onClick={confirmarAgendamento} type="button">
               {salvando ? "Confirmando..." : "Confirmar agendamento"}
             </button>
           </>
         )}
 
-        {mensagem && <p className="status-message">{mensagem}</p>}
+        {mensagem && <p className="chat-status">{mensagem}</p>}
       </section>
     </main>
+  );
+}
+
+function AssistantBubble({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+  return <div className={wide ? "chat-bubble assistant wide" : "chat-bubble assistant"}>{children}</div>;
+}
+
+function UserBubble({ children }: { children: React.ReactNode }) {
+  return <div className="chat-bubble user">{children}</div>;
+}
+
+function ChatInput({
+  buttonLabel,
+  onSubmit,
+  onValueChange,
+  placeholder,
+  value,
+}: {
+  buttonLabel: string;
+  onSubmit: () => void;
+  onValueChange: (value: string) => void;
+  placeholder: string;
+  value: string;
+}) {
+  return (
+    <div className="chat-input-stack">
+      <input onChange={(event) => onValueChange(event.target.value)} placeholder={placeholder} value={value} />
+      <button className="chat-action-button" onClick={onSubmit} type="button">
+        {buttonLabel}
+      </button>
+    </div>
   );
 }
