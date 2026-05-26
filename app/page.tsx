@@ -22,6 +22,7 @@ type Servico = {
 };
 
 type Produto = {
+  foto_url?: string | null;
   id: number;
   nome: string;
   preco: number | null;
@@ -40,11 +41,38 @@ type ServicoResumo = {
 };
 
 type Agendamento = {
+  cliente_id: number | null;
   id: number;
   data_agendamento: string;
+  servico_id: number | null;
   status: string;
   clientes: ClienteResumo | ClienteResumo[] | null;
   servicos: ServicoResumo | ServicoResumo[] | null;
+};
+
+type VendaItem = {
+  produto_id: number | null;
+  quantidade: number;
+  valor_unitario: number | null;
+  produtos: { nome: string } | { nome: string }[] | null;
+};
+
+type Venda = {
+  agendamento_id: number | null;
+  created_at: string;
+  id: number;
+  total: number | null;
+  agendamentos:
+    | {
+        data_agendamento: string;
+        servicos: ServicoResumo | ServicoResumo[] | null;
+      }
+    | {
+        data_agendamento: string;
+        servicos: ServicoResumo | ServicoResumo[] | null;
+      }[]
+    | null;
+  venda_itens: VendaItem[] | null;
 };
 
 type RankingItem = {
@@ -52,7 +80,8 @@ type RankingItem = {
   total: number;
 };
 
-type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "clientes";
+type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "financeiro" | "clientes";
+type PeriodoFinanceiro = "hoje" | "7" | "30" | "todos";
 
 function firstRelation<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] || null : value;
@@ -78,13 +107,19 @@ export default function AdminDashboard() {
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [vendas, setVendas] = useState<Venda[]>([]);
   const [clientes, setClientes] = useState<ClienteResumo[]>([]);
   const [mensagem, setMensagem] = useState("");
   const [produtoAviso, setProdutoAviso] = useState("");
+  const [financeiroAviso, setFinanceiroAviso] = useState("");
   const [servicoForm, setServicoForm] = useState({ duracao: "30", nome: "", preco: "" });
-  const [produtoForm, setProdutoForm] = useState({ estoque: "0", nome: "", preco: "" });
+  const [produtoForm, setProdutoForm] = useState({ estoque: "0", foto_url: "", nome: "", preco: "" });
+  const [periodoFinanceiro, setPeriodoFinanceiro] = useState<PeriodoFinanceiro>("hoje");
+  const [atendimentoAberto, setAtendimentoAberto] = useState<Agendamento | null>(null);
+  const [itensVenda, setItensVenda] = useState<Record<number, string>>({});
   const [salvandoServico, setSalvandoServico] = useState(false);
   const [salvandoProduto, setSalvandoProduto] = useState(false);
+  const [finalizandoVenda, setFinalizandoVenda] = useState(false);
 
   const linkPublico = typeof window === "undefined" ? "/agendamentos" : `${window.location.origin}/agendamentos`;
 
@@ -109,28 +144,53 @@ export default function AdminDashboard() {
       .slice(0, 6);
   }, [agendamentos]);
 
+  const vendasFiltradas = useMemo(() => filtrarVendasPorPeriodo(vendas, periodoFinanceiro), [periodoFinanceiro, vendas]);
+  const resumoFinanceiro = useMemo(
+    () => calcularResumoFinanceiro(vendasFiltradas, agendamentos, produtos),
+    [agendamentos, produtos, vendasFiltradas],
+  );
+
+  const totalAtendimentoAberto = useMemo(() => {
+    if (!atendimentoAberto) return 0;
+
+    const servico = firstRelation(atendimentoAberto.servicos);
+    const totalServico = servico?.preco || 0;
+    const totalProdutos = produtos.reduce((total, produto) => {
+      const quantidade = Number(itensVenda[produto.id] || 0);
+      return total + quantidade * (produto.preco || 0);
+    }, 0);
+
+    return totalServico + totalProdutos;
+  }, [atendimentoAberto, itensVenda, produtos]);
+
   async function carregarDados() {
     if (!isSupabaseConfigured) {
       setMensagem("Supabase nao configurado. Confira o .env.local.");
       return;
     }
 
-    const [empresaResponse, servicosResponse, agendamentosResponse, produtosResponse, clientesResponse] = await Promise.all([
+    const [empresaResponse, servicosResponse, agendamentosResponse, produtosResponse, clientesResponse, vendasResponse] =
+      await Promise.all([
       supabase.from("empresas").select("id,nome,plano,ativo").eq("id", EMPRESA_ID).maybeSingle(),
       supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", EMPRESA_ID).order("nome"),
       supabase
         .from("agendamentos")
-        .select("id,data_agendamento,status,clientes(nome,telefone),servicos(nome,preco)")
+        .select("id,cliente_id,servico_id,data_agendamento,status,clientes(nome,telefone),servicos(nome,preco)")
         .eq("empresa_id", EMPRESA_ID)
         .neq("status", "cancelado")
         .order("data_agendamento", { ascending: true }),
-      supabase.from("produtos").select("id,nome,preco,estoque").eq("empresa_id", EMPRESA_ID).order("nome"),
+      supabase.from("produtos").select("id,nome,preco,estoque,foto_url").eq("empresa_id", EMPRESA_ID).order("nome"),
       supabase
         .from("clientes")
         .select("nome,telefone,data_nascimento")
         .eq("empresa_id", EMPRESA_ID)
         .not("data_nascimento", "is", null)
         .order("data_nascimento", { ascending: true }),
+      supabase
+        .from("vendas")
+        .select("id,created_at,total,agendamento_id,agendamentos(data_agendamento,servicos(nome,preco)),venda_itens(produto_id,quantidade,valor_unitario,produtos(nome))")
+        .eq("empresa_id", EMPRESA_ID)
+        .order("created_at", { ascending: false }),
     ]);
 
     if (empresaResponse.data) setEmpresa(empresaResponse.data as Empresa);
@@ -144,6 +204,14 @@ export default function AdminDashboard() {
     } else {
       setProdutoAviso("");
       setProdutos((produtosResponse.data || []) as Produto[]);
+    }
+
+    if (vendasResponse.error) {
+      setFinanceiroAviso("Financeiro ainda nao configurado no Supabase. Rode o SQL de vendas para ativar.");
+      setVendas([]);
+    } else {
+      setFinanceiroAviso("");
+      setVendas((vendasResponse.data || []) as unknown as Venda[]);
     }
 
     if (empresaResponse.error || servicosResponse.error || agendamentosResponse.error || clientesResponse.error) {
@@ -245,6 +313,7 @@ export default function AdminDashboard() {
     setServicos([]);
     setProdutos([]);
     setAgendamentos([]);
+    setVendas([]);
     setClientes([]);
     setMensagem("");
   }
@@ -288,6 +357,7 @@ export default function AdminDashboard() {
     const { error } = await supabase.from("produtos").insert({
       empresa_id: EMPRESA_ID,
       estoque: Number(produtoForm.estoque || 0),
+      foto_url: produtoForm.foto_url.trim() || null,
       nome: produtoForm.nome.trim(),
       preco: produtoForm.preco ? Number(produtoForm.preco) : null,
     });
@@ -298,7 +368,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    setProdutoForm({ estoque: "0", nome: "", preco: "" });
+    setProdutoForm({ estoque: "0", foto_url: "", nome: "", preco: "" });
     await carregarDados();
     setMensagem("Produto cadastrado com sucesso.");
   }
@@ -328,6 +398,7 @@ export default function AdminDashboard() {
       .from("produtos")
       .update({
         estoque: produto.estoque || 0,
+        foto_url: produto.foto_url || null,
         nome: produto.nome,
         preco: produto.preco,
       })
@@ -346,6 +417,79 @@ export default function AdminDashboard() {
   async function copiarLink() {
     await navigator.clipboard.writeText(linkPublico);
     setMensagem("Link publico copiado para enviar aos clientes.");
+  }
+
+  function abrirFinalizacao(agendamento: Agendamento) {
+    setAtendimentoAberto(agendamento);
+    setItensVenda({});
+  }
+
+  async function finalizarAtendimento() {
+    if (!atendimentoAberto) return;
+
+    const itensSelecionados = produtos
+      .map((produto) => ({
+        produto,
+        quantidade: Number(itensVenda[produto.id] || 0),
+      }))
+      .filter((item) => item.quantidade > 0);
+
+    setFinalizandoVenda(true);
+    setMensagem("Finalizando atendimento e registrando venda...");
+
+    const { data: venda, error: vendaError } = await supabase
+      .from("vendas")
+      .insert({
+        agendamento_id: atendimentoAberto.id,
+        empresa_id: EMPRESA_ID,
+        total: totalAtendimentoAberto,
+      })
+      .select("id")
+      .single();
+
+    if (vendaError) {
+      setFinalizandoVenda(false);
+      setMensagem(`Erro ao finalizar venda: ${formatarErroSupabase(vendaError.message)}`);
+      return;
+    }
+
+    if (itensSelecionados.length > 0) {
+      const { error: itensError } = await supabase.from("venda_itens").insert(
+        itensSelecionados.map(({ produto, quantidade }) => ({
+          produto_id: produto.id,
+          quantidade,
+          valor_unitario: produto.preco || 0,
+          venda_id: venda.id,
+        })),
+      );
+
+      if (itensError) {
+        setFinalizandoVenda(false);
+        setMensagem(`Venda criada, mas os produtos nao foram lancados: ${formatarErroSupabase(itensError.message)}`);
+        return;
+      }
+
+      await Promise.all(
+        itensSelecionados.map(({ produto, quantidade }) =>
+          supabase
+            .from("produtos")
+            .update({ estoque: Math.max((produto.estoque || 0) - quantidade, 0) })
+            .eq("id", produto.id)
+            .eq("empresa_id", EMPRESA_ID),
+        ),
+      );
+    }
+
+    await supabase
+      .from("agendamentos")
+      .update({ status: "finalizado" })
+      .eq("id", atendimentoAberto.id)
+      .eq("empresa_id", EMPRESA_ID);
+
+    setFinalizandoVenda(false);
+    setAtendimentoAberto(null);
+    await carregarDados();
+    setMensagem(`Atendimento finalizado. Total registrado: ${formatarMoeda(totalAtendimentoAberto)}.`);
   }
 
   if (!authReady) {
@@ -449,11 +593,32 @@ export default function AdminDashboard() {
         </div>
 
         <nav className="admin-menu" aria-label="Menu do painel">
-          <AdminMenuButton active={activeSection === "visao"} label="Visao geral" onClick={() => setActiveSection("visao")} />
-          <AdminMenuButton active={activeSection === "agenda"} label="Agenda" onClick={() => setActiveSection("agenda")} />
-          <AdminMenuButton active={activeSection === "servicos"} label="Servicos" onClick={() => setActiveSection("servicos")} />
-          <AdminMenuButton active={activeSection === "produtos"} label="Produtos" onClick={() => setActiveSection("produtos")} />
-          <AdminMenuButton active={activeSection === "clientes"} label="Clientes" onClick={() => setActiveSection("clientes")} />
+          <AdminMenuButton
+            active={activeSection === "visao"}
+            icon="⌂"
+            label="Visao geral"
+            onClick={() => setActiveSection("visao")}
+          />
+          <AdminMenuButton active={activeSection === "agenda"} icon="◷" label="Agenda" onClick={() => setActiveSection("agenda")} />
+          <AdminMenuButton
+            active={activeSection === "servicos"}
+            icon="✂"
+            label="Servicos"
+            onClick={() => setActiveSection("servicos")}
+          />
+          <AdminMenuButton
+            active={activeSection === "produtos"}
+            icon="▣"
+            label="Produtos"
+            onClick={() => setActiveSection("produtos")}
+          />
+          <AdminMenuButton
+            active={activeSection === "financeiro"}
+            icon="$"
+            label="Financeiro"
+            onClick={() => setActiveSection("financeiro")}
+          />
+          <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => setActiveSection("clientes")} />
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -512,7 +677,7 @@ export default function AdminDashboard() {
 
               <article className="admin-panel">
                 <h2>Proximos lembretes</h2>
-                <AppointmentList agendamentos={proximosAgendamentos} />
+                <AppointmentList agendamentos={proximosAgendamentos} onFinish={abrirFinalizacao} />
               </article>
             </section>
           </AdminSectionShell>
@@ -525,7 +690,7 @@ export default function AdminDashboard() {
           >
             <article className="admin-panel">
               <h2>Agendamentos ativos</h2>
-              <AppointmentList agendamentos={proximosAgendamentos} />
+              <AppointmentList agendamentos={agendamentos} onFinish={abrirFinalizacao} />
             </article>
           </AdminSectionShell>
         )}
@@ -617,6 +782,15 @@ export default function AdminDashboard() {
                       value={produtoForm.estoque}
                     />
                   </label>
+                  <label>
+                    Foto do produto opcional
+                    <input
+                      onChange={(event) => setProdutoForm((form) => ({ ...form, foto_url: event.target.value }))}
+                      placeholder="Cole uma URL de imagem"
+                      type="url"
+                      value={produtoForm.foto_url}
+                    />
+                  </label>
                   <button
                     className="admin-pill-button primary wide"
                     disabled={salvandoProduto || Boolean(produtoAviso)}
@@ -630,6 +804,76 @@ export default function AdminDashboard() {
               <article className="admin-panel">
                 <h2>Editar produtos</h2>
                 <EditableProdutoList produtos={produtos} setProdutos={setProdutos} onSave={atualizarProduto} />
+              </article>
+            </section>
+          </AdminSectionShell>
+        )}
+
+        {activeSection === "financeiro" && (
+          <AdminSectionShell
+            description="Controle vendas de servicos e produtos depois que o atendimento for finalizado."
+            title="Financeiro"
+          >
+            {financeiroAviso && <p className="notice notice-error">{financeiroAviso}</p>}
+
+            <div className="finance-filter" aria-label="Periodo financeiro">
+              <button
+                className={periodoFinanceiro === "hoje" ? "active" : ""}
+                onClick={() => setPeriodoFinanceiro("hoje")}
+                type="button"
+              >
+                Hoje
+              </button>
+              <button
+                className={periodoFinanceiro === "7" ? "active" : ""}
+                onClick={() => setPeriodoFinanceiro("7")}
+                type="button"
+              >
+                7 dias
+              </button>
+              <button
+                className={periodoFinanceiro === "30" ? "active" : ""}
+                onClick={() => setPeriodoFinanceiro("30")}
+                type="button"
+              >
+                30 dias
+              </button>
+              <button
+                className={periodoFinanceiro === "todos" ? "active" : ""}
+                onClick={() => setPeriodoFinanceiro("todos")}
+                type="button"
+              >
+                Tudo
+              </button>
+            </div>
+
+            <section className="admin-metrics-grid" aria-label="Resumo financeiro">
+              <MetricCard helper="receita no periodo" label="Faturamento" value={formatarMoeda(resumoFinanceiro.totalReceita)} />
+              <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
+              <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
+            </section>
+
+            <section className="admin-two-columns">
+              <article className="admin-panel">
+                <h2>Produtos com mais saida</h2>
+                <RankingList items={resumoFinanceiro.produtosMaisVendidos} />
+              </article>
+
+              <article className="admin-panel">
+                <h2>Servicos mais vendidos</h2>
+                <RankingList items={resumoFinanceiro.servicosMaisVendidos} />
+              </article>
+            </section>
+
+            <section className="admin-two-columns">
+              <article className="admin-panel">
+                <h2>Produtos sem giro</h2>
+                <ProductStockList produtos={resumoFinanceiro.produtosSemGiro} emptyLabel="Todos os produtos tiveram giro." />
+              </article>
+
+              <article className="admin-panel">
+                <h2>Controle de estoque</h2>
+                <ProductStockList produtos={produtos} emptyLabel="Nenhum produto cadastrado." />
               </article>
             </section>
           </AdminSectionShell>
@@ -658,14 +902,56 @@ export default function AdminDashboard() {
           </AdminSectionShell>
         )}
       </section>
+
+      <nav className="admin-mobile-nav" aria-label="Menu principal mobile">
+        <AdminMenuButton active={activeSection === "visao"} icon="⌂" label="Inicio" onClick={() => setActiveSection("visao")} />
+        <AdminMenuButton active={activeSection === "agenda"} icon="◷" label="Agenda" onClick={() => setActiveSection("agenda")} />
+        <AdminMenuButton
+          active={activeSection === "servicos"}
+          icon="✂"
+          label="Servicos"
+          onClick={() => setActiveSection("servicos")}
+        />
+        <AdminMenuButton
+          active={activeSection === "produtos"}
+          icon="▣"
+          label="Produtos"
+          onClick={() => setActiveSection("produtos")}
+        />
+        <AdminMenuButton active={activeSection === "financeiro"} icon="$" label="Caixa" onClick={() => setActiveSection("financeiro")} />
+      </nav>
+
+      {atendimentoAberto && (
+        <SaleModal
+          agendamento={atendimentoAberto}
+          finalizando={finalizandoVenda}
+          itensVenda={itensVenda}
+          onClose={() => setAtendimentoAberto(null)}
+          onConfirm={finalizarAtendimento}
+          produtos={produtos}
+          setItensVenda={setItensVenda}
+          total={totalAtendimentoAberto}
+        />
+      )}
     </main>
   );
 }
 
-function AdminMenuButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+function AdminMenuButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: string;
+  label: string;
+  onClick: () => void;
+}) {
   return (
     <button className={active ? "active" : ""} onClick={onClick} type="button">
-      {label}
+      <span aria-hidden="true">{icon}</span>
+      <strong>{label}</strong>
     </button>
   );
 }
@@ -690,7 +976,7 @@ function AdminSectionShell({
   );
 }
 
-function MetricCard({ helper, label, value }: { helper: string; label: string; value: number }) {
+function MetricCard({ helper, label, value }: { helper: string; label: string; value: number | string }) {
   return (
     <article className="metric-card admin-metric-card">
       <span>{label}</span>
@@ -700,27 +986,166 @@ function MetricCard({ helper, label, value }: { helper: string; label: string; v
   );
 }
 
-function AppointmentList({ agendamentos }: { agendamentos: Agendamento[] }) {
+function AppointmentList({
+  agendamentos,
+  onFinish,
+}: {
+  agendamentos: Agendamento[];
+  onFinish?: (agendamento: Agendamento) => void;
+}) {
   if (agendamentos.length === 0) {
     return <div className="empty-state">Nenhum agendamento ativo por enquanto.</div>;
   }
 
   return (
-    <div className="simple-list">
+    <div className="appointment-card-list">
       {agendamentos.map((agendamento) => {
         const cliente = firstRelation(agendamento.clientes);
         const servico = firstRelation(agendamento.servicos);
 
         return (
-          <div key={agendamento.id}>
-            <strong>{cliente?.nome || "Cliente"}</strong>
-            <span>
-              {servico?.nome || "Servico"} em {new Date(agendamento.data_agendamento).toLocaleString("pt-BR")}
-            </span>
-          </div>
+          <article className="admin-appointment-card" key={agendamento.id}>
+            <div>
+              <strong>{cliente?.nome || "Cliente"}</strong>
+              <span>{cliente?.telefone || "Telefone nao informado"}</span>
+            </div>
+            <dl>
+              <div>
+                <dt>Servico</dt>
+                <dd>{servico?.nome || "Servico"}</dd>
+              </div>
+              <div>
+                <dt>Horario</dt>
+                <dd>{new Date(agendamento.data_agendamento).toLocaleString("pt-BR")}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>{agendamento.status}</dd>
+              </div>
+            </dl>
+            {onFinish && agendamento.status !== "finalizado" && (
+              <button className="admin-pill-button primary wide" onClick={() => onFinish(agendamento)} type="button">
+                Finalizar atendimento
+              </button>
+            )}
+          </article>
         );
       })}
     </div>
+  );
+}
+
+function ProductStockList({ emptyLabel, produtos }: { emptyLabel: string; produtos: Produto[] }) {
+  if (produtos.length === 0) {
+    return <div className="empty-state">{emptyLabel}</div>;
+  }
+
+  return (
+    <div className="product-stock-list">
+      {produtos.map((produto) => (
+        <article className="product-stock-card" key={produto.id}>
+          <ProductPhoto produto={produto} />
+          <div>
+            <strong>{produto.nome}</strong>
+            <small>{formatarMoeda(produto.preco || 0)}</small>
+          </div>
+          <em>{produto.estoque || 0} un.</em>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function SaleModal({
+  agendamento,
+  finalizando,
+  itensVenda,
+  onClose,
+  onConfirm,
+  produtos,
+  setItensVenda,
+  total,
+}: {
+  agendamento: Agendamento;
+  finalizando: boolean;
+  itensVenda: Record<number, string>;
+  onClose: () => void;
+  onConfirm: () => void;
+  produtos: Produto[];
+  setItensVenda: Dispatch<SetStateAction<Record<number, string>>>;
+  total: number;
+}) {
+  const cliente = firstRelation(agendamento.clientes);
+  const servico = firstRelation(agendamento.servicos);
+
+  return (
+    <section className="sale-modal-backdrop" role="dialog" aria-modal="true" aria-label="Finalizar atendimento">
+      <article className="sale-modal">
+        <div className="sale-modal-header">
+          <div>
+            <p className="admin-kicker">Fechar comanda</p>
+            <h2>{cliente?.nome || "Cliente"}</h2>
+            <p>
+              {servico?.nome || "Servico"} - {formatarMoeda(servico?.preco || 0)}
+            </p>
+          </div>
+          <button onClick={onClose} type="button">
+            Fechar
+          </button>
+        </div>
+
+        <div className="sale-products">
+          {produtos.length === 0 ? (
+            <div className="empty-state">Nenhum produto cadastrado para adicionar na venda.</div>
+          ) : (
+            produtos.map((produto) => (
+              <label className="sale-product-row" key={produto.id}>
+                <ProductPhoto produto={produto} />
+                <span>
+                  <strong>{produto.nome}</strong>
+                  <small>
+                    {formatarMoeda(produto.preco || 0)} · estoque {produto.estoque || 0}
+                  </small>
+                </span>
+                <input
+                  min="0"
+                  onChange={(event) =>
+                    setItensVenda((atual) => ({
+                      ...atual,
+                      [produto.id]: event.target.value,
+                    }))
+                  }
+                  placeholder="0"
+                  type="number"
+                  value={itensVenda[produto.id] || ""}
+                />
+              </label>
+            ))
+          )}
+        </div>
+
+        <div className="sale-total">
+          <span>Total do atendimento</span>
+          <strong>{formatarMoeda(total)}</strong>
+        </div>
+
+        <button className="admin-pill-button primary wide" disabled={finalizando} onClick={onConfirm} type="button">
+          {finalizando ? "Finalizando..." : "Finalizar e lancar financeiro"}
+        </button>
+      </article>
+    </section>
+  );
+}
+
+function ProductPhoto({ produto }: { produto: Produto }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={produto.foto_url ? "product-photo with-image" : "product-photo"}
+      style={produto.foto_url ? { backgroundImage: `url(${produto.foto_url})` } : undefined}
+    >
+      {!produto.foto_url && produto.nome.slice(0, 2)}
+    </span>
   );
 }
 
@@ -729,6 +1154,69 @@ function formatarAniversario(data?: string | null) {
 
   const [, mes, dia] = data.split("-");
   return `${dia}/${mes}`;
+}
+
+function formatarMoeda(valor: number) {
+  return new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" }).format(valor);
+}
+
+function filtrarVendasPorPeriodo(vendas: Venda[], periodo: PeriodoFinanceiro) {
+  if (periodo === "todos") return vendas;
+
+  const hoje = new Date();
+  const inicio = new Date(hoje);
+  inicio.setHours(0, 0, 0, 0);
+
+  if (periodo === "7") inicio.setDate(inicio.getDate() - 6);
+  if (periodo === "30") inicio.setDate(inicio.getDate() - 29);
+
+  return vendas.filter((venda) => new Date(venda.created_at) >= inicio);
+}
+
+function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], produtos: Produto[]) {
+  const produtoTotais = new Map<string, number>();
+  const servicoTotais = new Map<string, number>();
+  const produtosComGiro = new Set<number>();
+
+  vendas.forEach((venda) => {
+    venda.venda_itens?.forEach((item) => {
+      const produto = firstRelation(item.produtos);
+      if (!produto?.nome) return;
+      produtoTotais.set(produto.nome, (produtoTotais.get(produto.nome) || 0) + item.quantidade);
+      if (item.produto_id) produtosComGiro.add(item.produto_id);
+    });
+
+    const agendamento = firstRelation(venda.agendamentos);
+    const servico = firstRelation(agendamento?.servicos || null);
+    if (servico?.nome) {
+      servicoTotais.set(servico.nome, (servicoTotais.get(servico.nome) || 0) + 1);
+    }
+  });
+
+  if (servicoTotais.size === 0) {
+    agendamentos
+      .filter((agendamento) => agendamento.status === "finalizado")
+      .forEach((agendamento) => {
+        const servico = firstRelation(agendamento.servicos);
+        if (!servico?.nome) return;
+        servicoTotais.set(servico.nome, (servicoTotais.get(servico.nome) || 0) + 1);
+      });
+  }
+
+  return {
+    estoqueBaixo: produtos.filter((produto) => (produto.estoque || 0) <= 2),
+    produtosMaisVendidos: ordenarRanking(produtoTotais),
+    produtosSemGiro: produtos.filter((produto) => !produtosComGiro.has(produto.id)),
+    servicosMaisVendidos: ordenarRanking(servicoTotais),
+    totalReceita: vendas.reduce((total, venda) => total + (venda.total || 0), 0),
+  };
+}
+
+function ordenarRanking(totais: Map<string, number>) {
+  return Array.from(totais.entries())
+    .map(([nome, total]) => ({ nome, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
 }
 
 function EditableServicoList({
@@ -850,6 +1338,18 @@ function EditableProdutoList({
               }
               type="number"
               value={produto.estoque || 0}
+            />
+          </label>
+          <label>
+            Foto
+            <input
+              onChange={(event) =>
+                setProdutos(
+                  produtos.map((item) => (item.id === produto.id ? { ...item, foto_url: event.target.value } : item)),
+                )
+              }
+              placeholder="URL da imagem"
+              value={produto.foto_url || ""}
             />
           </label>
           <button className="admin-pill-button primary" onClick={() => onSave(produto)} type="button">

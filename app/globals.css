@@ -1031,6 +1031,29 @@ th {
   text-align: left;
 }
 
+.admin-menu button,
+.admin-mobile-nav button {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+}
+
+.admin-menu button span,
+.admin-mobile-nav button span {
+  display: grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: #ffb09a;
+}
+
+.admin-menu button strong,
+.admin-mobile-nav button strong {
+  font: inherit;
+}
+
 .admin-menu button:hover,
 .admin-menu button.active {
   border-color: rgb(255 112 74 / 0.18);
@@ -1178,7 +1201,195 @@ th {
 }
 
 .admin-panel .editable-row {
-  grid-template-columns: 1fr 120px 120px auto;
+  grid-template-columns: 1fr 110px 110px 1fr auto;
+}
+
+.admin-mobile-nav {
+  display: none;
+}
+
+.appointment-card-list,
+.product-stock-list,
+.sale-products {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.admin-appointment-card,
+.product-stock-card,
+.sale-product-row {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  background: #17191f;
+}
+
+.admin-appointment-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.admin-appointment-card strong,
+.admin-appointment-card span {
+  display: block;
+}
+
+.admin-appointment-card span,
+.admin-appointment-card dt,
+.admin-appointment-card small {
+  color: #aab2bf;
+}
+
+.admin-appointment-card dl {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.admin-appointment-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-appointment-card dd {
+  margin: 0;
+  text-align: right;
+  text-transform: capitalize;
+}
+
+.finance-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.finance-filter button {
+  min-height: 2.7rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 999px;
+  background: #17191f;
+  color: #cfd5df;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 0.65rem 1rem;
+}
+
+.finance-filter button.active {
+  border-color: rgb(255 112 74 / 0.24);
+  background: linear-gradient(135deg, rgb(255 75 38 / 0.36), rgb(22 101 52 / 0.24));
+  color: #ffffff;
+}
+
+.product-stock-card,
+.sale-product-row {
+  align-items: center;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: auto 1fr auto;
+  padding: 0.8rem;
+}
+
+.product-photo {
+  display: grid;
+  width: 3.4rem;
+  height: 3.4rem;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff4b26, #166534);
+  color: #ffffff;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.product-photo.with-image {
+  background-position: center;
+  background-size: cover;
+}
+
+.product-stock-card strong,
+.product-stock-card small {
+  display: block;
+}
+
+.product-stock-card small,
+.sale-product-row small {
+  color: #aab2bf;
+}
+
+.product-stock-card em {
+  color: #ffb09a;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.sale-modal-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.72);
+  padding: 1rem;
+}
+
+.sale-modal {
+  display: grid;
+  width: min(100%, 720px);
+  max-height: min(92vh, 760px);
+  overflow-y: auto;
+  gap: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 8px;
+  background: #111217;
+  box-shadow: 0 32px 100px rgb(0 0 0 / 0.5);
+  padding: clamp(1rem, 3vw, 1.35rem);
+}
+
+.sale-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sale-modal-header h2 {
+  margin: 0.2rem 0 0;
+  font-size: clamp(1.5rem, 4vw, 2.4rem);
+}
+
+.sale-modal-header button {
+  height: fit-content;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 999px;
+  background: transparent;
+  color: #f8fafc;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 0.65rem 1rem;
+}
+
+.sale-product-row input {
+  max-width: 7rem;
+  text-align: center;
+}
+
+.sale-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+  padding-top: 1rem;
+}
+
+.sale-total span {
+  color: #aab2bf;
+}
+
+.sale-total strong {
+  color: #ffb09a;
+  font-size: 1.5rem;
 }
 
 @media (max-width: 760px) {
@@ -1253,21 +1464,15 @@ th {
 
   .admin-dashboard {
     grid-template-columns: 1fr;
+    padding-bottom: 5.8rem;
   }
 
   .admin-sidebar {
-    position: static;
-    min-height: auto;
+    display: none;
   }
 
-  .admin-menu {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-menu button,
-  .admin-sidebar-footer a,
-  .admin-sidebar-footer button {
-    text-align: center;
+  .admin-main {
+    padding: 1rem;
   }
 
   .admin-header,
@@ -1287,5 +1492,75 @@ th {
 
   .admin-panel .editable-row {
     grid-template-columns: 1fr;
+  }
+
+  .admin-mobile-nav {
+    position: fixed;
+    z-index: 30;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.25rem;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: 999px;
+    background: rgb(17 18 23 / 0.92);
+    box-shadow: 0 20px 60px rgb(0 0 0 / 0.45);
+    padding: 0.35rem;
+  }
+
+  .admin-mobile-nav button {
+    min-width: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #cfd5df;
+    cursor: pointer;
+    display: grid;
+    gap: 0.2rem;
+    justify-items: center;
+    padding: 0.55rem 0.25rem;
+  }
+
+  .admin-mobile-nav button span {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .admin-mobile-nav button strong {
+    font-size: 0.68rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-mobile-nav button.active {
+    background: linear-gradient(135deg, rgb(255 75 38 / 0.36), rgb(22 101 52 / 0.28));
+    color: #ffffff;
+  }
+
+  .admin-header h1 {
+    font-size: clamp(2.3rem, 14vw, 3.4rem);
+  }
+
+  .admin-appointment-card dl div,
+  .sale-modal-header,
+  .sale-total {
+    display: grid;
+  }
+
+  .admin-appointment-card dd {
+    text-align: left;
+  }
+
+  .sale-product-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .sale-product-row input {
+    grid-column: 1 / -1;
+    max-width: none;
   }
 }
