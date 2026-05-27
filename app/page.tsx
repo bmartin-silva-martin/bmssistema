@@ -128,7 +128,7 @@ export default function AdminDashboard() {
   const [loginSenha, setLoginSenha] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loginCarregando, setLoginCarregando] = useState(false);
-  const [activeSection, setActiveSection] = useState<AdminSection>("visao");
+  const [activeSection, setActiveSection] = useState<AdminSection>("agenda");
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [servicos, setServicos] = useState<Servico[]>([]);
@@ -453,6 +453,25 @@ export default function AdminDashboard() {
     setMensagem("Link publico copiado para enviar aos clientes.");
   }
 
+  function enviarLembrete(agendamento: Agendamento) {
+    const cliente = firstRelation(agendamento.clientes);
+    const servico = firstRelation(agendamento.servicos);
+    const telefoneLimpo = cliente?.telefone?.replace(/\D/g, "");
+
+    if (!telefoneLimpo) {
+      setMensagem("Este cliente nao informou WhatsApp no agendamento.");
+      return;
+    }
+
+    const texto = encodeURIComponent(
+      `Ola, ${cliente?.nome || "tudo bem"}! Passando para lembrar seu agendamento de ${servico?.nome || "servico"} em ${new Date(
+        agendamento.data_agendamento,
+      ).toLocaleString("pt-BR")}.`,
+    );
+
+    window.open(`https://wa.me/55${telefoneLimpo}?text=${texto}`, "_blank", "noopener,noreferrer");
+  }
+
   function abrirFinalizacao(agendamento: Agendamento) {
     setAtendimentoAberto(agendamento);
     setItensVenda({});
@@ -671,8 +690,8 @@ export default function AdminDashboard() {
       <section className="admin-main">
         <header className="admin-header">
           <div className="mobile-app-topbar">
-            {activeSection !== "visao" ? (
-              <button aria-label="Voltar" onClick={() => abrirSecao("visao")} type="button">
+            {activeSection !== "agenda" ? (
+              <button aria-label="Voltar" onClick={() => abrirSecao("agenda")} type="button">
                 ←
               </button>
             ) : (
@@ -685,8 +704,8 @@ export default function AdminDashboard() {
 
           <div>
             <p className="admin-kicker">Painel da barbearia</p>
-            <h1>{empresa?.nome || "BMS Sistema"}</h1>
-            <p>Agenda, servicos, produtos e relacionamento com clientes em areas separadas.</p>
+            <h1>{activeSection === "agenda" ? "Olá, barbeiro" : empresa?.nome || "BMS Sistema"}</h1>
+            <p>{activeSection === "agenda" ? "Você está em sua agenda." : "Gerencie sua barbearia em uma tela simples."}</p>
           </div>
 
           <div className="admin-header-actions">
@@ -738,21 +757,18 @@ export default function AdminDashboard() {
 
               <article className="admin-panel">
                 <h2>Proximos lembretes</h2>
-                <AppointmentList agendamentos={proximosAgendamentos} onFinish={abrirFinalizacao} />
+                <AppointmentList agendamentos={proximosAgendamentos} onFinish={abrirFinalizacao} onNotify={enviarLembrete} />
               </article>
             </section>
           </AdminSectionShell>
         )}
 
         {activeSection === "agenda" && (
-          <AdminSectionShell
-            description="Veja os proximos clientes agendados e use esta area para acompanhar lembretes."
-            title="Agenda"
-          >
+          <AdminSectionShell description="Veja os clientes do dia, envie lembretes e finalize atendimentos." title="Agenda">
             <AgendaHero agendamentos={agendamentos} dias={diasAgendaPainel} vendas={vendas} />
             <article className="admin-panel">
-              <h2>Agendamentos ativos</h2>
-              <AppointmentList agendamentos={agendamentos} onFinish={abrirFinalizacao} />
+              <h2>Agenda do dia</h2>
+              <AppointmentList agendamentos={agendamentos} onFinish={abrirFinalizacao} onNotify={enviarLembrete} />
             </article>
           </AdminSectionShell>
         )}
@@ -764,13 +780,13 @@ export default function AdminDashboard() {
           >
             <section className="admin-two-columns">
               <article className="admin-panel">
-                <h2>Cadastrar servico</h2>
+                <h2>Inserir um novo servico</h2>
                 <form className="form-stack admin-form" onSubmit={cadastrarServico}>
                   <label>
                     Nome
                     <input
                       onChange={(event) => setServicoForm((form) => ({ ...form, nome: event.target.value }))}
-                      placeholder="Corte masculino"
+                      placeholder="Ex: Corte masculino"
                       value={servicoForm.nome}
                     />
                   </label>
@@ -779,7 +795,7 @@ export default function AdminDashboard() {
                     <input
                       inputMode="decimal"
                       onChange={(event) => setServicoForm((form) => ({ ...form, preco: event.target.value }))}
-                      placeholder="50"
+                      placeholder="R$ 0,00"
                       type="number"
                       value={servicoForm.preco}
                     />
@@ -794,13 +810,13 @@ export default function AdminDashboard() {
                     />
                   </label>
                   <button className="admin-pill-button primary wide" disabled={salvandoServico} type="submit">
-                    {salvandoServico ? "Salvando..." : "Cadastrar servico"}
+                    {salvandoServico ? "Salvando..." : "Adicionar a lista"}
                   </button>
                 </form>
               </article>
 
               <article className="admin-panel">
-                <h2>Editar servicos</h2>
+                <h2>Lista de servicos</h2>
                 <EditableServicoList servicos={servicos} setServicos={setServicos} onSave={atualizarServico} />
               </article>
             </section>
@@ -814,14 +830,14 @@ export default function AdminDashboard() {
           >
             <section className="admin-two-columns">
               <article className="admin-panel">
-                <h2>Cadastrar produto</h2>
+                <h2>Insira um novo produto</h2>
                 {produtoAviso && <p className="notice notice-error">{produtoAviso}</p>}
                 <form className="form-stack admin-form" onSubmit={cadastrarProduto}>
                   <label>
                     Nome
                     <input
                       onChange={(event) => setProdutoForm((form) => ({ ...form, nome: event.target.value }))}
-                      placeholder="Pomada modeladora"
+                      placeholder="Ex: Pomada"
                       value={produtoForm.nome}
                     />
                   </label>
@@ -830,7 +846,7 @@ export default function AdminDashboard() {
                     <input
                       inputMode="decimal"
                       onChange={(event) => setProdutoForm((form) => ({ ...form, preco: event.target.value }))}
-                      placeholder="35"
+                      placeholder="R$ 0,00"
                       type="number"
                       value={produtoForm.preco}
                     />
@@ -840,7 +856,7 @@ export default function AdminDashboard() {
                     <input
                       inputMode="decimal"
                       onChange={(event) => setProdutoForm((form) => ({ ...form, comissao: event.target.value }))}
-                      placeholder="20"
+                      placeholder="Ex: 20%"
                       type="number"
                       value={produtoForm.comissao}
                     />
@@ -868,13 +884,13 @@ export default function AdminDashboard() {
                     disabled={salvandoProduto || Boolean(produtoAviso)}
                     type="submit"
                   >
-                    {salvandoProduto ? "Salvando..." : "Cadastrar produto"}
+                    {salvandoProduto ? "Salvando..." : "Adicionar a lista"}
                   </button>
                 </form>
               </article>
 
               <article className="admin-panel">
-                <h2>Editar produtos</h2>
+                <h2>Lista de produtos</h2>
                 <EditableProdutoList produtos={produtos} setProdutos={setProdutos} onSave={atualizarProduto} />
               </article>
             </section>
@@ -976,8 +992,7 @@ export default function AdminDashboard() {
       </section>
 
       <nav className="admin-mobile-nav" aria-label="Menu principal mobile">
-        <AdminMenuButton active={activeSection === "visao"} icon="⌂" label="Inicio" onClick={() => abrirSecao("visao")} />
-        <AdminMenuButton active={activeSection === "agenda"} icon="◷" label="Agenda" onClick={() => abrirSecao("agenda")} />
+        <AdminMenuButton active={activeSection === "agenda"} icon="⌂" label="Inicio" onClick={() => abrirSecao("agenda")} />
         <AdminMenuButton
           active={activeSection === "servicos"}
           icon="✂"
@@ -991,6 +1006,7 @@ export default function AdminDashboard() {
           onClick={() => abrirSecao("produtos")}
         />
         <AdminMenuButton active={activeSection === "financeiro"} icon="$" label="Caixa" onClick={() => abrirSecao("financeiro")} />
+        <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => abrirSecao("clientes")} />
       </nav>
 
       {atendimentoAberto && (
@@ -1073,8 +1089,11 @@ function MobileDrawer({
         </button>
         <h2>INBARBER</h2>
         <nav>
+          <button onClick={() => onNavigate("agenda")} type="button">
+            Inicio
+          </button>
           <button onClick={() => onNavigate("visao")} type="button">
-            Meu link
+            Meu link do cliente
           </button>
           <button onClick={() => onNavigate("clientes")} type="button">
             Clientes
@@ -1163,9 +1182,11 @@ function MetricCard({ helper, label, value }: { helper: string; label: string; v
 function AppointmentList({
   agendamentos,
   onFinish,
+  onNotify,
 }: {
   agendamentos: Agendamento[];
   onFinish?: (agendamento: Agendamento) => void;
+  onNotify?: (agendamento: Agendamento) => void;
 }) {
   if (agendamentos.length === 0) {
     return <div className="empty-state">Nenhum agendamento ativo por enquanto.</div>;
@@ -1197,11 +1218,18 @@ function AppointmentList({
                 <dd>{agendamento.status}</dd>
               </div>
             </dl>
-            {onFinish && agendamento.status !== "finalizado" && (
-              <button className="admin-pill-button primary wide" onClick={() => onFinish(agendamento)} type="button">
-                Finalizar atendimento
-              </button>
-            )}
+            <div className="appointment-actions">
+              {onNotify && (
+                <button className="admin-pill-button secondary" onClick={() => onNotify(agendamento)} type="button">
+                  Enviar lembrete
+                </button>
+              )}
+              {onFinish && agendamento.status !== "finalizado" && (
+                <button className="admin-pill-button primary" onClick={() => onFinish(agendamento)} type="button">
+                  Finalizar
+                </button>
+              )}
+            </div>
           </article>
         );
       })}
