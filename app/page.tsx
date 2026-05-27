@@ -22,6 +22,7 @@ type Servico = {
 };
 
 type Produto = {
+  comissao_percentual?: number | null;
   foto_url?: string | null;
   id: number;
   nome: string;
@@ -82,9 +83,34 @@ type RankingItem = {
 
 type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "financeiro" | "clientes";
 type PeriodoFinanceiro = "hoje" | "7" | "30" | "todos";
+type DiaPainel = {
+  dia: string;
+  iso: string;
+  labelCompleto: string;
+  semana: string;
+};
+
+const diasCurtos = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+const mesesCurtos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 function firstRelation<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] || null : value;
+}
+
+function montarDiasDoPainel() {
+  const hoje = new Date();
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const data = new Date(hoje);
+    data.setDate(hoje.getDate() + index);
+
+    return {
+      dia: String(data.getDate()).padStart(2, "0"),
+      iso: data.toISOString().slice(0, 10),
+      labelCompleto: `${String(data.getDate()).padStart(2, "0")} ${mesesCurtos[data.getMonth()]} ${data.getFullYear()}`,
+      semana: diasCurtos[data.getDay()],
+    };
+  });
 }
 
 function formatarErroSupabase(errorMessage: string) {
@@ -103,6 +129,7 @@ export default function AdminDashboard() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loginCarregando, setLoginCarregando] = useState(false);
   const [activeSection, setActiveSection] = useState<AdminSection>("visao");
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -113,7 +140,7 @@ export default function AdminDashboard() {
   const [produtoAviso, setProdutoAviso] = useState("");
   const [financeiroAviso, setFinanceiroAviso] = useState("");
   const [servicoForm, setServicoForm] = useState({ duracao: "30", nome: "", preco: "" });
-  const [produtoForm, setProdutoForm] = useState({ estoque: "0", foto_url: "", nome: "", preco: "" });
+  const [produtoForm, setProdutoForm] = useState({ comissao: "", estoque: "0", foto_url: "", nome: "", preco: "" });
   const [periodoFinanceiro, setPeriodoFinanceiro] = useState<PeriodoFinanceiro>("hoje");
   const [atendimentoAberto, setAtendimentoAberto] = useState<Agendamento | null>(null);
   const [itensVenda, setItensVenda] = useState<Record<number, string>>({});
@@ -122,6 +149,7 @@ export default function AdminDashboard() {
   const [finalizandoVenda, setFinalizandoVenda] = useState(false);
 
   const linkPublico = typeof window === "undefined" ? "/agendamentos" : `${window.location.origin}/agendamentos`;
+  const diasAgendaPainel = useMemo(() => montarDiasDoPainel(), []);
 
   const ranking = useMemo(() => {
     const totais = new Map<string, number>();
@@ -179,7 +207,11 @@ export default function AdminDashboard() {
         .eq("empresa_id", EMPRESA_ID)
         .neq("status", "cancelado")
         .order("data_agendamento", { ascending: true }),
-      supabase.from("produtos").select("id,nome,preco,estoque,foto_url").eq("empresa_id", EMPRESA_ID).order("nome"),
+      supabase
+        .from("produtos")
+        .select("id,nome,preco,estoque,foto_url,comissao_percentual")
+        .eq("empresa_id", EMPRESA_ID)
+        .order("nome"),
       supabase
         .from("clientes")
         .select("nome,telefone,data_nascimento")
@@ -356,6 +388,7 @@ export default function AdminDashboard() {
     setSalvandoProduto(true);
     const { error } = await supabase.from("produtos").insert({
       empresa_id: EMPRESA_ID,
+      comissao_percentual: produtoForm.comissao ? Number(produtoForm.comissao) : null,
       estoque: Number(produtoForm.estoque || 0),
       foto_url: produtoForm.foto_url.trim() || null,
       nome: produtoForm.nome.trim(),
@@ -368,7 +401,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    setProdutoForm({ estoque: "0", foto_url: "", nome: "", preco: "" });
+    setProdutoForm({ comissao: "", estoque: "0", foto_url: "", nome: "", preco: "" });
     await carregarDados();
     setMensagem("Produto cadastrado com sucesso.");
   }
@@ -397,6 +430,7 @@ export default function AdminDashboard() {
     const { error } = await supabase
       .from("produtos")
       .update({
+        comissao_percentual: produto.comissao_percentual || null,
         estoque: produto.estoque || 0,
         foto_url: produto.foto_url || null,
         nome: produto.nome,
@@ -422,6 +456,11 @@ export default function AdminDashboard() {
   function abrirFinalizacao(agendamento: Agendamento) {
     setAtendimentoAberto(agendamento);
     setItensVenda({});
+  }
+
+  function abrirSecao(secao: AdminSection) {
+    setActiveSection(secao);
+    setMobileDrawerOpen(false);
   }
 
   async function finalizarAtendimento() {
@@ -597,28 +636,28 @@ export default function AdminDashboard() {
             active={activeSection === "visao"}
             icon="⌂"
             label="Visao geral"
-            onClick={() => setActiveSection("visao")}
+            onClick={() => abrirSecao("visao")}
           />
-          <AdminMenuButton active={activeSection === "agenda"} icon="◷" label="Agenda" onClick={() => setActiveSection("agenda")} />
+          <AdminMenuButton active={activeSection === "agenda"} icon="◷" label="Agenda" onClick={() => abrirSecao("agenda")} />
           <AdminMenuButton
             active={activeSection === "servicos"}
             icon="✂"
             label="Servicos"
-            onClick={() => setActiveSection("servicos")}
+            onClick={() => abrirSecao("servicos")}
           />
           <AdminMenuButton
             active={activeSection === "produtos"}
             icon="▣"
             label="Produtos"
-            onClick={() => setActiveSection("produtos")}
+            onClick={() => abrirSecao("produtos")}
           />
           <AdminMenuButton
             active={activeSection === "financeiro"}
             icon="$"
             label="Financeiro"
-            onClick={() => setActiveSection("financeiro")}
+            onClick={() => abrirSecao("financeiro")}
           />
-          <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => setActiveSection("clientes")} />
+          <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => abrirSecao("clientes")} />
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -631,6 +670,19 @@ export default function AdminDashboard() {
 
       <section className="admin-main">
         <header className="admin-header">
+          <div className="mobile-app-topbar">
+            {activeSection !== "visao" ? (
+              <button aria-label="Voltar" onClick={() => abrirSecao("visao")} type="button">
+                ←
+              </button>
+            ) : (
+              <span />
+            )}
+            <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
+              ☰
+            </button>
+          </div>
+
           <div>
             <p className="admin-kicker">Painel da barbearia</p>
             <h1>{empresa?.nome || "BMS Sistema"}</h1>
@@ -646,6 +698,15 @@ export default function AdminDashboard() {
             </Link>
           </div>
         </header>
+
+        <MobileDrawer
+          email={session.user.email || ""}
+          isOpen={mobileDrawerOpen}
+          linkPublico={linkPublico}
+          onClose={() => setMobileDrawerOpen(false)}
+          onLogout={sairDoPainel}
+          onNavigate={abrirSecao}
+        />
 
         {activeSection === "visao" && (
           <AdminSectionShell
@@ -688,6 +749,7 @@ export default function AdminDashboard() {
             description="Veja os proximos clientes agendados e use esta area para acompanhar lembretes."
             title="Agenda"
           >
+            <AgendaHero agendamentos={agendamentos} dias={diasAgendaPainel} vendas={vendas} />
             <article className="admin-panel">
               <h2>Agendamentos ativos</h2>
               <AppointmentList agendamentos={agendamentos} onFinish={abrirFinalizacao} />
@@ -771,6 +833,16 @@ export default function AdminDashboard() {
                       placeholder="35"
                       type="number"
                       value={produtoForm.preco}
+                    />
+                  </label>
+                  <label>
+                    Comissao (%)
+                    <input
+                      inputMode="decimal"
+                      onChange={(event) => setProdutoForm((form) => ({ ...form, comissao: event.target.value }))}
+                      placeholder="20"
+                      type="number"
+                      value={produtoForm.comissao}
                     />
                   </label>
                   <label>
@@ -904,21 +976,21 @@ export default function AdminDashboard() {
       </section>
 
       <nav className="admin-mobile-nav" aria-label="Menu principal mobile">
-        <AdminMenuButton active={activeSection === "visao"} icon="⌂" label="Inicio" onClick={() => setActiveSection("visao")} />
-        <AdminMenuButton active={activeSection === "agenda"} icon="◷" label="Agenda" onClick={() => setActiveSection("agenda")} />
+        <AdminMenuButton active={activeSection === "visao"} icon="⌂" label="Inicio" onClick={() => abrirSecao("visao")} />
+        <AdminMenuButton active={activeSection === "agenda"} icon="◷" label="Agenda" onClick={() => abrirSecao("agenda")} />
         <AdminMenuButton
           active={activeSection === "servicos"}
           icon="✂"
           label="Servicos"
-          onClick={() => setActiveSection("servicos")}
+          onClick={() => abrirSecao("servicos")}
         />
         <AdminMenuButton
           active={activeSection === "produtos"}
           icon="▣"
           label="Produtos"
-          onClick={() => setActiveSection("produtos")}
+          onClick={() => abrirSecao("produtos")}
         />
-        <AdminMenuButton active={activeSection === "financeiro"} icon="$" label="Caixa" onClick={() => setActiveSection("financeiro")} />
+        <AdminMenuButton active={activeSection === "financeiro"} icon="$" label="Caixa" onClick={() => abrirSecao("financeiro")} />
       </nav>
 
       {atendimentoAberto && (
@@ -972,6 +1044,108 @@ function AdminSectionShell({
         <p>{description}</p>
       </div>
       {children}
+    </section>
+  );
+}
+
+function MobileDrawer({
+  email,
+  isOpen,
+  linkPublico,
+  onClose,
+  onLogout,
+  onNavigate,
+}: {
+  email: string;
+  isOpen: boolean;
+  linkPublico: string;
+  onClose: () => void;
+  onLogout: () => void;
+  onNavigate: (secao: AdminSection) => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <section className="mobile-drawer-backdrop">
+      <aside className="mobile-drawer" aria-label="Menu mobile">
+        <button aria-label="Fechar menu" className="mobile-drawer-close" onClick={onClose} type="button">
+          ×
+        </button>
+        <h2>INBARBER</h2>
+        <nav>
+          <button onClick={() => onNavigate("visao")} type="button">
+            Meu link
+          </button>
+          <button onClick={() => onNavigate("clientes")} type="button">
+            Clientes
+          </button>
+          <button onClick={() => onNavigate("agenda")} type="button">
+            Agenda
+          </button>
+          <button onClick={() => onNavigate("financeiro")} type="button">
+            Faturamento
+          </button>
+          <button onClick={() => onNavigate("produtos")} type="button">
+            Produtos
+          </button>
+          <a href={linkPublico}>Link de agendamento</a>
+        </nav>
+        <footer>
+          <div>
+            <strong>{email || "Usuario"}</strong>
+            <span>Conta do painel</span>
+          </div>
+          <button onClick={onLogout} type="button">
+            Sair →
+          </button>
+        </footer>
+      </aside>
+    </section>
+  );
+}
+
+function AgendaHero({ agendamentos, dias, vendas }: { agendamentos: Agendamento[]; dias: DiaPainel[]; vendas: Venda[] }) {
+  const hojeIso = new Date().toISOString().slice(0, 10);
+  const agendamentosHoje = agendamentos.filter((item) => item.data_agendamento.slice(0, 10) === hojeIso);
+  const vendasHoje = vendas.filter((venda) => venda.created_at.slice(0, 10) === hojeIso);
+  const totalHoje = vendasHoje.reduce((total, venda) => total + (venda.total || 0), 0);
+  const totalSemana = vendas.reduce((total, venda) => total + (venda.total || 0), 0);
+
+  return (
+    <section className="agenda-hero">
+      <div className="agenda-title-row">
+        <div>
+          <h2>Olá, barbeiro</h2>
+          <p>Você está em sua agenda.</p>
+        </div>
+        <button type="button">☰</button>
+      </div>
+
+      <strong className="agenda-week-label">
+        {dias[0]?.labelCompleto} à {dias[dias.length - 1]?.labelCompleto}
+      </strong>
+
+      <div className="agenda-day-strip">
+        {dias.map((dia, index) => (
+          <span className={index === 0 ? "active" : ""} key={dia.iso}>
+            <small>{dia.semana}</small>
+            <strong>{dia.dia}</strong>
+          </span>
+        ))}
+      </div>
+
+      <div className="agenda-summary-grid">
+        <article className="hot">
+          <span>Hoje</span>
+          <strong>{formatarMoeda(totalHoje)}</strong>
+          <em>{agendamentosHoje.length}</em>
+        </article>
+        <article>
+          <span>Esta semana</span>
+          <strong>{formatarMoeda(totalSemana)}</strong>
+          <em>{agendamentos.length}</em>
+        </article>
+      </div>
     </section>
   );
 }
@@ -1338,6 +1512,20 @@ function EditableProdutoList({
               }
               type="number"
               value={produto.estoque || 0}
+            />
+          </label>
+          <label>
+            Comissao
+            <input
+              onChange={(event) =>
+                setProdutos(
+                  produtos.map((item) =>
+                    item.id === produto.id ? { ...item, comissao_percentual: Number(event.target.value) } : item,
+                  ),
+                )
+              }
+              type="number"
+              value={produto.comissao_percentual || 0}
             />
           </label>
           <label>
