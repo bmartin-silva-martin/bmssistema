@@ -135,6 +135,10 @@ export default function AgendamentoPublicoPage() {
   const primeiroNome = nome.trim().split(" ")[0] || "tudo bem";
   const servicoSelecionado = servicos.find((servico) => servico.id === servicoId);
   const diaSelecionado = useMemo(() => diasAgenda.find((dia) => dia.valor === data), [data, diasAgenda]);
+  const horariosValidos = useMemo(
+    () => horariosDisponiveis.filter((hora) => !horarioJaPassou(data, hora)),
+    [data, horariosDisponiveis],
+  );
 
   function rolarParaProximaEtapa() {
     window.setTimeout(() => {
@@ -483,34 +487,32 @@ export default function AgendamentoPublicoPage() {
               ))}
             </div>
 
-            <div className="chat-time-grid">
-              {horariosDisponiveis.map((hora) => {
-                const indisponivel = ocupados.includes(hora);
-                const passou = horarioJaPassou(data, hora);
+            {horariosValidos.length === 0 ? (
+              <div className="chat-empty">Nao ha horarios disponiveis para este dia. Escolha outro dia.</div>
+            ) : (
+              <div className="chat-time-grid">
+                {horariosValidos.map((hora) => {
+                  const indisponivel = ocupados.includes(hora);
 
-                return (
-                  <button
-                    aria-pressed={horario === hora}
-                    className="chat-time-button"
-                    disabled={indisponivel || passou}
-                    key={hora}
-                    onClick={() => {
-                      if (passou) {
-                        setMensagem("Esse horario ja passou. Escolha outro horario disponivel.");
-                        return;
-                      }
-
-                      setHorario(hora);
-                      setHorarioConfirmado(false);
-                      rolarParaProximaEtapa();
-                    }}
-                    type="button"
-                  >
-                    {passou ? `${hora} passou` : hora}
-                  </button>
-                );
-              })}
-            </div>
+                  return (
+                    <button
+                      aria-pressed={horario === hora}
+                      className="chat-time-button"
+                      disabled={indisponivel}
+                      key={hora}
+                      onClick={() => {
+                        setHorario(hora);
+                        setHorarioConfirmado(false);
+                        rolarParaProximaEtapa();
+                      }}
+                      type="button"
+                    >
+                      {indisponivel ? `${hora} ocupado` : hora}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             <button
               className="chat-action-button"
