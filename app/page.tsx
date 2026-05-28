@@ -1430,58 +1430,102 @@ function EditableServicoList({
   servicos: Servico[];
   setServicos: Dispatch<SetStateAction<Servico[]>>;
 }) {
+  const [busca, setBusca] = useState("");
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [limite, setLimite] = useState(6);
+  const servicosFiltrados = servicos.filter((servico) => normalizarBusca(servico.nome).includes(normalizarBusca(busca)));
+  const servicosVisiveis = servicosFiltrados.slice(0, limite);
+
   if (servicos.length === 0) {
     return <div className="empty-state">Nenhum servico cadastrado ainda.</div>;
   }
 
   return (
-    <div className="editable-list">
-      {servicos.map((servico) => (
-        <article className="editable-row" key={servico.id}>
-          <label>
-            Nome
-            <input
-              onChange={(event) =>
-                setServicos(
-                  servicos.map((item) => (item.id === servico.id ? { ...item, nome: event.target.value } : item)),
-                )
-              }
-              value={servico.nome}
-            />
-          </label>
-          <label>
-            Preco
-            <input
-              onChange={(event) =>
-                setServicos(
-                  servicos.map((item) =>
-                    item.id === servico.id ? { ...item, preco: Number(event.target.value) } : item,
-                  ),
-                )
-              }
-              type="number"
-              value={servico.preco}
-            />
-          </label>
-          <label>
-            Duracao
-            <input
-              onChange={(event) =>
-                setServicos(
-                  servicos.map((item) =>
-                    item.id === servico.id ? { ...item, duracao: Number(event.target.value) } : item,
-                  ),
-                )
-              }
-              type="number"
-              value={servico.duracao || 30}
-            />
-          </label>
-          <button className="admin-pill-button primary" onClick={() => onSave(servico)} type="button">
-            Salvar
-          </button>
-        </article>
-      ))}
+    <div className="compact-manager">
+      <input
+        className="manager-search"
+        onChange={(event) => {
+          setBusca(event.target.value);
+          setLimite(6);
+        }}
+        placeholder="Buscar servico"
+        value={busca}
+      />
+      <div className="compact-list">
+        {servicosVisiveis.map((servico) => {
+          const editando = editandoId === servico.id;
+
+          return (
+            <article className="compact-row service-row" key={servico.id}>
+              <span className="drag-dots" aria-hidden="true">
+                ⋮
+              </span>
+              <div className="compact-row-main">
+                <strong>{servico.nome}</strong>
+                <span>
+                  {servico.duracao || 30} min. - {formatarMoeda(servico.preco || 0)}
+                </span>
+              </div>
+              <button className="row-icon-button" onClick={() => setEditandoId(editando ? null : servico.id)} type="button">
+                Editar
+              </button>
+
+              {editando && (
+                <div className="compact-edit-panel">
+                  <label>
+                    Nome
+                    <input
+                      onChange={(event) =>
+                        setServicos(
+                          servicos.map((item) => (item.id === servico.id ? { ...item, nome: event.target.value } : item)),
+                        )
+                      }
+                      value={servico.nome}
+                    />
+                  </label>
+                  <label>
+                    Preco
+                    <input
+                      onChange={(event) =>
+                        setServicos(
+                          servicos.map((item) =>
+                            item.id === servico.id ? { ...item, preco: Number(event.target.value) } : item,
+                          ),
+                        )
+                      }
+                      type="number"
+                      value={servico.preco}
+                    />
+                  </label>
+                  <label>
+                    Duracao
+                    <input
+                      onChange={(event) =>
+                        setServicos(
+                          servicos.map((item) =>
+                            item.id === servico.id ? { ...item, duracao: Number(event.target.value) } : item,
+                          ),
+                        )
+                      }
+                      type="number"
+                      value={servico.duracao || 30}
+                    />
+                  </label>
+                  <button className="admin-pill-button primary" onClick={() => onSave(servico)} type="button">
+                    Salvar servico
+                  </button>
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      {servicosFiltrados.length === 0 && <div className="empty-state">Nenhum servico encontrado.</div>}
+      {servicosFiltrados.length > limite && (
+        <button className="manager-more-button" onClick={() => setLimite((valor) => valor + 6)} type="button">
+          Ver mais servicos
+        </button>
+      )}
     </div>
   );
 }
@@ -1495,86 +1539,145 @@ function EditableProdutoList({
   produtos: Produto[];
   setProdutos: Dispatch<SetStateAction<Produto[]>>;
 }) {
+  const [busca, setBusca] = useState("");
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [limite, setLimite] = useState(6);
+  const produtosFiltrados = produtos.filter((produto) => normalizarBusca(produto.nome).includes(normalizarBusca(busca)));
+  const produtosVisiveis = produtosFiltrados.slice(0, limite);
+
   if (produtos.length === 0) {
     return <div className="empty-state">Nenhum produto cadastrado ainda.</div>;
   }
 
   return (
-    <div className="editable-list">
-      {produtos.map((produto) => (
-        <article className="editable-row" key={produto.id}>
-          <label>
-            Nome
-            <input
-              onChange={(event) =>
-                setProdutos(
-                  produtos.map((item) => (item.id === produto.id ? { ...item, nome: event.target.value } : item)),
-                )
-              }
-              value={produto.nome}
-            />
-          </label>
-          <label>
-            Preco
-            <input
-              onChange={(event) =>
-                setProdutos(
-                  produtos.map((item) =>
-                    item.id === produto.id ? { ...item, preco: Number(event.target.value) } : item,
-                  ),
-                )
-              }
-              type="number"
-              value={produto.preco || 0}
-            />
-          </label>
-          <label>
-            Estoque
-            <input
-              onChange={(event) =>
-                setProdutos(
-                  produtos.map((item) =>
-                    item.id === produto.id ? { ...item, estoque: Number(event.target.value) } : item,
-                  ),
-                )
-              }
-              type="number"
-              value={produto.estoque || 0}
-            />
-          </label>
-          <label>
-            Comissao
-            <input
-              onChange={(event) =>
-                setProdutos(
-                  produtos.map((item) =>
-                    item.id === produto.id ? { ...item, comissao_percentual: Number(event.target.value) } : item,
-                  ),
-                )
-              }
-              type="number"
-              value={produto.comissao_percentual || 0}
-            />
-          </label>
-          <label>
-            Foto
-            <input
-              onChange={(event) =>
-                setProdutos(
-                  produtos.map((item) => (item.id === produto.id ? { ...item, foto_url: event.target.value } : item)),
-                )
-              }
-              placeholder="URL da imagem"
-              value={produto.foto_url || ""}
-            />
-          </label>
-          <button className="admin-pill-button primary" onClick={() => onSave(produto)} type="button">
-            Salvar
-          </button>
-        </article>
-      ))}
+    <div className="compact-manager">
+      <input
+        className="manager-search"
+        onChange={(event) => {
+          setBusca(event.target.value);
+          setLimite(6);
+        }}
+        placeholder="Buscar produto"
+        value={busca}
+      />
+      <div className="compact-list">
+        {produtosVisiveis.map((produto) => {
+          const editando = editandoId === produto.id;
+
+          return (
+            <article className="compact-row product-row" key={produto.id}>
+              <span className="drag-dots" aria-hidden="true">
+                ⋮
+              </span>
+              {produto.foto_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="" className="compact-row-photo" src={produto.foto_url} />
+              ) : (
+                <span className="compact-row-photo photo-placeholder" aria-hidden="true">
+                  ▣
+                </span>
+              )}
+              <div className="compact-row-main">
+                <strong>{produto.nome}</strong>
+                <span>
+                  {produto.estoque || 0} un. - {formatarMoeda(produto.preco || 0)}
+                </span>
+              </div>
+              <button className="row-icon-button" onClick={() => setEditandoId(editando ? null : produto.id)} type="button">
+                Editar
+              </button>
+
+              {editando && (
+                <div className="compact-edit-panel">
+                  <label>
+                    Nome
+                    <input
+                      onChange={(event) =>
+                        setProdutos(
+                          produtos.map((item) => (item.id === produto.id ? { ...item, nome: event.target.value } : item)),
+                        )
+                      }
+                      value={produto.nome}
+                    />
+                  </label>
+                  <label>
+                    Preco
+                    <input
+                      onChange={(event) =>
+                        setProdutos(
+                          produtos.map((item) =>
+                            item.id === produto.id ? { ...item, preco: Number(event.target.value) } : item,
+                          ),
+                        )
+                      }
+                      type="number"
+                      value={produto.preco || 0}
+                    />
+                  </label>
+                  <label>
+                    Estoque
+                    <input
+                      onChange={(event) =>
+                        setProdutos(
+                          produtos.map((item) =>
+                            item.id === produto.id ? { ...item, estoque: Number(event.target.value) } : item,
+                          ),
+                        )
+                      }
+                      type="number"
+                      value={produto.estoque || 0}
+                    />
+                  </label>
+                  <label>
+                    Comissao
+                    <input
+                      onChange={(event) =>
+                        setProdutos(
+                          produtos.map((item) =>
+                            item.id === produto.id ? { ...item, comissao_percentual: Number(event.target.value) } : item,
+                          ),
+                        )
+                      }
+                      type="number"
+                      value={produto.comissao_percentual || 0}
+                    />
+                  </label>
+                  <label>
+                    Foto
+                    <input
+                      onChange={(event) =>
+                        setProdutos(
+                          produtos.map((item) => (item.id === produto.id ? { ...item, foto_url: event.target.value } : item)),
+                        )
+                      }
+                      placeholder="URL da imagem"
+                      value={produto.foto_url || ""}
+                    />
+                  </label>
+                  <button className="admin-pill-button primary" onClick={() => onSave(produto)} type="button">
+                    Salvar produto
+                  </button>
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      {produtosFiltrados.length === 0 && <div className="empty-state">Nenhum produto encontrado.</div>}
+      {produtosFiltrados.length > limite && (
+        <button className="manager-more-button" onClick={() => setLimite((valor) => valor + 6)} type="button">
+          Ver mais produtos
+        </button>
+      )}
     </div>
   );
+}
+
+function normalizarBusca(valor: string) {
+  return valor
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function RankingList({ items }: { items: RankingItem[] }) {

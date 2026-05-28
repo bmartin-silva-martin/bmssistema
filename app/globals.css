@@ -2206,3 +2206,159 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+.compact-manager {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.manager-search {
+  width: 100%;
+}
+
+.compact-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.compact-row {
+  align-items: center;
+  border: 1px solid rgb(255 255 255 / 0.06);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #181c24, #141820);
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  padding: 0.85rem;
+}
+
+.compact-row.service-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.compact-row.product-row {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+
+.drag-dots {
+  color: #e5e7eb;
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.compact-row-photo {
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 18px;
+  object-fit: cover;
+  background: #242832;
+}
+
+.photo-placeholder {
+  align-items: center;
+  color: #aeb6c4;
+  display: flex;
+  font-size: 1.3rem;
+  justify-content: center;
+}
+
+.compact-row-main {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.compact-row-main strong {
+  color: #ffffff;
+  font-size: 1.08rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-row-main span {
+  color: #aeb6c4;
+  font-size: 0.95rem;
+}
+
+.row-icon-button {
+  min-height: 4.1rem;
+  min-width: 5.2rem;
+  border: 0;
+  border-radius: 18px;
+  background: #10141c;
+  color: #e7eaf0;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.compact-edit-panel {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  margin-top: 0.25rem;
+  padding-top: 0.9rem;
+}
+
+.compact-edit-panel label {
+  display: grid;
+  gap: 0.35rem;
+  color: #c8cdd5;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.compact-edit-panel label:first-child,
+.compact-edit-panel label:last-of-type,
+.compact-edit-panel .admin-pill-button {
+  grid-column: 1 / -1;
+}
+
+.compact-edit-panel input {
+  min-height: 3.4rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 18px;
+  background: #242832;
+  color: #ffffff;
+  padding: 0.8rem 1rem;
+}
+
+.manager-more-button {
+  min-height: 3.6rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 999px;
+  background: #17191f;
+  color: #f8fafc;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.admin-section:has(.compact-manager) .admin-panel {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+@media (max-width: 620px) {
+  .compact-row-photo {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 15px;
+  }
+
+  .row-icon-button {
+    min-width: 4.6rem;
+    font-size: 0.85rem;
+  }
+
+  .compact-edit-panel {
+    grid-template-columns: 1fr;
+  }
+}
