@@ -12,6 +12,8 @@ type Empresa = {
   nome: string;
   plano: string | null;
   ativo: boolean | null;
+  dias_atendimento?: number[] | null;
+  horarios_atendimento?: string[] | null;
 };
 
 type Servico = {
@@ -45,6 +47,8 @@ type Agendamento = {
   cliente_id: number | null;
   id: number;
   data_agendamento: string;
+  lembrete_enviado_em?: string | null;
+  lembrete_status?: string | null;
   servico_id: number | null;
   status: string;
   clientes: ClienteResumo | ClienteResumo[] | null;
@@ -81,7 +85,7 @@ type RankingItem = {
   total: number;
 };
 
-type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "financeiro" | "clientes";
+type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "financeiro" | "clientes" | "configuracoes";
 type PeriodoFinanceiro = "hoje" | "7" | "30" | "todos";
 type DiaPainel = {
   dia: string;
@@ -92,6 +96,25 @@ type DiaPainel = {
 
 const diasCurtos = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const mesesCurtos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const DIAS_ATENDIMENTO_PADRAO = [1, 2, 3, 4, 5, 6];
+const HORARIOS_ATENDIMENTO_PADRAO = [
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "13:30",
+  "13:45",
+  "14:00",
+  "14:15",
+  "14:30",
+  "14:45",
+  "15:00",
+  "16:00",
+  "16:15",
+  "16:30",
+  "17:00",
+];
 
 function firstRelation<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] || null : value;
@@ -111,6 +134,28 @@ function montarDiasDoPainel() {
       semana: diasCurtos[data.getDay()],
     };
   });
+}
+
+function dataLocalISO(data = new Date()) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+
+  return `${ano}-${mes}-${dia}`;
+}
+
+function normalizarTelefoneBrasil(value = "") {
+  let digits = value.replace(/\D/g, "");
+
+  while (digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
+
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
+    digits = `55${digits}`;
+  }
+
+  return digits;
 }
 
 function formatarErroSupabase(errorMessage: string) {
@@ -147,6 +192,10 @@ export default function AdminDashboard() {
   const [salvandoServico, setSalvandoServico] = useState(false);
   const [salvandoProduto, setSalvandoProduto] = useState(false);
   const [finalizandoVenda, setFinalizandoVenda] = useState(false);
+  const [salvandoConfiguracao, setSalvandoConfiguracao] = useState(false);
+  const [configDias, setConfigDias] = useState<number[]>(DIAS_ATENDIMENTO_PADRAO);
+  const [configHorarios, setConfigHorarios] = useState<string[]>(HORARIOS_ATENDIMENTO_PADRAO);
+  const [novoHorario, setNovoHorario] = useState("");
 
   const linkPublico = typeof window === "undefined" ? "/agendamentos" : `${window.location.origin}/agendamentos`;
   const diasAgendaPainel = useMemo(() => montarDiasDoPainel(), []);
@@ -170,6 +219,21 @@ export default function AdminDashboard() {
     return [...agendamentos]
       .sort((a, b) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime())
       .slice(0, 6);
+  }, [agendamentos]);
+
+  const lembretesDeHoje = useMemo(() => {
+    const hojeIso = dataLocalISO();
+
+    return agendamentos
+      .filter((agendamento) => {
+        const status = agendamento.status.toLowerCase();
+        return (
+          agendamento.data_agendamento.slice(0, 10) === hojeIso &&
+          status !== "cancelado" &&
+          status !== "finalizado"
+        );
+      })
+      .sort((a, b) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime());
   }, [agendamentos]);
 
   const vendasFiltradas = useMemo(() => filtrarVendasPorPeriodo(vendas, periodoFinanceiro), [periodoFinanceiro, vendas]);
@@ -199,11 +263,17 @@ export default function AdminDashboard() {
 
     const [empresaResponse, servicosResponse, agendamentosResponse, produtosResponse, clientesResponse, vendasResponse] =
       await Promise.all([
-      supabase.from("empresas").select("id,nome,plano,ativo").eq("id", EMPRESA_ID).maybeSingle(),
+      supabase
+        .from("empresas")
+        .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento")
+        .eq("id", EMPRESA_ID)
+        .maybeSingle(),
       supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", EMPRESA_ID).order("nome"),
       supabase
         .from("agendamentos")
-        .select("id,cliente_id,servico_id,data_agendamento,status,clientes(nome,telefone),servicos(nome,preco)")
+        .select(
+          "id,cliente_id,servico_id,data_agendamento,status,lembrete_enviado_em,lembrete_status,clientes(nome,telefone),servicos(nome,preco)",
+        )
         .eq("empresa_id", EMPRESA_ID)
         .neq("status", "cancelado")
         .order("data_agendamento", { ascending: true }),
@@ -225,7 +295,14 @@ export default function AdminDashboard() {
         .order("created_at", { ascending: false }),
     ]);
 
-    if (empresaResponse.data) setEmpresa(empresaResponse.data as Empresa);
+    if (empresaResponse.data) {
+      const empresaAtual = empresaResponse.data as Empresa;
+      setEmpresa(empresaAtual);
+      setConfigDias(empresaAtual.dias_atendimento?.length ? empresaAtual.dias_atendimento : DIAS_ATENDIMENTO_PADRAO);
+      setConfigHorarios(
+        empresaAtual.horarios_atendimento?.length ? empresaAtual.horarios_atendimento : HORARIOS_ATENDIMENTO_PADRAO,
+      );
+    }
     if (servicosResponse.data) setServicos(servicosResponse.data as Servico[]);
     if (agendamentosResponse.data) setAgendamentos(agendamentosResponse.data as unknown as Agendamento[]);
     if (clientesResponse.data) setClientes(clientesResponse.data as ClienteResumo[]);
@@ -453,10 +530,32 @@ export default function AdminDashboard() {
     setMensagem("Link publico copiado para enviar aos clientes.");
   }
 
-  function enviarLembrete(agendamento: Agendamento) {
+  async function marcarLembreteEnviado(agendamento: Agendamento) {
+    const enviadoEm = new Date().toISOString();
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ lembrete_enviado_em: enviadoEm, lembrete_status: "enviado" })
+      .eq("id", agendamento.id)
+      .eq("empresa_id", EMPRESA_ID);
+
+    if (error) {
+      setMensagem(`WhatsApp aberto, mas nao consegui marcar o lembrete: ${formatarErroSupabase(error.message)}`);
+      return false;
+    }
+
+    setAgendamentos((atuais) =>
+      atuais.map((item) =>
+        item.id === agendamento.id ? { ...item, lembrete_enviado_em: enviadoEm, lembrete_status: "enviado" } : item,
+      ),
+    );
+
+    return true;
+  }
+
+  async function enviarLembrete(agendamento: Agendamento) {
     const cliente = firstRelation(agendamento.clientes);
     const servico = firstRelation(agendamento.servicos);
-    const telefoneLimpo = cliente?.telefone?.replace(/\D/g, "");
+    const telefoneLimpo = normalizarTelefoneBrasil(cliente?.telefone || "");
 
     if (!telefoneLimpo) {
       setMensagem("Este cliente nao informou WhatsApp no agendamento.");
@@ -469,7 +568,47 @@ export default function AdminDashboard() {
       ).toLocaleString("pt-BR")}.`,
     );
 
-    window.open(`https://wa.me/55${telefoneLimpo}?text=${texto}`, "_blank", "noopener,noreferrer");
+    window.open(`https://wa.me/${telefoneLimpo}?text=${texto}`, "_blank", "noopener,noreferrer");
+    const lembreteMarcado = await marcarLembreteEnviado(agendamento);
+
+    if (lembreteMarcado) {
+      setMensagem(`Lembrete de ${cliente?.nome || "cliente"} marcado como enviado.`);
+    }
+  }
+
+  async function enviarLembretesDoDia() {
+    const pendentes = lembretesDeHoje.filter((agendamento) => {
+      const cliente = firstRelation(agendamento.clientes);
+      return cliente?.telefone && !agendamento.lembrete_enviado_em;
+    });
+
+    if (pendentes.length === 0) {
+      setMensagem("Nao ha lembretes pendentes com WhatsApp informado para hoje.");
+      return;
+    }
+
+    try {
+      await fetch("/api/push/reminders", {
+        body: JSON.stringify({
+          agendamentoIds: pendentes.map((agendamento) => agendamento.id),
+          empresaId: EMPRESA_ID,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+    } catch {
+      // O WhatsApp continua funcionando mesmo se o push nao estiver configurado.
+    }
+
+    await enviarLembrete(pendentes[0]);
+
+    if (pendentes.length > 1) {
+      setMensagem(
+        `Abrimos o WhatsApp do primeiro cliente. Ao voltar para o painel, toque novamente para enviar o proximo. Restam ${
+          pendentes.length - 1
+        } lembretes.`,
+      );
+    }
   }
 
   function abrirFinalizacao(agendamento: Agendamento) {
@@ -480,6 +619,54 @@ export default function AdminDashboard() {
   function abrirSecao(secao: AdminSection) {
     setActiveSection(secao);
     setMobileDrawerOpen(false);
+  }
+
+  function alternarDiaAtendimento(dia: number) {
+    setConfigDias((atuais) => {
+      const proximos = atuais.includes(dia) ? atuais.filter((item) => item !== dia) : [...atuais, dia];
+      return proximos.sort((a, b) => a - b);
+    });
+  }
+
+  function adicionarHorarioAtendimento() {
+    if (!novoHorario) return;
+
+    setConfigHorarios((atuais) => Array.from(new Set([...atuais, novoHorario])).sort());
+    setNovoHorario("");
+  }
+
+  function removerHorarioAtendimento(horario: string) {
+    setConfigHorarios((atuais) => atuais.filter((item) => item !== horario));
+  }
+
+  async function salvarConfiguracaoAgenda() {
+    if (configDias.length === 0) {
+      setMensagem("Selecione pelo menos um dia de atendimento.");
+      return;
+    }
+
+    if (configHorarios.length === 0) {
+      setMensagem("Adicione pelo menos um horario de atendimento.");
+      return;
+    }
+
+    setSalvandoConfiguracao(true);
+    const { error } = await supabase
+      .from("empresas")
+      .update({
+        dias_atendimento: configDias,
+        horarios_atendimento: configHorarios,
+      })
+      .eq("id", EMPRESA_ID);
+    setSalvandoConfiguracao(false);
+
+    if (error) {
+      setMensagem(`Erro ao salvar configuracoes: ${formatarErroSupabase(error.message)}`);
+      return;
+    }
+
+    await carregarDados();
+    setMensagem("Configuracoes de agenda salvas com sucesso.");
   }
 
   async function finalizarAtendimento() {
@@ -677,6 +864,12 @@ export default function AdminDashboard() {
             onClick={() => abrirSecao("financeiro")}
           />
           <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => abrirSecao("clientes")} />
+          <AdminMenuButton
+            active={activeSection === "configuracoes"}
+            icon="⚙"
+            label="Configuracoes"
+            onClick={() => abrirSecao("configuracoes")}
+          />
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -766,6 +959,11 @@ export default function AdminDashboard() {
         {activeSection === "agenda" && (
           <AdminSectionShell description="Veja os clientes do dia, envie lembretes e finalize atendimentos." title="Agenda">
             <AgendaHero agendamentos={agendamentos} dias={diasAgendaPainel} vendas={vendas} />
+            <TodayReminderPanel
+              agendamentos={lembretesDeHoje}
+              onNotify={enviarLembrete}
+              onSendAll={enviarLembretesDoDia}
+            />
             <article className="admin-panel">
               <h2>Agenda do dia</h2>
               <AppointmentList agendamentos={agendamentos} onFinish={abrirFinalizacao} onNotify={enviarLembrete} />
@@ -989,6 +1187,58 @@ export default function AdminDashboard() {
             </article>
           </AdminSectionShell>
         )}
+
+        {activeSection === "configuracoes" && (
+          <AdminSectionShell
+            description="Defina os dias e horarios que aparecem para o cliente no link publico."
+            title="Configuracoes"
+          >
+            <article className="admin-panel schedule-settings">
+              <div>
+                <h2>Agenda de atendimento</h2>
+                <p>Os clientes so conseguirao escolher dias e horarios marcados aqui.</p>
+              </div>
+
+              <section>
+                <h3>Dias disponiveis</h3>
+                <div className="day-toggle-grid">
+                  {diasCurtos.map((dia, index) => (
+                    <button
+                      className={configDias.includes(index) ? "active" : ""}
+                      key={dia}
+                      onClick={() => alternarDiaAtendimento(index)}
+                      type="button"
+                    >
+                      {dia}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h3>Horarios disponiveis</h3>
+                <div className="time-add-row">
+                  <input onChange={(event) => setNovoHorario(event.target.value)} type="time" value={novoHorario} />
+                  <button className="admin-pill-button secondary" onClick={adicionarHorarioAtendimento} type="button">
+                    Adicionar
+                  </button>
+                </div>
+
+                <div className="time-chip-grid">
+                  {configHorarios.map((horario) => (
+                    <button key={horario} onClick={() => removerHorarioAtendimento(horario)} type="button">
+                      {horario} <span>remover</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <button className="admin-pill-button primary wide" disabled={salvandoConfiguracao} onClick={salvarConfiguracaoAgenda} type="button">
+                {salvandoConfiguracao ? "Salvando..." : "Salvar configuracoes"}
+              </button>
+            </article>
+          </AdminSectionShell>
+        )}
       </section>
 
       <nav className="admin-mobile-nav" aria-label="Menu principal mobile">
@@ -1007,6 +1257,12 @@ export default function AdminDashboard() {
         />
         <AdminMenuButton active={activeSection === "financeiro"} icon="$" label="Caixa" onClick={() => abrirSecao("financeiro")} />
         <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => abrirSecao("clientes")} />
+        <AdminMenuButton
+          active={activeSection === "configuracoes"}
+          icon="⚙"
+          label="Config"
+          onClick={() => abrirSecao("configuracoes")}
+        />
       </nav>
 
       {atendimentoAberto && (
@@ -1107,6 +1363,9 @@ function MobileDrawer({
           <button onClick={() => onNavigate("produtos")} type="button">
             Produtos
           </button>
+          <button onClick={() => onNavigate("configuracoes")} type="button">
+            Configuracoes
+          </button>
           <a href={linkPublico}>Link de agendamento</a>
         </nav>
         <footer>
@@ -1124,7 +1383,7 @@ function MobileDrawer({
 }
 
 function AgendaHero({ agendamentos, dias, vendas }: { agendamentos: Agendamento[]; dias: DiaPainel[]; vendas: Venda[] }) {
-  const hojeIso = new Date().toISOString().slice(0, 10);
+  const hojeIso = dataLocalISO();
   const agendamentosHoje = agendamentos.filter((item) => item.data_agendamento.slice(0, 10) === hojeIso);
   const vendasHoje = vendas.filter((venda) => venda.created_at.slice(0, 10) === hojeIso);
   const totalHoje = vendasHoje.reduce((total, venda) => total + (venda.total || 0), 0);
@@ -1169,6 +1428,83 @@ function AgendaHero({ agendamentos, dias, vendas }: { agendamentos: Agendamento[
   );
 }
 
+function TodayReminderPanel({
+  agendamentos,
+  onNotify,
+  onSendAll,
+}: {
+  agendamentos: Agendamento[];
+  onNotify: (agendamento: Agendamento) => void | Promise<void>;
+  onSendAll: () => void | Promise<void>;
+}) {
+  const pendentes = agendamentos.filter((agendamento) => {
+    const cliente = firstRelation(agendamento.clientes);
+    return cliente?.telefone && !agendamento.lembrete_enviado_em;
+  });
+  const enviados = agendamentos.filter((agendamento) => Boolean(agendamento.lembrete_enviado_em));
+  const semTelefone = agendamentos.filter((agendamento) => {
+    const cliente = firstRelation(agendamento.clientes);
+    return !cliente?.telefone;
+  });
+
+  return (
+    <article className="reminder-panel">
+      <div className="reminder-header">
+        <div>
+          <span>Lembretes de hoje</span>
+          <h2>{pendentes.length > 0 ? `${pendentes.length} para enviar` : "Tudo em dia"}</h2>
+          <p>Abra o WhatsApp com a mensagem pronta e marque cada cliente como lembrado.</p>
+        </div>
+        <button className="admin-pill-button primary" disabled={pendentes.length === 0} onClick={onSendAll} type="button">
+          Enviar lembretes do dia
+        </button>
+      </div>
+
+      <div className="reminder-summary" aria-label="Resumo de lembretes">
+        <span>{pendentes.length} pendentes</span>
+        <span>{enviados.length} enviados</span>
+        <span>{semTelefone.length} sem telefone</span>
+      </div>
+
+      {agendamentos.length === 0 ? (
+        <div className="empty-state">Nenhum cliente agendado para hoje.</div>
+      ) : (
+        <div className="reminder-list">
+          {agendamentos.map((agendamento) => {
+            const cliente = firstRelation(agendamento.clientes);
+            const servico = firstRelation(agendamento.servicos);
+            const enviado = Boolean(agendamento.lembrete_enviado_em);
+            const horario = new Date(agendamento.data_agendamento).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+
+            return (
+              <section className="reminder-row" key={agendamento.id}>
+                <div>
+                  <strong>{cliente?.nome || "Cliente"}</strong>
+                  <span>
+                    {horario} - {servico?.nome || "Servico"}
+                  </span>
+                </div>
+                <em className={enviado ? "sent" : ""}>{enviado ? "Enviado" : "Pendente"}</em>
+                <button
+                  className="row-icon-button"
+                  disabled={enviado || !cliente?.telefone}
+                  onClick={() => onNotify(agendamento)}
+                  type="button"
+                >
+                  {cliente?.telefone ? "Enviar" : "Sem WhatsApp"}
+                </button>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </article>
+  );
+}
+
 function MetricCard({ helper, label, value }: { helper: string; label: string; value: number | string }) {
   return (
     <article className="metric-card admin-metric-card">
@@ -1186,7 +1522,7 @@ function AppointmentList({
 }: {
   agendamentos: Agendamento[];
   onFinish?: (agendamento: Agendamento) => void;
-  onNotify?: (agendamento: Agendamento) => void;
+  onNotify?: (agendamento: Agendamento) => void | Promise<void>;
 }) {
   if (agendamentos.length === 0) {
     return <div className="empty-state">Nenhum agendamento ativo por enquanto.</div>;

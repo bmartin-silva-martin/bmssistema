@@ -5,7 +5,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const EMPRESA_ID = 1;
 const BARBEARIA_NOME = "Barbearia Teste";
-const HORARIOS = [
+const HORARIOS_PADRAO = [
   "09:00",
   "09:30",
   "10:00",
@@ -23,6 +23,7 @@ const HORARIOS = [
   "16:30",
   "17:00",
 ];
+const DIAS_ATENDIMENTO_PADRAO = [1, 2, 3, 4, 5, 6];
 const moeda = new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" });
 const diasSemana = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const meses = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
@@ -38,46 +39,102 @@ type HorarioOcupado = {
   data_agendamento: string;
 };
 
-function montarDiasAgenda() {
-  const hoje = new Date();
+type EmpresaAgendaConfig = {
+  dias_atendimento?: number[] | null;
+  horarios_atendimento?: string[] | null;
+};
 
-  return Array.from({ length: 7 }, (_, index) => {
+function dataLocalISO(data = new Date()) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+
+  return `${ano}-${mes}-${dia}`;
+}
+
+function horarioJaPassou(dataISO: string, hora: string) {
+  const agora = new Date();
+  const horarioEscolhido = new Date(`${dataISO}T${hora}:00`);
+
+  return horarioEscolhido.getTime() <= agora.getTime();
+}
+
+function normalizarTelefoneBrasil(value: string) {
+  let digits = value.replace(/\D/g, "");
+
+  while (digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
+
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
+    digits = `55${digits}`;
+  }
+
+  return digits;
+}
+
+function telefoneBrasilValido(value: string) {
+  return /^55\d{10,11}$/.test(normalizarTelefoneBrasil(value));
+}
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+
+  return Uint8Array.from([...rawData].map((character) => character.charCodeAt(0)));
+}
+
+function montarDiasAgenda(diasAtendimento = DIAS_ATENDIMENTO_PADRAO) {
+  const hoje = new Date();
+  const diasPermitidos = diasAtendimento.length > 0 ? diasAtendimento : DIAS_ATENDIMENTO_PADRAO;
+  const dias = [];
+  let index = 0;
+
+  while (dias.length < 7 && index < 21) {
     const data = new Date(hoje);
     data.setDate(hoje.getDate() + index);
 
-    return {
-      dia: String(data.getDate()).padStart(2, "0"),
-      label: index === 0 ? "HOJE" : String(data.getDate()).padStart(2, "0"),
-      mes: meses[data.getMonth()],
-      semana: diasSemana[data.getDay()],
-      valor: data.toISOString().slice(0, 10),
-    };
-  });
+    if (diasPermitidos.includes(data.getDay())) {
+      dias.push({
+        dia: String(data.getDate()).padStart(2, "0"),
+        label: dataLocalISO(data) === dataLocalISO() ? "HOJE" : String(data.getDate()).padStart(2, "0"),
+        mes: meses[data.getMonth()],
+        semana: diasSemana[data.getDay()],
+        valor: dataLocalISO(data),
+      });
+    }
+
+    index += 1;
+  }
+
+  return dias;
 }
 
-const DIAS_AGENDA = montarDiasAgenda();
-
 export default function AgendamentoPublicoPage() {
+  const [diasAgenda, setDiasAgenda] = useState(() => montarDiasAgenda());
+  const [horariosDisponiveis, setHorariosDisponiveis] = useState(HORARIOS_PADRAO);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [ocupados, setOcupados] = useState<string[]>([]);
   const [servicoId, setServicoId] = useState<number | null>(null);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [dataNascimento, setDataNascimento] = useState("");
-  const [data, setData] = useState(DIAS_AGENDA[0]?.valor || "");
+  const [data, setData] = useState(diasAgenda[0]?.valor || "");
   const [horario, setHorario] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [nomeConfirmado, setNomeConfirmado] = useState(false);
   const [notificacaoRespondida, setNotificacaoRespondida] = useState(false);
+  const [aceitaLembrete, setAceitaLembrete] = useState(false);
   const [servicoConfirmado, setServicoConfirmado] = useState(false);
   const [horarioConfirmado, setHorarioConfirmado] = useState(false);
   const fimDoFluxoRef = useRef<HTMLDivElement | null>(null);
 
   const primeiroNome = nome.trim().split(" ")[0] || "tudo bem";
   const servicoSelecionado = servicos.find((servico) => servico.id === servicoId);
-  const diaSelecionado = useMemo(() => DIAS_AGENDA.find((dia) => dia.valor === data), [data]);
+  const diaSelecionado = useMemo(() => diasAgenda.find((dia) => dia.valor === data), [data, diasAgenda]);
 
   function rolarParaProximaEtapa() {
     window.setTimeout(() => {
@@ -91,18 +148,28 @@ export default function AgendamentoPublicoPage() {
   const carregarServicos = useCallback(async () => {
     if (!isSupabaseConfigured) return;
 
-    const { data: lista, error } = await supabase
-      .from("servicos")
-      .select("id,nome,preco,duracao")
-      .eq("empresa_id", EMPRESA_ID)
-      .order("preco", { ascending: false });
+    const [servicosResponse, empresaResponse] = await Promise.all([
+      supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", EMPRESA_ID).order("preco", { ascending: false }),
+      supabase.from("empresas").select("dias_atendimento,horarios_atendimento").eq("id", EMPRESA_ID).maybeSingle(),
+    ]);
 
-    if (error) {
-      setMensagem(`Erro ao carregar servicos: ${error.message}`);
+    if (servicosResponse.error) {
+      setMensagem(`Erro ao carregar servicos: ${servicosResponse.error.message}`);
       return;
     }
 
-    setServicos(lista || []);
+    if (empresaResponse.data) {
+      const config = empresaResponse.data as EmpresaAgendaConfig;
+      const diasConfigurados = config.dias_atendimento?.length ? config.dias_atendimento : DIAS_ATENDIMENTO_PADRAO;
+      const horariosConfigurados = config.horarios_atendimento?.length ? config.horarios_atendimento : HORARIOS_PADRAO;
+      const novosDias = montarDiasAgenda(diasConfigurados);
+
+      setDiasAgenda(novosDias);
+      setHorariosDisponiveis(horariosConfigurados);
+      setData(novosDias[0]?.valor || "");
+    }
+
+    setServicos(servicosResponse.data || []);
   }, []);
 
   const carregarHorariosOcupados = useCallback(async () => {
@@ -146,17 +213,62 @@ export default function AgendamentoPublicoPage() {
   }, [carregarHorariosOcupados]);
 
   async function pedirNotificacao() {
-    if ("Notification" in window) {
-      await Notification.requestPermission();
+    if (!("Notification" in window)) {
+      setAceitaLembrete(false);
+      setMensagem("Seu navegador nao permite notificacoes. Vamos seguir com o agendamento pelo WhatsApp.");
+      setNotificacaoRespondida(true);
+      rolarParaProximaEtapa();
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setAceitaLembrete(permission === "granted");
+
+    if (permission !== "granted") {
+      setMensagem("Tudo bem, voce ainda pode agendar. A barbearia podera lembrar pelo WhatsApp informado.");
+    } else {
+      setMensagem("Notificacoes ativadas. Ao confirmar, vamos salvar este aparelho para receber lembretes.");
     }
 
     setNotificacaoRespondida(true);
     rolarParaProximaEtapa();
   }
 
+  async function salvarInscricaoPush(clienteId: number, agendamentoId: number) {
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
+    if (!aceitaLembrete || !vapidPublicKey || Notification.permission !== "granted") {
+      return;
+    }
+
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      return;
+    }
+
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    const inscricaoAtual = await registration.pushManager.getSubscription();
+    const subscription =
+      inscricaoAtual ||
+      (await registration.pushManager.subscribe({
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        userVisibleOnly: true,
+      }));
+
+    await fetch("/api/push-subscriptions", {
+      body: JSON.stringify({
+        agendamentoId,
+        clienteId,
+        empresaId: EMPRESA_ID,
+        subscription: subscription.toJSON(),
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+  }
+
   async function confirmarAgendamento() {
     const nomeLimpo = nome.trim();
-    const telefoneLimpo = telefone.trim();
+    const telefoneLimpo = normalizarTelefoneBrasil(telefone);
 
     if (!isSupabaseConfigured) {
       setMensagem("Agendamento indisponivel. Supabase nao configurado.");
@@ -168,8 +280,18 @@ export default function AgendamentoPublicoPage() {
       return;
     }
 
+    if (!telefoneBrasilValido(telefoneLimpo)) {
+      setMensagem("Informe um WhatsApp valido com DDD. Exemplo: 18999998888.");
+      return;
+    }
+
     if (ocupados.includes(horario)) {
       setMensagem("Esse horario ja foi reservado. Escolha outro horario.");
+      return;
+    }
+
+    if (horarioJaPassou(data, horario)) {
+      setMensagem("Esse horario ja passou. Escolha outro dia ou um horario mais tarde.");
       return;
     }
 
@@ -181,6 +303,7 @@ export default function AgendamentoPublicoPage() {
       .insert({
         data_nascimento: dataNascimento || null,
         empresa_id: EMPRESA_ID,
+        aceita_lembrete: aceitaLembrete,
         nome: nomeLimpo,
         telefone: telefoneLimpo,
       })
@@ -193,21 +316,35 @@ export default function AgendamentoPublicoPage() {
       return;
     }
 
-    const { error } = await supabase.from("agendamentos").insert({
-      cliente_id: cliente.id,
-      data_agendamento: `${data} ${horario}:00`,
-      empresa_id: EMPRESA_ID,
-      servico_id: servicoId,
-      status: "confirmado",
-    });
-
-    setSalvando(false);
+    const { data: agendamento, error } = await supabase
+      .from("agendamentos")
+      .insert({
+        aceita_lembrete: aceitaLembrete,
+        cliente_id: cliente.id,
+        data_agendamento: `${data} ${horario}:00`,
+        empresa_id: EMPRESA_ID,
+        servico_id: servicoId,
+        status: "confirmado",
+      })
+      .select("id")
+      .single();
 
     if (error) {
+      setSalvando(false);
       setMensagem(`Erro ao confirmar agendamento: ${error.message}`);
       return;
     }
 
+    try {
+      await salvarInscricaoPush(cliente.id, agendamento.id);
+    } catch {
+      setMensagem("Agendamento confirmado! Nao conseguimos ativar o push, mas a barbearia recebeu sua reserva.");
+      setSalvando(false);
+      rolarParaProximaEtapa();
+      return;
+    }
+
+    setSalvando(false);
     setMensagem("Agendamento confirmado! A barbearia recebeu sua reserva.");
     rolarParaProximaEtapa();
   }
@@ -258,6 +395,7 @@ export default function AgendamentoPublicoPage() {
                   className="chat-secondary-button"
                   onClick={() => {
                     setNotificacaoRespondida(true);
+                    setAceitaLembrete(false);
                     rolarParaProximaEtapa();
                   }}
                   type="button"
@@ -325,7 +463,7 @@ export default function AgendamentoPublicoPage() {
             <p className="chat-section-label">Selecione o dia e horario:</p>
 
             <div className="chat-day-carousel">
-              {DIAS_AGENDA.map((dia) => (
+              {diasAgenda.map((dia) => (
                 <button
                   aria-pressed={data === dia.valor}
                   className="chat-day-card"
@@ -346,23 +484,29 @@ export default function AgendamentoPublicoPage() {
             </div>
 
             <div className="chat-time-grid">
-              {HORARIOS.map((hora) => {
+              {horariosDisponiveis.map((hora) => {
                 const indisponivel = ocupados.includes(hora);
+                const passou = horarioJaPassou(data, hora);
 
                 return (
                   <button
                     aria-pressed={horario === hora}
                     className="chat-time-button"
-                    disabled={indisponivel}
+                    disabled={indisponivel || passou}
                     key={hora}
                     onClick={() => {
+                      if (passou) {
+                        setMensagem("Esse horario ja passou. Escolha outro horario disponivel.");
+                        return;
+                      }
+
                       setHorario(hora);
                       setHorarioConfirmado(false);
                       rolarParaProximaEtapa();
                     }}
                     type="button"
                   >
-                    {hora}
+                    {passou ? `${hora} passou` : hora}
                   </button>
                 );
               })}

@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "BMS Sistema",
   description: "Gestao de agendamentos e servicos para negocios locais.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "BMS Sistema",
+  },
 };
 
 export default function RootLayout({

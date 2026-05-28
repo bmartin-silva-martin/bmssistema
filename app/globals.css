@@ -1897,7 +1897,7 @@ th {
     right: 0.75rem;
     bottom: 0.75rem;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.25rem;
     border: 1px solid rgb(255 255 255 / 0.12);
     border-radius: 999px;
@@ -2151,7 +2151,7 @@ th {
   right: max(0.75rem, calc((100vw - 720px) / 2));
   bottom: 0.75rem;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.25rem;
   border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 999px;
@@ -2359,6 +2359,224 @@ th {
   }
 
   .compact-edit-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.reminder-panel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 28px;
+  background: linear-gradient(180deg, #1b2029, #141820);
+  box-shadow: 0 22px 70px rgb(0 0 0 / 0.26);
+  padding: 1.25rem;
+}
+
+.reminder-header {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+}
+
+.reminder-header span,
+.reminder-summary span {
+  color: #c8cdd5;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reminder-header h2 {
+  color: #ffffff;
+  font-size: clamp(1.7rem, 5vw, 2.5rem);
+  margin: 0.15rem 0;
+}
+
+.reminder-header p {
+  color: #aeb6c4;
+  margin: 0;
+}
+
+.reminder-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.reminder-summary span {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 999px;
+  background: #222630;
+  padding: 0.55rem 0.8rem;
+}
+
+.reminder-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.reminder-row {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.75rem;
+  border: 1px solid rgb(255 255 255 / 0.07);
+  border-radius: 22px;
+  background: #11151d;
+  padding: 0.85rem;
+}
+
+.reminder-row div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.reminder-row strong {
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reminder-row span {
+  color: #aeb6c4;
+  font-size: 0.9rem;
+}
+
+.reminder-row em {
+  border-radius: 999px;
+  background: rgb(255 75 38 / 0.14);
+  color: #ffb199;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 900;
+  padding: 0.45rem 0.7rem;
+}
+
+.reminder-row em.sent {
+  background: rgb(34 197 94 / 0.16);
+  color: #86efac;
+}
+
+.reminder-row .row-icon-button {
+  min-height: 3.4rem;
+  min-width: 6rem;
+}
+
+.reminder-row .row-icon-button:disabled,
+.reminder-header .admin-pill-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 620px) {
+  .reminder-panel {
+    border-radius: 24px;
+    padding: 1rem;
+  }
+
+  .reminder-header,
+  .reminder-row {
+    grid-template-columns: 1fr;
+  }
+
+  .reminder-header .admin-pill-button,
+  .reminder-row .row-icon-button {
+    width: 100%;
+  }
+
+  .reminder-row {
+    align-items: stretch;
+  }
+}
+
+.schedule-settings {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.schedule-settings > div p {
+  color: #aeb6c4;
+  margin: 0.35rem 0 0;
+}
+
+.schedule-settings h3 {
+  color: #c8cdd5;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+}
+
+.day-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.day-toggle-grid button,
+.time-chip-grid button {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 18px;
+  background: #20242e;
+  color: #d5d9e0;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 3.2rem;
+}
+
+.day-toggle-grid button.active {
+  border-color: rgb(255 139 92 / 0.65);
+  background: linear-gradient(135deg, #f04b2b, #176c37);
+  color: #ffffff;
+}
+
+.time-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+}
+
+.time-add-row input {
+  min-height: 3.6rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 18px;
+  background: #242832;
+  color: #ffffff;
+  padding: 0.8rem 1rem;
+}
+
+.time-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.time-chip-grid button {
+  display: grid;
+  gap: 0.1rem;
+  justify-items: center;
+}
+
+.time-chip-grid button span {
+  color: #aeb6c4;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 620px) {
+  .day-toggle-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .time-add-row {
     grid-template-columns: 1fr;
   }
 }
