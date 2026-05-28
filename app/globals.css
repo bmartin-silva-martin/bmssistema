@@ -855,6 +855,54 @@ th {
   gap: 1rem;
 }
 
+.chat-booking-page {
+  padding: clamp(1rem, 3vw, 3rem);
+}
+
+.chat-booking {
+  width: min(100%, 1540px);
+  gap: clamp(0.9rem, 2.2vw, 1.45rem);
+  padding-block: clamp(1.5rem, 6vh, 4.2rem);
+}
+
+.chat-bubble {
+  border-radius: 18px;
+  font-size: clamp(1rem, 1.45vw, 1.25rem);
+  padding: clamp(1rem, 1.8vw, 1.45rem);
+}
+
+.chat-bubble.assistant.wide {
+  max-width: min(84%, 1240px);
+}
+
+.chat-input-stack input,
+.chat-final-form input,
+.chat-action-button,
+.chat-secondary-button {
+  min-height: 4.7rem;
+  border-radius: 18px;
+  font-size: clamp(0.98rem, 1.45vw, 1.1rem);
+}
+
+.chat-service-card {
+  min-height: 205px;
+  border-radius: 18px;
+}
+
+.chat-service-image {
+  height: 128px;
+}
+
+.chat-day-card {
+  min-height: 215px;
+  border-radius: 18px;
+}
+
+.chat-time-button {
+  min-height: 4.35rem;
+  border-radius: 18px;
+}
+
 .admin-login-page,
 .admin-dashboard {
   min-height: 100vh;
