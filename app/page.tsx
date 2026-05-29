@@ -193,6 +193,7 @@ export default function AdminDashboard() {
   const [salvandoProduto, setSalvandoProduto] = useState(false);
   const [finalizandoVenda, setFinalizandoVenda] = useState(false);
   const [salvandoConfiguracao, setSalvandoConfiguracao] = useState(false);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
   const [configDias, setConfigDias] = useState<number[]>(DIAS_ATENDIMENTO_PADRAO);
   const [configHorarios, setConfigHorarios] = useState<string[]>(HORARIOS_ATENDIMENTO_PADRAO);
   const [novoHorario, setNovoHorario] = useState("");
@@ -1010,12 +1011,23 @@ export default function AdminDashboard() {
             </article>
 
             <article className="admin-panel">
-              <h2>Historico de atendimentos</h2>
-              <AppointmentList
-                agendamentos={historicoAgendamentos}
-                emptyLabel="Nenhum atendimento finalizado ainda."
-                variant="history"
-              />
+              <button
+                className="collapsible-panel-trigger"
+                onClick={() => setHistoricoAberto((aberto) => !aberto)}
+                type="button"
+              >
+                <span>Historico de atendimentos</span>
+                <strong>{historicoAgendamentos.length}</strong>
+                <em>{historicoAberto ? "Ocultar" : "Ver historico"}</em>
+              </button>
+
+              {historicoAberto && (
+                <AppointmentList
+                  agendamentos={historicoAgendamentos}
+                  emptyLabel="Nenhum atendimento finalizado ainda."
+                  variant="history"
+                />
+              )}
             </article>
           </AdminSectionShell>
         )}

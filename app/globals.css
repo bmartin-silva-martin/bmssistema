@@ -1240,6 +1240,35 @@ th {
   padding: clamp(1rem, 3vw, 1.4rem);
 }
 
+.collapsible-panel-trigger {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem 0.8rem;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #f8fafc;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.collapsible-panel-trigger span {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.collapsible-panel-trigger span,
+.collapsible-panel-trigger strong {
+  font-weight: 800;
+}
+
+.collapsible-panel-trigger em {
+  color: #aab2bf;
+  font-style: normal;
+}
+
 .admin-panel .empty-state,
 .admin-panel .simple-list div,
 .admin-panel .editable-row {
