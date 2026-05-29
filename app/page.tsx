@@ -988,7 +988,12 @@ export default function AdminDashboard() {
 
         {activeSection === "agenda" && (
           <AdminSectionShell description="Veja os clientes do dia, envie lembretes e finalize atendimentos." title="Agenda">
-            <AgendaHero agendamentos={agendamentosAtivos} dias={diasAgendaPainel} vendas={vendas} />
+            <AgendaHero
+              agendamentos={agendamentosAtivos}
+              dias={diasAgendaPainel}
+              onOpenMenu={() => setMobileDrawerOpen(true)}
+              vendas={vendas}
+            />
             <TodayReminderPanel
               agendamentos={lembretesDeHoje}
               onNotify={enviarLembrete}
@@ -1426,7 +1431,17 @@ function MobileDrawer({
   );
 }
 
-function AgendaHero({ agendamentos, dias, vendas }: { agendamentos: Agendamento[]; dias: DiaPainel[]; vendas: Venda[] }) {
+function AgendaHero({
+  agendamentos,
+  dias,
+  onOpenMenu,
+  vendas,
+}: {
+  agendamentos: Agendamento[];
+  dias: DiaPainel[];
+  onOpenMenu: () => void;
+  vendas: Venda[];
+}) {
   const hojeIso = dataLocalISO();
   const agendamentosHoje = agendamentos.filter((item) => item.data_agendamento.slice(0, 10) === hojeIso);
   const vendasHoje = vendas.filter((venda) => venda.created_at.slice(0, 10) === hojeIso);
@@ -1440,7 +1455,9 @@ function AgendaHero({ agendamentos, dias, vendas }: { agendamentos: Agendamento[
           <h2>Olá, barbeiro</h2>
           <p>Você está em sua agenda.</p>
         </div>
-        <button type="button">☰</button>
+        <button aria-label="Abrir menu" onClick={onOpenMenu} type="button">
+          ☰
+        </button>
       </div>
 
       <strong className="agenda-week-label">
