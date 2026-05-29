@@ -3,6 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 
 const EMPRESA_ID = 1;
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function getSupabaseServerClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -34,8 +37,16 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({
-    dias_atendimento: data?.dias_atendimento || null,
-    horarios_atendimento: data?.horarios_atendimento || null,
-  });
+  return NextResponse.json(
+    {
+      dias_atendimento: data?.dias_atendimento || null,
+      horarios_atendimento: data?.horarios_atendimento || null,
+      updated_at: new Date().toISOString(),
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      },
+    },
+  );
 }
