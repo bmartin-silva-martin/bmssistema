@@ -157,18 +157,16 @@ export default function AgendamentoPublicoPage() {
   const carregarConfiguracaoAgenda = useCallback(async () => {
     if (!isSupabaseConfigured) return;
 
-    const { data: empresaConfig, error } = await supabase
-      .from("empresas")
-      .select("dias_atendimento,horarios_atendimento")
-      .eq("id", EMPRESA_ID)
-      .maybeSingle();
+    const response = await fetch(`/api/public-config?at=${Date.now()}`, {
+      cache: "no-store",
+    });
 
-    if (error) {
-      setMensagem("Nao consegui carregar os horarios da barbearia. Confira a policy publica da tabela empresas.");
+    if (!response.ok) {
+      setMensagem("Nao consegui carregar os horarios da barbearia. Atualize a pagina e tente novamente.");
       return;
     }
 
-    if (!empresaConfig) return;
+    const empresaConfig = (await response.json()) as EmpresaAgendaConfig;
 
     const config = empresaConfig as EmpresaAgendaConfig;
     const diasConfigurados = config.dias_atendimento?.length ? config.dias_atendimento : DIAS_ATENDIMENTO_PADRAO;
@@ -187,7 +185,7 @@ export default function AgendamentoPublicoPage() {
 
     const [servicosResponse, empresaResponse] = await Promise.all([
       supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", EMPRESA_ID).order("preco", { ascending: false }),
-      supabase.from("empresas").select("dias_atendimento,horarios_atendimento").eq("id", EMPRESA_ID).maybeSingle(),
+      fetch(`/api/public-config?at=${Date.now()}`, { cache: "no-store" }),
     ]);
 
     if (servicosResponse.error) {
@@ -195,8 +193,8 @@ export default function AgendamentoPublicoPage() {
       return;
     }
 
-    if (empresaResponse.data) {
-      const config = empresaResponse.data as EmpresaAgendaConfig;
+    if (empresaResponse.ok) {
+      const config = (await empresaResponse.json()) as EmpresaAgendaConfig;
       const diasConfigurados = config.dias_atendimento?.length ? config.dias_atendimento : DIAS_ATENDIMENTO_PADRAO;
       const horariosConfigurados = config.horarios_atendimento?.length
         ? config.horarios_atendimento.map(normalizarHorario).sort()
@@ -206,8 +204,8 @@ export default function AgendamentoPublicoPage() {
       setDiasAgenda(novosDias);
       setHorariosDisponiveis(horariosConfigurados);
       setData((dataAtual) => (novosDias.some((dia) => dia.valor === dataAtual) ? dataAtual : novosDias[0]?.valor || ""));
-    } else if (empresaResponse.error) {
-      setMensagem("Nao consegui carregar os horarios da barbearia. Confira a policy publica da tabela empresas.");
+    } else {
+      setMensagem("Nao consegui carregar os horarios da barbearia. Atualize a pagina e tente novamente.");
     }
 
     setServicos(servicosResponse.data || []);
