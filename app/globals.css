@@ -2527,6 +2527,100 @@ th {
   padding: 0;
 }
 
+.admin-section:has(.client-manager) .admin-panel {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.client-manager {
+  display: grid;
+  gap: 1rem;
+}
+
+.client-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.client-summary-grid span {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 999px;
+  background: #1b2029;
+  color: #d8dce3;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  padding: 0.65rem 0.85rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.client-card-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.client-card {
+  align-items: center;
+  border: 1px solid rgb(255 255 255 / 0.07);
+  border-radius: 24px;
+  background: linear-gradient(180deg, #181c24, #141820);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  padding: 0.9rem;
+}
+
+.client-avatar {
+  align-items: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #f04b2b, #176c37);
+  color: #ffffff;
+  display: flex;
+  font-size: 0.95rem;
+  font-weight: 900;
+  justify-content: center;
+  text-transform: uppercase;
+}
+
+.client-card-main {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.client-card-main strong,
+.client-card-main span,
+.client-card-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client-card-main strong {
+  color: #ffffff;
+  font-size: 1.08rem;
+}
+
+.client-card-main span {
+  color: #c8cdd5;
+}
+
+.client-card-main small {
+  color: #8f98a8;
+  font-size: 0.9rem;
+}
+
+.client-edit-panel label:nth-child(2),
+.client-edit-panel label:nth-child(3) {
+  grid-column: auto;
+}
+
 @media (max-width: 620px) {
   .compact-row-photo {
     width: 3rem;
@@ -2541,6 +2635,19 @@ th {
 
   .compact-edit-panel {
     grid-template-columns: 1fr;
+  }
+
+  .client-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .client-card .row-icon-button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }
 

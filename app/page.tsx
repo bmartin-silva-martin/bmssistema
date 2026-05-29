@@ -34,6 +34,7 @@ type Produto = {
 
 type ClienteResumo = {
   data_nascimento?: string | null;
+  id: number;
   nome: string;
   telefone: string | null;
 };
@@ -302,7 +303,7 @@ export default function AdminDashboard() {
       supabase
         .from("agendamentos")
         .select(
-          "id,cliente_id,servico_id,data_agendamento,status,lembrete_enviado_em,lembrete_status,clientes(nome,telefone),servicos(nome,preco)",
+          "id,cliente_id,servico_id,data_agendamento,status,lembrete_enviado_em,lembrete_status,clientes(id,nome,telefone,data_nascimento),servicos(nome,preco)",
         )
         .eq("empresa_id", EMPRESA_ID)
         .neq("status", "cancelado")
@@ -314,10 +315,9 @@ export default function AdminDashboard() {
         .order("nome"),
       supabase
         .from("clientes")
-        .select("nome,telefone,data_nascimento")
+        .select("id,nome,telefone,data_nascimento")
         .eq("empresa_id", EMPRESA_ID)
-        .not("data_nascimento", "is", null)
-        .order("data_nascimento", { ascending: true }),
+        .order("nome", { ascending: true }),
       supabase
         .from("vendas")
         .select("id,created_at,total,agendamento_id,agendamentos(data_agendamento,servicos(nome,preco)),venda_itens(produto_id,quantidade,valor_unitario,produtos(nome))")
@@ -553,6 +553,54 @@ export default function AdminDashboard() {
 
     await carregarDados();
     setMensagem("Produto atualizado com sucesso.");
+  }
+
+  async function atualizarCliente(cliente: ClienteResumo) {
+    const nome = cliente.nome.trim();
+    const telefone = normalizarTelefoneBrasil(cliente.telefone || "");
+
+    if (!nome) {
+      setMensagem("Informe o nome do cliente.");
+      return;
+    }
+
+    if (telefone && (telefone.length < 12 || telefone.length > 13)) {
+      setMensagem("Informe um WhatsApp valido com DDD. Exemplo: 18981518787.");
+      return;
+    }
+
+    const response = await fetch("/api/clientes", {
+      body: JSON.stringify({
+        data_nascimento: cliente.data_nascimento || null,
+        id: cliente.id,
+        nome,
+        telefone: telefone || null,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PATCH",
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setMensagem(`Erro ao atualizar cliente: ${formatarErroSupabase(data?.error || "Nao foi possivel salvar.")}`);
+      return;
+    }
+
+    const clienteAtualizado = data?.cliente as ClienteResumo | undefined;
+
+    if (clienteAtualizado) {
+      setClientes((atuais) => atuais.map((item) => (item.id === clienteAtualizado.id ? clienteAtualizado : item)));
+      setAgendamentos((atuais) =>
+        atuais.map((agendamento) =>
+          agendamento.cliente_id === clienteAtualizado.id
+            ? { ...agendamento, clientes: clienteAtualizado }
+            : agendamento,
+        ),
+      );
+    }
+
+    await carregarDados();
+    setMensagem("Cliente atualizado com sucesso.");
   }
 
   async function copiarLink() {
@@ -1250,23 +1298,12 @@ export default function AdminDashboard() {
 
         {activeSection === "clientes" && (
           <AdminSectionShell
-            description="Veja aniversarios cadastrados no fluxo publico para relacionamento com clientes."
+            description="Pesquise clientes, corrija WhatsApp e mantenha aniversarios atualizados."
             title="Clientes"
           >
             <article className="admin-panel">
-              <h2>Aniversarios</h2>
-              {clientes.length === 0 ? (
-                <div className="empty-state">Nenhum cliente com data de nascimento cadastrada ainda.</div>
-              ) : (
-                <div className="simple-list">
-                  {clientes.map((cliente) => (
-                    <div key={`${cliente.nome}-${cliente.telefone}-${cliente.data_nascimento}`}>
-                      <strong>{cliente.nome}</strong>
-                      <span>{formatarAniversario(cliente.data_nascimento)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <h2>Cadastro de clientes</h2>
+              <EditableClienteList clientes={clientes} setClientes={setClientes} onSave={atualizarCliente} />
             </article>
           </AdminSectionShell>
         )}
@@ -2194,6 +2231,116 @@ function EditableProdutoList({
       {produtosFiltrados.length > limite && (
         <button className="manager-more-button" onClick={() => setLimite((valor) => valor + 6)} type="button">
           Ver mais produtos
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EditableClienteList({
+  clientes,
+  onSave,
+  setClientes,
+}: {
+  clientes: ClienteResumo[];
+  onSave: (cliente: ClienteResumo) => Promise<void>;
+  setClientes: Dispatch<SetStateAction<ClienteResumo[]>>;
+}) {
+  const [busca, setBusca] = useState("");
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [limite, setLimite] = useState(8);
+  const termoBusca = normalizarBusca(busca);
+  const clientesFiltrados = clientes.filter((cliente) => {
+    return [cliente.nome, cliente.telefone || "", formatarAniversario(cliente.data_nascimento)]
+      .map(normalizarBusca)
+      .some((valor) => valor.includes(termoBusca));
+  });
+  const clientesVisiveis = clientesFiltrados.slice(0, limite);
+
+  function atualizarClienteLocal(id: number, patch: Partial<ClienteResumo>) {
+    setClientes((atuais) => atuais.map((cliente) => (cliente.id === id ? { ...cliente, ...patch } : cliente)));
+  }
+
+  if (clientes.length === 0) {
+    return <div className="empty-state">Nenhum cliente cadastrado ainda.</div>;
+  }
+
+  return (
+    <div className="client-manager">
+      <input
+        className="manager-search"
+        onChange={(event) => {
+          setBusca(event.target.value);
+          setLimite(8);
+        }}
+        placeholder="Buscar por nome, WhatsApp ou aniversario"
+        value={busca}
+      />
+
+      <div className="client-summary-grid">
+        <span>{clientes.length} clientes</span>
+        <span>{clientes.filter((cliente) => cliente.telefone).length} com WhatsApp</span>
+        <span>{clientes.filter((cliente) => cliente.data_nascimento).length} aniversarios</span>
+      </div>
+
+      <div className="client-card-list">
+        {clientesVisiveis.map((cliente) => {
+          const editando = editandoId === cliente.id;
+
+          return (
+            <article className="client-card" key={cliente.id}>
+              <div className="client-avatar" aria-hidden="true">
+                {cliente.nome.slice(0, 2)}
+              </div>
+              <div className="client-card-main">
+                <strong>{cliente.nome}</strong>
+                <span>{cliente.telefone || "WhatsApp nao informado"}</span>
+                <small>Aniversario: {formatarAniversario(cliente.data_nascimento)}</small>
+              </div>
+              <button className="row-icon-button" onClick={() => setEditandoId(editando ? null : cliente.id)} type="button">
+                Editar
+              </button>
+
+              {editando && (
+                <div className="compact-edit-panel client-edit-panel">
+                  <label>
+                    Nome
+                    <input
+                      onChange={(event) => atualizarClienteLocal(cliente.id, { nome: event.target.value })}
+                      value={cliente.nome}
+                    />
+                  </label>
+                  <label>
+                    WhatsApp com DDD
+                    <input
+                      inputMode="tel"
+                      onChange={(event) => atualizarClienteLocal(cliente.id, { telefone: event.target.value })}
+                      placeholder="18981518787"
+                      value={cliente.telefone || ""}
+                    />
+                  </label>
+                  <label>
+                    Data de nascimento
+                    <input
+                      onChange={(event) => atualizarClienteLocal(cliente.id, { data_nascimento: event.target.value || null })}
+                      type="date"
+                      value={cliente.data_nascimento || ""}
+                    />
+                  </label>
+                  <button className="admin-pill-button primary" onClick={() => onSave(cliente)} type="button">
+                    Salvar cliente
+                  </button>
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
+      {clientesFiltrados.length === 0 && <div className="empty-state">Nenhum cliente encontrado.</div>}
+      {clientesFiltrados.length > limite && (
+        <button className="manager-more-button" onClick={() => setLimite((valor) => valor + 8)} type="button">
+          Ver mais clientes
         </button>
       )}
     </div>
