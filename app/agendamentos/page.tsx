@@ -77,6 +77,11 @@ function telefoneBrasilValido(value: string) {
   return /^55\d{10,11}$/.test(normalizarTelefoneBrasil(value));
 }
 
+function normalizarHorario(value: string) {
+  const match = value.match(/^(\d{2}):(\d{2})/);
+  return match ? `${match[1]}:${match[2]}` : value;
+}
+
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
@@ -149,6 +154,34 @@ export default function AgendamentoPublicoPage() {
     }, 120);
   }
 
+  const carregarConfiguracaoAgenda = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+
+    const { data: empresaConfig, error } = await supabase
+      .from("empresas")
+      .select("dias_atendimento,horarios_atendimento")
+      .eq("id", EMPRESA_ID)
+      .maybeSingle();
+
+    if (error) {
+      setMensagem("Nao consegui carregar os horarios da barbearia. Confira a policy publica da tabela empresas.");
+      return;
+    }
+
+    if (!empresaConfig) return;
+
+    const config = empresaConfig as EmpresaAgendaConfig;
+    const diasConfigurados = config.dias_atendimento?.length ? config.dias_atendimento : DIAS_ATENDIMENTO_PADRAO;
+    const horariosConfigurados = config.horarios_atendimento?.length
+      ? config.horarios_atendimento.map(normalizarHorario).sort()
+      : HORARIOS_PADRAO;
+    const novosDias = montarDiasAgenda(diasConfigurados);
+
+    setDiasAgenda(novosDias);
+    setHorariosDisponiveis(horariosConfigurados);
+    setData((dataAtual) => (novosDias.some((dia) => dia.valor === dataAtual) ? dataAtual : novosDias[0]?.valor || ""));
+  }, []);
+
   const carregarServicos = useCallback(async () => {
     if (!isSupabaseConfigured) return;
 
@@ -165,12 +198,16 @@ export default function AgendamentoPublicoPage() {
     if (empresaResponse.data) {
       const config = empresaResponse.data as EmpresaAgendaConfig;
       const diasConfigurados = config.dias_atendimento?.length ? config.dias_atendimento : DIAS_ATENDIMENTO_PADRAO;
-      const horariosConfigurados = config.horarios_atendimento?.length ? config.horarios_atendimento : HORARIOS_PADRAO;
+      const horariosConfigurados = config.horarios_atendimento?.length
+        ? config.horarios_atendimento.map(normalizarHorario).sort()
+        : HORARIOS_PADRAO;
       const novosDias = montarDiasAgenda(diasConfigurados);
 
       setDiasAgenda(novosDias);
       setHorariosDisponiveis(horariosConfigurados);
-      setData(novosDias[0]?.valor || "");
+      setData((dataAtual) => (novosDias.some((dia) => dia.valor === dataAtual) ? dataAtual : novosDias[0]?.valor || ""));
+    } else if (empresaResponse.error) {
+      setMensagem("Nao consegui carregar os horarios da barbearia. Confira a policy publica da tabela empresas.");
     }
 
     setServicos(servicosResponse.data || []);
@@ -215,6 +252,32 @@ export default function AgendamentoPublicoPage() {
 
     carregar();
   }, [carregarHorariosOcupados]);
+
+  useEffect(() => {
+    if (!servicoConfirmado) return;
+
+    const timer = window.setTimeout(() => {
+      carregarConfiguracaoAgenda();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [carregarConfiguracaoAgenda, servicoConfirmado]);
+
+  useEffect(() => {
+    function recarregarAoVoltar() {
+      if (document.visibilityState === "visible") {
+        carregarConfiguracaoAgenda();
+      }
+    }
+
+    document.addEventListener("visibilitychange", recarregarAoVoltar);
+    window.addEventListener("focus", carregarConfiguracaoAgenda);
+
+    return () => {
+      document.removeEventListener("visibilitychange", recarregarAoVoltar);
+      window.removeEventListener("focus", carregarConfiguracaoAgenda);
+    };
+  }, [carregarConfiguracaoAgenda]);
 
   async function pedirNotificacao() {
     if (!("Notification" in window)) {
