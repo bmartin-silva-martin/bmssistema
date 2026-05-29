@@ -651,20 +651,38 @@ export default function AdminDashboard() {
     }
 
     setSalvandoConfiguracao(true);
-    const { error } = await supabase
-      .from("empresas")
-      .update({
+    const response = await fetch("/api/schedule-config", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
         dias_atendimento: configDias,
         horarios_atendimento: configHorarios,
-      })
-      .eq("id", EMPRESA_ID);
+      }),
+    });
+    const data = await response.json().catch(() => null);
     setSalvandoConfiguracao(false);
 
-    if (error) {
-      setMensagem(`Erro ao salvar configuracoes: ${formatarErroSupabase(error.message)}`);
+    if (!response.ok) {
+      setMensagem(`Erro ao salvar configuracoes: ${formatarErroSupabase(data?.error || "Nao foi possivel salvar.")}`);
       return;
     }
 
+    const diasSalvos = Array.isArray(data?.dias_atendimento) ? data.dias_atendimento : configDias;
+    const horariosSalvos = Array.isArray(data?.horarios_atendimento) ? data.horarios_atendimento : configHorarios;
+
+    setConfigDias(diasSalvos);
+    setConfigHorarios(horariosSalvos);
+    setEmpresa((empresaAtual) =>
+      empresaAtual
+        ? {
+            ...empresaAtual,
+            dias_atendimento: diasSalvos,
+            horarios_atendimento: horariosSalvos,
+          }
+        : empresaAtual,
+    );
     await carregarDados();
     setMensagem("Configuracoes de agenda salvas com sucesso.");
   }
