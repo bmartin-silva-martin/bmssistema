@@ -215,26 +215,34 @@ export default function AdminDashboard() {
       .slice(0, 5);
   }, [agendamentos]);
 
+  const agendamentosAtivos = useMemo(() => {
+    return agendamentos.filter((agendamento) => {
+      const status = agendamento.status.toLowerCase();
+      return status !== "cancelado" && status !== "finalizado";
+    });
+  }, [agendamentos]);
+
+  const historicoAgendamentos = useMemo(() => {
+    return agendamentos
+      .filter((agendamento) => agendamento.status.toLowerCase() === "finalizado")
+      .sort((a, b) => new Date(b.data_agendamento).getTime() - new Date(a.data_agendamento).getTime());
+  }, [agendamentos]);
+
   const proximosAgendamentos = useMemo(() => {
-    return [...agendamentos]
+    return [...agendamentosAtivos]
       .sort((a, b) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime())
       .slice(0, 6);
-  }, [agendamentos]);
+  }, [agendamentosAtivos]);
 
   const lembretesDeHoje = useMemo(() => {
     const hojeIso = dataLocalISO();
 
-    return agendamentos
+    return agendamentosAtivos
       .filter((agendamento) => {
-        const status = agendamento.status.toLowerCase();
-        return (
-          agendamento.data_agendamento.slice(0, 10) === hojeIso &&
-          status !== "cancelado" &&
-          status !== "finalizado"
-        );
+        return agendamento.data_agendamento.slice(0, 10) === hojeIso;
       })
       .sort((a, b) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime());
-  }, [agendamentos]);
+  }, [agendamentosAtivos]);
 
   const vendasFiltradas = useMemo(() => filtrarVendasPorPeriodo(vendas, periodoFinanceiro), [periodoFinanceiro, vendas]);
   const resumoFinanceiro = useMemo(
@@ -908,9 +916,13 @@ export default function AdminDashboard() {
             ) : (
               <span />
             )}
-            <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
-              ☰
-            </button>
+            {activeSection !== "agenda" ? (
+              <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
+                ☰
+              </button>
+            ) : (
+              <span />
+            )}
           </div>
 
           <div>
@@ -957,7 +969,7 @@ export default function AdminDashboard() {
             <section className="admin-metrics-grid" aria-label="Resumo da barbearia">
               <MetricCard helper="servicos ativos" label="Servicos" value={servicos.length} />
               <MetricCard helper="produtos cadastrados" label="Produtos" value={produtos.length} />
-              <MetricCard helper="agendamentos ativos" label="Agendamentos" value={agendamentos.length} />
+              <MetricCard helper="agendamentos ativos" label="Agendamentos" value={agendamentosAtivos.length} />
             </section>
 
             <section className="admin-two-columns">
@@ -976,7 +988,7 @@ export default function AdminDashboard() {
 
         {activeSection === "agenda" && (
           <AdminSectionShell description="Veja os clientes do dia, envie lembretes e finalize atendimentos." title="Agenda">
-            <AgendaHero agendamentos={agendamentos} dias={diasAgendaPainel} vendas={vendas} />
+            <AgendaHero agendamentos={agendamentosAtivos} dias={diasAgendaPainel} vendas={vendas} />
             <TodayReminderPanel
               agendamentos={lembretesDeHoje}
               onNotify={enviarLembrete}
@@ -984,7 +996,21 @@ export default function AdminDashboard() {
             />
             <article className="admin-panel">
               <h2>Agenda do dia</h2>
-              <AppointmentList agendamentos={agendamentos} onFinish={abrirFinalizacao} onNotify={enviarLembrete} />
+              <AppointmentList
+                agendamentos={lembretesDeHoje}
+                emptyLabel="Nenhum agendamento ativo para hoje."
+                onFinish={abrirFinalizacao}
+                onNotify={enviarLembrete}
+              />
+            </article>
+
+            <article className="admin-panel">
+              <h2>Historico de atendimentos</h2>
+              <AppointmentList
+                agendamentos={historicoAgendamentos}
+                emptyLabel="Nenhum atendimento finalizado ainda."
+                variant="history"
+              />
             </article>
           </AdminSectionShell>
         )}
@@ -1535,15 +1561,19 @@ function MetricCard({ helper, label, value }: { helper: string; label: string; v
 
 function AppointmentList({
   agendamentos,
+  emptyLabel = "Nenhum agendamento ativo por enquanto.",
   onFinish,
   onNotify,
+  variant = "active",
 }: {
   agendamentos: Agendamento[];
+  emptyLabel?: string;
   onFinish?: (agendamento: Agendamento) => void;
   onNotify?: (agendamento: Agendamento) => void | Promise<void>;
+  variant?: "active" | "history";
 }) {
   if (agendamentos.length === 0) {
-    return <div className="empty-state">Nenhum agendamento ativo por enquanto.</div>;
+    return <div className="empty-state">{emptyLabel}</div>;
   }
 
   return (
@@ -1553,7 +1583,7 @@ function AppointmentList({
         const servico = firstRelation(agendamento.servicos);
 
         return (
-          <article className="admin-appointment-card" key={agendamento.id}>
+          <article className={`admin-appointment-card ${variant === "history" ? "is-history" : ""}`} key={agendamento.id}>
             <div>
               <strong>{cliente?.nome || "Cliente"}</strong>
               <span>{cliente?.telefone || "Telefone nao informado"}</span>
@@ -1572,8 +1602,9 @@ function AppointmentList({
                 <dd>{agendamento.status}</dd>
               </div>
             </dl>
-            <div className="appointment-actions">
-              {onNotify && (
+            {variant === "active" && (
+              <div className="appointment-actions">
+              {onNotify && agendamento.status.toLowerCase() !== "finalizado" && (
                 <button className="admin-pill-button secondary" onClick={() => onNotify(agendamento)} type="button">
                   Enviar lembrete
                 </button>
@@ -1583,7 +1614,8 @@ function AppointmentList({
                   Finalizar
                 </button>
               )}
-            </div>
+              </div>
+            )}
           </article>
         );
       })}
