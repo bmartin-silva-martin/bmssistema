@@ -65,6 +65,7 @@ type VendaItem = {
 type Venda = {
   agendamento_id: number | null;
   created_at: string;
+  forma_pagamento?: string | null;
   id: number;
   total: number | null;
   agendamentos:
@@ -83,6 +84,10 @@ type Venda = {
 type RankingItem = {
   nome: string;
   total: number;
+};
+
+type PaymentItem = RankingItem & {
+  valor: number;
 };
 
 type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "financeiro" | "clientes" | "configuracoes";
@@ -194,6 +199,7 @@ export default function AdminDashboard() {
   const [finalizandoVenda, setFinalizandoVenda] = useState(false);
   const [salvandoConfiguracao, setSalvandoConfiguracao] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
+  const [buscaHistorico, setBuscaHistorico] = useState("");
   const [configDias, setConfigDias] = useState<number[]>(DIAS_ATENDIMENTO_PADRAO);
   const [configHorarios, setConfigHorarios] = useState<string[]>(HORARIOS_ATENDIMENTO_PADRAO);
   const [novoHorario, setNovoHorario] = useState("");
@@ -228,6 +234,21 @@ export default function AdminDashboard() {
       .filter((agendamento) => agendamento.status.toLowerCase() === "finalizado")
       .sort((a, b) => new Date(b.data_agendamento).getTime() - new Date(a.data_agendamento).getTime());
   }, [agendamentos]);
+
+  const historicoFiltrado = useMemo(() => {
+    const termo = buscaHistorico.trim().toLowerCase();
+    if (!termo) return historicoAgendamentos;
+
+    return historicoAgendamentos.filter((agendamento) => {
+      const cliente = firstRelation(agendamento.clientes);
+      const servico = firstRelation(agendamento.servicos);
+      const horario = new Date(agendamento.data_agendamento).toLocaleString("pt-BR").toLowerCase();
+
+      return [cliente?.nome, cliente?.telefone, servico?.nome, horario]
+        .filter(Boolean)
+        .some((valor) => String(valor).toLowerCase().includes(termo));
+    });
+  }, [buscaHistorico, historicoAgendamentos]);
 
   const proximosAgendamentos = useMemo(() => {
     return [...agendamentosAtivos]
@@ -1022,11 +1043,25 @@ export default function AdminDashboard() {
               </button>
 
               {historicoAberto && (
-                <AppointmentList
-                  agendamentos={historicoAgendamentos}
-                  emptyLabel="Nenhum atendimento finalizado ainda."
-                  variant="history"
-                />
+                <>
+                  <label className="admin-history-search">
+                    Buscar no historico
+                    <input
+                      onChange={(event) => setBuscaHistorico(event.target.value)}
+                      placeholder="Nome, telefone, servico ou data"
+                      value={buscaHistorico}
+                    />
+                  </label>
+                  <AppointmentList
+                    agendamentos={historicoFiltrado}
+                    emptyLabel={
+                      buscaHistorico.trim()
+                        ? "Nenhum atendimento encontrado para esta busca."
+                        : "Nenhum atendimento finalizado ainda."
+                    }
+                    variant="history"
+                  />
+                </>
               )}
             </article>
           </AdminSectionShell>
@@ -1194,34 +1229,21 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <section className="admin-metrics-grid" aria-label="Resumo financeiro">
+            <section className="finance-dashboard-grid" aria-label="Resumo financeiro">
               <MetricCard helper="receita no periodo" label="Faturamento" value={formatarMoeda(resumoFinanceiro.totalReceita)} />
               <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
               <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
+              <PaymentChart items={resumoFinanceiro.formasPagamento} total={resumoFinanceiro.totalReceita} />
             </section>
 
-            <section className="admin-two-columns">
-              <article className="admin-panel">
-                <h2>Produtos com mais saida</h2>
-                <RankingList items={resumoFinanceiro.produtosMaisVendidos} />
-              </article>
-
-              <article className="admin-panel">
-                <h2>Servicos mais vendidos</h2>
-                <RankingList items={resumoFinanceiro.servicosMaisVendidos} />
-              </article>
+            <section className="finance-card-grid">
+              <FinanceRankingCard items={resumoFinanceiro.produtosMaisVendidos} title="Produtos com mais saida" />
+              <FinanceRankingCard items={resumoFinanceiro.servicosMaisVendidos} title="Servicos mais vendidos" />
             </section>
 
-            <section className="admin-two-columns">
-              <article className="admin-panel">
-                <h2>Produtos sem giro</h2>
-                <ProductStockList produtos={resumoFinanceiro.produtosSemGiro} emptyLabel="Todos os produtos tiveram giro." />
-              </article>
-
-              <article className="admin-panel">
-                <h2>Controle de estoque</h2>
-                <ProductStockList produtos={produtos} emptyLabel="Nenhum produto cadastrado." />
-              </article>
+            <section className="finance-card-grid">
+              <FinanceProductCard emptyLabel="Todos os produtos tiveram giro." produtos={resumoFinanceiro.produtosSemGiro} title="Produtos sem giro" />
+              <FinanceProductCard emptyLabel="Nenhum produto cadastrado." produtos={produtos} title="Controle de estoque" />
             </section>
           </AdminSectionShell>
         )}
@@ -1316,7 +1338,7 @@ export default function AdminDashboard() {
           label="Produtos"
           onClick={() => abrirSecao("produtos")}
         />
-        <AdminMenuButton active={activeSection === "financeiro"} icon="$" label="Caixa" onClick={() => abrirSecao("financeiro")} />
+        <AdminMenuButton active={activeSection === "financeiro"} icon="$" label="Financeiro" onClick={() => abrirSecao("financeiro")} />
         <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => abrirSecao("clientes")} />
         <AdminMenuButton
           active={activeSection === "configuracoes"}
@@ -1652,24 +1674,103 @@ function AppointmentList({
   );
 }
 
-function ProductStockList({ emptyLabel, produtos }: { emptyLabel: string; produtos: Produto[] }) {
-  if (produtos.length === 0) {
-    return <div className="empty-state">{emptyLabel}</div>;
-  }
+function PaymentChart({ items, total }: { items: PaymentItem[]; total: number }) {
+  const maiorValor = Math.max(...items.map((item) => item.valor), 1);
 
   return (
-    <div className="product-stock-list">
-      {produtos.map((produto) => (
-        <article className="product-stock-card" key={produto.id}>
-          <ProductPhoto produto={produto} />
-          <div>
-            <strong>{produto.nome}</strong>
-            <small>{formatarMoeda(produto.preco || 0)}</small>
-          </div>
-          <em>{produto.estoque || 0} un.</em>
-        </article>
-      ))}
-    </div>
+    <article className="finance-chart-card">
+      <div>
+        <span>Formas de pagamento</span>
+        <strong>{formatarMoeda(total)}</strong>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="finance-empty">Nenhuma venda no periodo.</p>
+      ) : (
+        <div className="payment-bars">
+          {items.map((item) => (
+            <div className="payment-bar-row" key={item.nome}>
+              <span>{item.nome}</span>
+              <div>
+                <em style={{ width: `${Math.max(8, (item.valor / maiorValor) * 100)}%` }} />
+              </div>
+              <strong>{formatarMoeda(item.valor)}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function FinanceRankingCard({ items, title }: { items: RankingItem[]; title: string }) {
+  const [mostrarTodos, setMostrarTodos] = useState(false);
+  const visiveis = mostrarTodos ? items : items.slice(0, 3);
+
+  return (
+    <article className="finance-list-card">
+      <div className="finance-card-header">
+        <h2>{title}</h2>
+        <span>Top {Math.min(items.length, 3)}</span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="empty-state">Ainda nao ha dados neste periodo.</div>
+      ) : (
+        <div className="finance-ranking-list">
+          {visiveis.map((item, index) => (
+            <div className="finance-ranking-row" key={item.nome}>
+              <em>{index + 1}</em>
+              <span>{item.nome}</span>
+              <strong>{item.total}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {items.length > 3 && (
+        <button className="manager-more-button" onClick={() => setMostrarTodos((valor) => !valor)} type="button">
+          {mostrarTodos ? "Ver menos" : "Ver mais"}
+        </button>
+      )}
+    </article>
+  );
+}
+
+function FinanceProductCard({ emptyLabel, produtos, title }: { emptyLabel: string; produtos: Produto[]; title: string }) {
+  const [mostrarTodos, setMostrarTodos] = useState(false);
+  const visiveis = mostrarTodos ? produtos : produtos.slice(0, 3);
+
+  return (
+    <article className="finance-list-card">
+      <div className="finance-card-header">
+        <h2>{title}</h2>
+        <span>{produtos.length} itens</span>
+      </div>
+
+      {produtos.length === 0 ? (
+        <div className="empty-state">{emptyLabel}</div>
+      ) : (
+        <div className="finance-product-list">
+          {visiveis.map((produto) => (
+            <div className="finance-product-row" key={produto.id}>
+              <ProductPhoto produto={produto} />
+              <span>
+                <strong>{produto.nome}</strong>
+                <small>{formatarMoeda(produto.preco || 0)}</small>
+              </span>
+              <em>{produto.estoque || 0} un.</em>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {produtos.length > 3 && (
+        <button className="manager-more-button" onClick={() => setMostrarTodos((valor) => !valor)} type="button">
+          {mostrarTodos ? "Ver menos" : "Ver mais"}
+        </button>
+      )}
+    </article>
   );
 }
 
@@ -1793,9 +1894,17 @@ function filtrarVendasPorPeriodo(vendas: Venda[], periodo: PeriodoFinanceiro) {
 function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], produtos: Produto[]) {
   const produtoTotais = new Map<string, number>();
   const servicoTotais = new Map<string, number>();
+  const formaTotais = new Map<string, { total: number; valor: number }>();
   const produtosComGiro = new Set<number>();
 
   vendas.forEach((venda) => {
+    const forma = venda.forma_pagamento || "Nao informado";
+    const formaAtual = formaTotais.get(forma) || { total: 0, valor: 0 };
+    formaTotais.set(forma, {
+      total: formaAtual.total + 1,
+      valor: formaAtual.valor + (venda.total || 0),
+    });
+
     venda.venda_itens?.forEach((item) => {
       const produto = firstRelation(item.produtos);
       if (!produto?.nome) return;
@@ -1822,6 +1931,9 @@ function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], 
 
   return {
     estoqueBaixo: produtos.filter((produto) => (produto.estoque || 0) <= 2),
+    formasPagamento: Array.from(formaTotais.entries())
+      .map(([nome, dados]) => ({ nome, total: dados.total, valor: dados.valor }))
+      .sort((a, b) => b.valor - a.valor),
     produtosMaisVendidos: ordenarRanking(produtoTotais),
     produtosSemGiro: produtos.filter((produto) => !produtosComGiro.has(produto.id)),
     servicosMaisVendidos: ordenarRanking(servicoTotais),

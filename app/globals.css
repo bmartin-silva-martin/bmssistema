@@ -1269,6 +1269,14 @@ th {
   font-style: normal;
 }
 
+.admin-history-search {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  color: #cbd5e1;
+  font-weight: 800;
+}
+
 .admin-panel .empty-state,
 .admin-panel .simple-list div,
 .admin-panel .editable-row {
@@ -1361,6 +1369,140 @@ th {
   border-color: rgb(255 112 74 / 0.24);
   background: linear-gradient(135deg, rgb(255 75 38 / 0.36), rgb(22 101 52 / 0.24));
   color: #ffffff;
+}
+
+.finance-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.finance-dashboard-grid .admin-metric-card {
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgb(34 36 42 / 0.96), rgb(22 24 30 / 0.98));
+  padding: clamp(1rem, 3vw, 1.35rem);
+}
+
+.finance-chart-card,
+.finance-list-card {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgb(34 36 42 / 0.96), rgb(22 24 30 / 0.98));
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.25);
+  padding: clamp(1rem, 3vw, 1.35rem);
+}
+
+.finance-chart-card {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 1rem;
+}
+
+.finance-chart-card > div:first-child,
+.finance-card-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.finance-chart-card span,
+.finance-card-header span {
+  color: #aab2bf;
+  font-weight: 800;
+}
+
+.finance-chart-card strong {
+  color: #f8fafc;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.payment-bars,
+.finance-ranking-list,
+.finance-product-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.payment-bar-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) 1.5fr auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.payment-bar-row > div {
+  height: 0.8rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.payment-bar-row em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff4b26, #166534);
+}
+
+.payment-bar-row strong {
+  min-width: 6rem;
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+.finance-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.finance-card-header h2 {
+  margin: 0;
+  font-size: clamp(1.2rem, 3vw, 1.65rem);
+}
+
+.finance-ranking-row,
+.finance-product-row {
+  display: grid;
+  align-items: center;
+  gap: 0.85rem;
+  border-radius: 18px;
+  background: #17191f;
+  padding: 0.8rem;
+}
+
+.finance-ranking-row {
+  grid-template-columns: auto 1fr auto;
+}
+
+.finance-ranking-row em {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgb(255 75 38 / 0.5), rgb(22 101 52 / 0.38));
+  color: #ffffff;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.finance-ranking-row span,
+.finance-product-row strong {
+  color: #f8fafc;
+  font-weight: 900;
+}
+
+.finance-product-row {
+  grid-template-columns: auto 1fr auto;
+}
+
+.finance-product-row small,
+.finance-product-row em,
+.finance-empty {
+  color: #aab2bf;
+  font-style: normal;
 }
 
 .product-stock-card,
@@ -1789,8 +1931,18 @@ th {
   }
 
   .admin-metrics-grid,
-  .admin-two-columns {
+  .admin-two-columns,
+  .finance-dashboard-grid,
+  .finance-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .payment-bar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-bar-row strong {
+    text-align: left;
   }
 
   .admin-panel .editable-row {
