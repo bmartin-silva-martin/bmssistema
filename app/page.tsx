@@ -14,6 +14,7 @@ type Empresa = {
   ativo: boolean | null;
   dias_atendimento?: number[] | null;
   horarios_atendimento?: string[] | null;
+  nome_responsavel?: string | null;
 };
 
 type Servico = {
@@ -103,6 +104,7 @@ type DiaPainel = {
 const diasCurtos = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const mesesCurtos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const DIAS_ATENDIMENTO_PADRAO = [1, 2, 3, 4, 5, 6];
+const DONO_STORAGE_KEY = "bms_nome_dono";
 const HORARIOS_ATENDIMENTO_PADRAO = [
   "09:00",
   "09:30",
@@ -201,6 +203,11 @@ export default function AdminDashboard() {
   const [salvandoConfiguracao, setSalvandoConfiguracao] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [buscaHistorico, setBuscaHistorico] = useState("");
+  const [nomeDono, setNomeDono] = useState(() => {
+    if (typeof window === "undefined") return "";
+
+    return window.localStorage.getItem(DONO_STORAGE_KEY) || "";
+  });
   const [configDias, setConfigDias] = useState<number[]>(DIAS_ATENDIMENTO_PADRAO);
   const [configHorarios, setConfigHorarios] = useState<string[]>(HORARIOS_ATENDIMENTO_PADRAO);
   const [novoHorario, setNovoHorario] = useState("");
@@ -292,8 +299,15 @@ export default function AdminDashboard() {
       return;
     }
 
-    const [empresaResponse, servicosResponse, agendamentosResponse, produtosResponse, clientesResponse, vendasResponse] =
-      await Promise.all([
+    const [
+      empresaResponse,
+      servicosResponse,
+      agendamentosResponse,
+      produtosResponse,
+      clientesResponse,
+      vendasResponse,
+      perfilResponse,
+    ] = await Promise.all([
       supabase
         .from("empresas")
         .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento")
@@ -320,9 +334,14 @@ export default function AdminDashboard() {
         .order("nome", { ascending: true }),
       supabase
         .from("vendas")
-        .select("id,created_at,total,agendamento_id,agendamentos(data_agendamento,servicos(nome,preco)),venda_itens(produto_id,quantidade,valor_unitario,produtos(nome))")
+        .select(
+          "id,created_at,total,agendamento_id,agendamentos(data_agendamento,servicos(nome,preco)),venda_itens(produto_id,quantidade,valor_unitario,produtos(nome))",
+        )
         .eq("empresa_id", EMPRESA_ID)
         .order("created_at", { ascending: false }),
+      fetch("/api/company-profile", { cache: "no-store" })
+        .then((response) => response.json())
+        .catch(() => null),
     ]);
 
     if (empresaResponse.data) {
@@ -336,6 +355,11 @@ export default function AdminDashboard() {
     if (servicosResponse.data) setServicos(servicosResponse.data as Servico[]);
     if (agendamentosResponse.data) setAgendamentos(agendamentosResponse.data as unknown as Agendamento[]);
     if (clientesResponse.data) setClientes(clientesResponse.data as ClienteResumo[]);
+
+    if (perfilResponse?.empresa?.nome_responsavel) {
+      setNomeDono(perfilResponse.empresa.nome_responsavel);
+      window.localStorage.setItem(DONO_STORAGE_KEY, perfilResponse.empresa.nome_responsavel);
+    }
 
     if (produtosResponse.error) {
       setProdutoAviso("Tabela produtos ainda nao encontrada no Supabase.");
@@ -765,6 +789,25 @@ export default function AdminDashboard() {
     setMensagem("Configuracoes de agenda salvas com sucesso.");
   }
 
+  async function salvarNomeDono() {
+    const nome = nomeDono.trim();
+    const response = await fetch("/api/company-profile", {
+      body: JSON.stringify({ nome_responsavel: nome || null }),
+      headers: { "Content-Type": "application/json" },
+      method: "PATCH",
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setMensagem(data?.error || "Nao foi possivel salvar o nome do dono.");
+      return;
+    }
+
+    window.localStorage.setItem(DONO_STORAGE_KEY, data?.empresa?.nome_responsavel || nome);
+    setNomeDono(data?.empresa?.nome_responsavel || nome);
+    setMensagem(nome ? `Nome salvo. A tela inicial agora mostra Olá, ${nome}.` : "Nome removido da tela inicial.");
+  }
+
   async function finalizarAtendimento() {
     if (!atendimentoAberto) return;
 
@@ -997,7 +1040,7 @@ export default function AdminDashboard() {
 
           <div>
             <p className="admin-kicker">Painel da barbearia</p>
-            <h1>{activeSection === "agenda" ? "Olá, barbeiro" : empresa?.nome || "BMS Sistema"}</h1>
+            <h1>{activeSection === "agenda" ? `Olá, ${nomeDono || "barbeiro"}` : empresa?.nome || "BMS Sistema"}</h1>
             <p>{activeSection === "agenda" ? "Você está em sua agenda." : "Gerencie sua barbearia em uma tela simples."}</p>
           </div>
 
@@ -1061,6 +1104,7 @@ export default function AdminDashboard() {
             <AgendaHero
               agendamentos={agendamentosAtivos}
               dias={diasAgendaPainel}
+              nomeDono={nomeDono}
               onOpenMenu={() => setMobileDrawerOpen(true)}
               vendas={vendas}
             />
@@ -1314,6 +1358,25 @@ export default function AdminDashboard() {
             title="Configuracoes"
           >
             <article className="admin-panel schedule-settings">
+              <section className="owner-profile-card">
+                <div>
+                  <span>Perfil do dono</span>
+                  <h3>Nome que aparece no app</h3>
+                  <p>Use esse campo para personalizar a saudacao da agenda. Cada barbearia tera o proprio nome salvo.</p>
+                </div>
+                <div className="owner-name-row">
+                  <input
+                    onChange={(event) => setNomeDono(event.target.value)}
+                    placeholder="Ex: Bruno"
+                    value={nomeDono}
+                  />
+                  <button className="admin-pill-button primary" onClick={salvarNomeDono} type="button">
+                    Salvar nome
+                  </button>
+                </div>
+                <strong>Previa: Ola, {nomeDono || "barbeiro"}</strong>
+              </section>
+
               <div>
                 <h2>Agenda de atendimento</h2>
                 <p>Os clientes so conseguirao escolher dias e horarios marcados aqui.</p>
@@ -1505,11 +1568,13 @@ function MobileDrawer({
 function AgendaHero({
   agendamentos,
   dias,
+  nomeDono,
   onOpenMenu,
   vendas,
 }: {
   agendamentos: Agendamento[];
   dias: DiaPainel[];
+  nomeDono: string;
   onOpenMenu: () => void;
   vendas: Venda[];
 }) {
@@ -1523,7 +1588,7 @@ function AgendaHero({
     <section className="agenda-hero">
       <div className="agenda-title-row">
         <div>
-          <h2>Olá, barbeiro</h2>
+          <h2>Olá, {nomeDono || "barbeiro"}</h2>
           <p>Você está em sua agenda.</p>
         </div>
         <button aria-label="Abrir menu" onClick={onOpenMenu} type="button">
