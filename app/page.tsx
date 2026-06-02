@@ -5,7 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
-const EMPRESA_ID = 1;
+const EMPRESA_ID_LEGADO = 1;
 
 type Empresa = {
   id: number;
@@ -15,6 +15,8 @@ type Empresa = {
   dias_atendimento?: number[] | null;
   horarios_atendimento?: string[] | null;
   nome_responsavel?: string | null;
+  owner_user_id?: string | null;
+  slug?: string | null;
 };
 
 type Servico = {
@@ -212,7 +214,12 @@ export default function AdminDashboard() {
   const [configHorarios, setConfigHorarios] = useState<string[]>(HORARIOS_ATENDIMENTO_PADRAO);
   const [novoHorario, setNovoHorario] = useState("");
 
-  const linkPublico = typeof window === "undefined" ? "/agendamentos" : `${window.location.origin}/agendamentos`;
+  const empresaIdAtual = empresa?.id || EMPRESA_ID_LEGADO;
+  const empresaSlugAtual = empresa?.slug?.trim();
+  const linkPublico =
+    typeof window === "undefined"
+      ? `/agendamentos${empresaSlugAtual ? `?empresa=${empresaSlugAtual}` : ""}`
+      : `${window.location.origin}/agendamentos${empresaSlugAtual ? `?empresa=${empresaSlugAtual}` : ""}`;
   const diasAgendaPainel = useMemo(() => montarDiasDoPainel(), []);
 
   const ranking = useMemo(() => {
@@ -299,8 +306,36 @@ export default function AdminDashboard() {
       return;
     }
 
+    const userId = session?.user.id;
+    let empresaAtual: Empresa | null = null;
+
+    if (userId) {
+      const { data } = await supabase
+        .from("empresas")
+        .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id")
+        .eq("owner_user_id", userId)
+        .maybeSingle();
+
+      empresaAtual = (data as Empresa | null) || null;
+    }
+
+    if (!empresaAtual) {
+      const { data } = await supabase
+        .from("empresas")
+        .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id")
+        .eq("id", EMPRESA_ID_LEGADO)
+        .maybeSingle();
+
+      empresaAtual = (data as Empresa | null) || null;
+    }
+
+    if (!empresaAtual) {
+      setMensagem("Nenhuma empresa encontrada para este login. Vincule o usuario a uma barbearia no Supabase.");
+      return;
+    }
+
+    const empresaId = empresaAtual.id;
     const [
-      empresaResponse,
       servicosResponse,
       agendamentosResponse,
       produtosResponse,
@@ -308,50 +343,43 @@ export default function AdminDashboard() {
       vendasResponse,
       perfilResponse,
     ] = await Promise.all([
-      supabase
-        .from("empresas")
-        .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento")
-        .eq("id", EMPRESA_ID)
-        .maybeSingle(),
-      supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", EMPRESA_ID).order("nome"),
+      supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", empresaId).order("nome"),
       supabase
         .from("agendamentos")
         .select(
           "id,cliente_id,servico_id,data_agendamento,status,lembrete_enviado_em,lembrete_status,clientes(id,nome,telefone,data_nascimento),servicos(nome,preco)",
         )
-        .eq("empresa_id", EMPRESA_ID)
+        .eq("empresa_id", empresaId)
         .neq("status", "cancelado")
         .order("data_agendamento", { ascending: true }),
       supabase
         .from("produtos")
         .select("id,nome,preco,estoque,foto_url,comissao_percentual")
-        .eq("empresa_id", EMPRESA_ID)
+        .eq("empresa_id", empresaId)
         .order("nome"),
       supabase
         .from("clientes")
         .select("id,nome,telefone,data_nascimento")
-        .eq("empresa_id", EMPRESA_ID)
+        .eq("empresa_id", empresaId)
         .order("nome", { ascending: true }),
       supabase
         .from("vendas")
         .select(
           "id,created_at,total,agendamento_id,agendamentos(data_agendamento,servicos(nome,preco)),venda_itens(produto_id,quantidade,valor_unitario,produtos(nome))",
         )
-        .eq("empresa_id", EMPRESA_ID)
+        .eq("empresa_id", empresaId)
         .order("created_at", { ascending: false }),
-      fetch("/api/company-profile", { cache: "no-store" })
+      fetch(`/api/company-profile?empresaId=${empresaId}`, { cache: "no-store" })
         .then((response) => response.json())
         .catch(() => null),
     ]);
 
-    if (empresaResponse.data) {
-      const empresaAtual = empresaResponse.data as Empresa;
-      setEmpresa(empresaAtual);
-      setConfigDias(empresaAtual.dias_atendimento?.length ? empresaAtual.dias_atendimento : DIAS_ATENDIMENTO_PADRAO);
-      setConfigHorarios(
-        empresaAtual.horarios_atendimento?.length ? empresaAtual.horarios_atendimento : HORARIOS_ATENDIMENTO_PADRAO,
-      );
-    }
+    setEmpresa(empresaAtual);
+    setConfigDias(empresaAtual.dias_atendimento?.length ? empresaAtual.dias_atendimento : DIAS_ATENDIMENTO_PADRAO);
+    setConfigHorarios(
+      empresaAtual.horarios_atendimento?.length ? empresaAtual.horarios_atendimento : HORARIOS_ATENDIMENTO_PADRAO,
+    );
+
     if (servicosResponse.data) setServicos(servicosResponse.data as Servico[]);
     if (agendamentosResponse.data) setAgendamentos(agendamentosResponse.data as unknown as Agendamento[]);
     if (clientesResponse.data) setClientes(clientesResponse.data as ClienteResumo[]);
@@ -377,7 +405,7 @@ export default function AdminDashboard() {
       setVendas((vendasResponse.data || []) as unknown as Venda[]);
     }
 
-    if (empresaResponse.error || servicosResponse.error || agendamentosResponse.error || clientesResponse.error) {
+    if (servicosResponse.error || agendamentosResponse.error || clientesResponse.error) {
       setMensagem("Alguns dados nao puderam ser carregados. Confira as politicas RLS no Supabase.");
     }
   }
@@ -492,7 +520,7 @@ export default function AdminDashboard() {
     setSalvandoServico(true);
     const { error } = await supabase.from("servicos").insert({
       duracao: Number(servicoForm.duracao || 30),
-      empresa_id: EMPRESA_ID,
+      empresa_id: empresaIdAtual,
       nome: servicoForm.nome.trim(),
       preco: Number(servicoForm.preco),
     });
@@ -518,7 +546,7 @@ export default function AdminDashboard() {
 
     setSalvandoProduto(true);
     const { error } = await supabase.from("produtos").insert({
-      empresa_id: EMPRESA_ID,
+      empresa_id: empresaIdAtual,
       comissao_percentual: produtoForm.comissao ? Number(produtoForm.comissao) : null,
       estoque: Number(produtoForm.estoque || 0),
       foto_url: produtoForm.foto_url.trim() || null,
@@ -546,7 +574,7 @@ export default function AdminDashboard() {
         preco: servico.preco,
       })
       .eq("id", servico.id)
-      .eq("empresa_id", EMPRESA_ID);
+      .eq("empresa_id", empresaIdAtual);
 
     if (error) {
       setMensagem(`Erro ao atualizar servico: ${formatarErroSupabase(error.message)}`);
@@ -568,7 +596,7 @@ export default function AdminDashboard() {
         preco: produto.preco,
       })
       .eq("id", produto.id)
-      .eq("empresa_id", EMPRESA_ID);
+      .eq("empresa_id", empresaIdAtual);
 
     if (error) {
       setMensagem(`Erro ao atualizar produto: ${formatarErroSupabase(error.message)}`);
@@ -596,6 +624,7 @@ export default function AdminDashboard() {
     const response = await fetch("/api/clientes", {
       body: JSON.stringify({
         data_nascimento: cliente.data_nascimento || null,
+        empresaId: empresaIdAtual,
         id: cliente.id,
         nome,
         telefone: telefone || null,
@@ -638,7 +667,7 @@ export default function AdminDashboard() {
       .from("agendamentos")
       .update({ lembrete_enviado_em: enviadoEm, lembrete_status: "enviado" })
       .eq("id", agendamento.id)
-      .eq("empresa_id", EMPRESA_ID);
+      .eq("empresa_id", empresaIdAtual);
 
     if (error) {
       setMensagem(`WhatsApp aberto, mas nao consegui marcar o lembrete: ${formatarErroSupabase(error.message)}`);
@@ -693,7 +722,7 @@ export default function AdminDashboard() {
       await fetch("/api/push/reminders", {
         body: JSON.stringify({
           agendamentoIds: pendentes.map((agendamento) => agendamento.id),
-          empresaId: EMPRESA_ID,
+          empresaId: empresaIdAtual,
         }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -760,6 +789,7 @@ export default function AdminDashboard() {
       },
       body: JSON.stringify({
         dias_atendimento: configDias,
+        empresaId: empresaIdAtual,
         horarios_atendimento: configHorarios,
       }),
     });
@@ -792,7 +822,7 @@ export default function AdminDashboard() {
   async function salvarNomeDono() {
     const nome = nomeDono.trim();
     const response = await fetch("/api/company-profile", {
-      body: JSON.stringify({ nome_responsavel: nome || null }),
+      body: JSON.stringify({ empresaId: empresaIdAtual, nome_responsavel: nome || null }),
       headers: { "Content-Type": "application/json" },
       method: "PATCH",
     });
@@ -825,7 +855,7 @@ export default function AdminDashboard() {
       .from("vendas")
       .insert({
         agendamento_id: atendimentoAberto.id,
-        empresa_id: EMPRESA_ID,
+        empresa_id: empresaIdAtual,
         total: totalAtendimentoAberto,
       })
       .select("id")
@@ -859,7 +889,7 @@ export default function AdminDashboard() {
             .from("produtos")
             .update({ estoque: Math.max((produto.estoque || 0) - quantidade, 0) })
             .eq("id", produto.id)
-            .eq("empresa_id", EMPRESA_ID),
+            .eq("empresa_id", empresaIdAtual),
         ),
       );
     }
@@ -868,7 +898,7 @@ export default function AdminDashboard() {
       .from("agendamentos")
       .update({ status: "finalizado" })
       .eq("id", atendimentoAberto.id)
-      .eq("empresa_id", EMPRESA_ID);
+      .eq("empresa_id", empresaIdAtual);
 
     setFinalizandoVenda(false);
     setAtendimentoAberto(null);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const EMPRESA_ID = 1;
+const EMPRESA_ID_LEGADO = 1;
 const DIAS_VALIDOS = new Set([0, 1, 2, 3, 4, 5, 6]);
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,12 @@ function normalizarHorarios(horarios: unknown) {
   ).sort();
 }
 
-async function buscarConfiguracao() {
+function getEmpresaId(value: unknown) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : EMPRESA_ID_LEGADO;
+}
+
+async function buscarConfiguracao(empresaId: number) {
   const supabase = getSupabaseServerClient();
 
   if (!supabase) {
@@ -64,7 +69,7 @@ async function buscarConfiguracao() {
   const { data, error } = await supabase
     .from("empresas")
     .select("dias_atendimento,horarios_atendimento")
-    .eq("id", EMPRESA_ID)
+    .eq("id", empresaId)
     .maybeSingle();
 
   if (error) return { data: null, error: error.message };
@@ -72,8 +77,9 @@ async function buscarConfiguracao() {
   return { data, error: null };
 }
 
-export async function GET() {
-  const { data, error } = await buscarConfiguracao();
+export async function GET(request: Request) {
+  const empresaId = getEmpresaId(new URL(request.url).searchParams.get("empresaId"));
+  const { data, error } = await buscarConfiguracao(empresaId);
 
   if (error) {
     return NextResponse.json({ error }, { status: 500 });
@@ -101,6 +107,7 @@ export async function PUT(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
+  const empresaId = getEmpresaId(body?.empresaId);
   const diasAtendimento = normalizarDias(body?.dias_atendimento);
   const horariosAtendimento = normalizarHorarios(body?.horarios_atendimento);
 
@@ -118,7 +125,7 @@ export async function PUT(request: Request) {
       dias_atendimento: diasAtendimento,
       horarios_atendimento: horariosAtendimento,
     })
-    .eq("id", EMPRESA_ID)
+    .eq("id", empresaId)
     .select("dias_atendimento,horarios_atendimento")
     .maybeSingle();
 

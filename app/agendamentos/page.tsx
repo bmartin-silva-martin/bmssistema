@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
-const EMPRESA_ID = 1;
-const BARBEARIA_NOME = "Barbearia Teste";
+const EMPRESA_ID_LEGADO = 1;
+const BARBEARIA_NOME_PADRAO = "Barbearia Teste";
 const HORARIOS_PADRAO = [
   "09:00",
   "09:30",
@@ -40,6 +40,9 @@ type HorarioOcupado = {
 };
 
 type EmpresaAgendaConfig = {
+  id?: number | null;
+  nome?: string | null;
+  slug?: string | null;
   dias_atendimento?: number[] | null;
   horarios_atendimento?: string[] | null;
 };
@@ -117,6 +120,8 @@ function montarDiasAgenda(diasAtendimento = DIAS_ATENDIMENTO_PADRAO) {
 }
 
 export default function AgendamentoPublicoPage() {
+  const [empresaId, setEmpresaId] = useState(EMPRESA_ID_LEGADO);
+  const [barbeariaNome, setBarbeariaNome] = useState(BARBEARIA_NOME_PADRAO);
   const [diasAgenda, setDiasAgenda] = useState(() => montarDiasAgenda());
   const [horariosDisponiveis, setHorariosDisponiveis] = useState(HORARIOS_PADRAO);
   const [servicos, setServicos] = useState<Servico[]>([]);
@@ -154,10 +159,33 @@ export default function AgendamentoPublicoPage() {
     }, 120);
   }
 
+  function getEmpresaParam() {
+    if (typeof window === "undefined") return "";
+
+    return new URLSearchParams(window.location.search).get("empresa")?.trim() || "";
+  }
+
+  function aplicarConfigEmpresa(config: EmpresaAgendaConfig) {
+    const diasConfigurados = config.dias_atendimento?.length ? config.dias_atendimento : DIAS_ATENDIMENTO_PADRAO;
+    const horariosConfigurados = config.horarios_atendimento?.length
+      ? config.horarios_atendimento.map(normalizarHorario).sort()
+      : HORARIOS_PADRAO;
+    const novosDias = montarDiasAgenda(diasConfigurados);
+
+    if (config.id) setEmpresaId(config.id);
+    if (config.nome) setBarbeariaNome(config.nome);
+
+    setDiasAgenda(novosDias);
+    setHorariosDisponiveis(horariosConfigurados);
+    setData((dataAtual) => (novosDias.some((dia) => dia.valor === dataAtual) ? dataAtual : novosDias[0]?.valor || ""));
+  }
+
   const carregarConfiguracaoAgenda = useCallback(async () => {
     if (!isSupabaseConfigured) return;
 
-    const response = await fetch(`/api/public-config?at=${Date.now()}`, {
+    const empresaParam = getEmpresaParam();
+    const queryEmpresa = empresaParam ? `&empresa=${encodeURIComponent(empresaParam)}` : "";
+    const response = await fetch(`/api/public-config?at=${Date.now()}${queryEmpresa}`, {
       cache: "no-store",
     });
 
@@ -166,49 +194,37 @@ export default function AgendamentoPublicoPage() {
       return;
     }
 
-    const empresaConfig = (await response.json()) as EmpresaAgendaConfig;
-
-    const config = empresaConfig as EmpresaAgendaConfig;
-    const diasConfigurados = config.dias_atendimento?.length ? config.dias_atendimento : DIAS_ATENDIMENTO_PADRAO;
-    const horariosConfigurados = config.horarios_atendimento?.length
-      ? config.horarios_atendimento.map(normalizarHorario).sort()
-      : HORARIOS_PADRAO;
-    const novosDias = montarDiasAgenda(diasConfigurados);
-
-    setDiasAgenda(novosDias);
-    setHorariosDisponiveis(horariosConfigurados);
-    setData((dataAtual) => (novosDias.some((dia) => dia.valor === dataAtual) ? dataAtual : novosDias[0]?.valor || ""));
+    aplicarConfigEmpresa((await response.json()) as EmpresaAgendaConfig);
   }, []);
 
   const carregarServicos = useCallback(async () => {
     if (!isSupabaseConfigured) return;
 
-    const [servicosResponse, empresaResponse] = await Promise.all([
-      supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", EMPRESA_ID).order("preco", { ascending: false }),
-      fetch(`/api/public-config?at=${Date.now()}`, { cache: "no-store" }),
-    ]);
-
-    if (servicosResponse.error) {
-      setMensagem(`Erro ao carregar servicos: ${servicosResponse.error.message}`);
-      return;
-    }
+    const empresaParam = getEmpresaParam();
+    const queryEmpresa = empresaParam ? `&empresa=${encodeURIComponent(empresaParam)}` : "";
+    const empresaResponse = await fetch(`/api/public-config?at=${Date.now()}${queryEmpresa}`, { cache: "no-store" });
 
     if (empresaResponse.ok) {
       const config = (await empresaResponse.json()) as EmpresaAgendaConfig;
-      const diasConfigurados = config.dias_atendimento?.length ? config.dias_atendimento : DIAS_ATENDIMENTO_PADRAO;
-      const horariosConfigurados = config.horarios_atendimento?.length
-        ? config.horarios_atendimento.map(normalizarHorario).sort()
-        : HORARIOS_PADRAO;
-      const novosDias = montarDiasAgenda(diasConfigurados);
+      const idEmpresa = config.id || EMPRESA_ID_LEGADO;
 
-      setDiasAgenda(novosDias);
-      setHorariosDisponiveis(horariosConfigurados);
-      setData((dataAtual) => (novosDias.some((dia) => dia.valor === dataAtual) ? dataAtual : novosDias[0]?.valor || ""));
+      aplicarConfigEmpresa(config);
+
+      const servicosResponse = await supabase
+        .from("servicos")
+        .select("id,nome,preco,duracao")
+        .eq("empresa_id", idEmpresa)
+        .order("preco", { ascending: false });
+
+      if (servicosResponse.error) {
+        setMensagem(`Erro ao carregar servicos: ${servicosResponse.error.message}`);
+        return;
+      }
+
+      setServicos(servicosResponse.data || []);
     } else {
       setMensagem("Nao consegui carregar os horarios da barbearia. Atualize a pagina e tente novamente.");
     }
-
-    setServicos(servicosResponse.data || []);
   }, []);
 
   const carregarHorariosOcupados = useCallback(async () => {
@@ -220,7 +236,7 @@ export default function AgendamentoPublicoPage() {
     const { data: lista, error } = await supabase
       .from("agendamentos")
       .select("data_agendamento")
-      .eq("empresa_id", EMPRESA_ID)
+      .eq("empresa_id", empresaId)
       .neq("status", "cancelado")
       .gte("data_agendamento", inicio)
       .lte("data_agendamento", fim);
@@ -231,7 +247,7 @@ export default function AgendamentoPublicoPage() {
     }
 
     setOcupados(((lista || []) as HorarioOcupado[]).map((item) => item.data_agendamento.slice(11, 16)));
-  }, [data]);
+  }, [data, empresaId]);
 
   useEffect(() => {
     async function carregarTela() {
@@ -323,7 +339,7 @@ export default function AgendamentoPublicoPage() {
       body: JSON.stringify({
         agendamentoId,
         clienteId,
-        empresaId: EMPRESA_ID,
+        empresaId,
         subscription: subscription.toJSON(),
       }),
       headers: { "Content-Type": "application/json" },
@@ -367,7 +383,7 @@ export default function AgendamentoPublicoPage() {
       .from("clientes")
       .insert({
         data_nascimento: dataNascimento || null,
-        empresa_id: EMPRESA_ID,
+        empresa_id: empresaId,
         aceita_lembrete: aceitaLembrete,
         nome: nomeLimpo,
         telefone: telefoneLimpo,
@@ -387,7 +403,7 @@ export default function AgendamentoPublicoPage() {
         aceita_lembrete: aceitaLembrete,
         cliente_id: cliente.id,
         data_agendamento: `${data} ${horario}:00`,
-        empresa_id: EMPRESA_ID,
+        empresa_id: empresaId,
         servico_id: servicoId,
         status: "confirmado",
       })
@@ -418,7 +434,7 @@ export default function AgendamentoPublicoPage() {
     <main className="chat-booking-page">
       <section className="chat-booking">
         <AssistantBubble wide>
-          Ola, tudo bem? Sou a assistente virtual do(a) {BARBEARIA_NOME} e cuido do agendamento dos servicos, ok?
+          Ola, tudo bem? Sou a assistente virtual do(a) {barbeariaNome} e cuido do agendamento dos servicos, ok?
         </AssistantBubble>
 
         <AssistantBubble>Qual o seu nome? Escreva seu nome e sobrenome, por favor.</AssistantBubble>

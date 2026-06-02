@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const EMPRESA_ID = 1;
+const EMPRESA_ID_LEGADO = 1;
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,18 +20,22 @@ function getSupabaseServerClient() {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = getSupabaseServerClient();
 
   if (!supabase) {
     return NextResponse.json({ error: "Supabase nao configurado." }, { status: 500 });
   }
 
-  const { data, error } = await supabase
+  const empresaSlug = new URL(request.url).searchParams.get("empresa")?.trim();
+  let query = supabase
     .from("empresas")
-    .select("dias_atendimento,horarios_atendimento")
-    .eq("id", EMPRESA_ID)
-    .maybeSingle();
+    .select("id,nome,slug,dias_atendimento,horarios_atendimento")
+    .eq("ativo", true);
+
+  query = empresaSlug ? query.eq("slug", empresaSlug) : query.eq("id", EMPRESA_ID_LEGADO);
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -39,6 +43,9 @@ export async function GET() {
 
   return NextResponse.json(
     {
+      id: data?.id || EMPRESA_ID_LEGADO,
+      nome: data?.nome || "Barbearia Teste",
+      slug: data?.slug || null,
       dias_atendimento: data?.dias_atendimento || null,
       horarios_atendimento: data?.horarios_atendimento || null,
       updated_at: new Date().toISOString(),

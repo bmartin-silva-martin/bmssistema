@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const EMPRESA_ID = 1;
+const EMPRESA_ID_LEGADO = 1;
 
 type ClienteUpdateRequest = {
   data_nascimento?: string | null;
+  empresaId?: number;
   id?: number;
   nome?: string;
   telefone?: string | null;
@@ -48,6 +49,11 @@ function normalizarDataNascimento(value?: string | null) {
   return value;
 }
 
+function getEmpresaId(value: unknown) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : EMPRESA_ID_LEGADO;
+}
+
 export async function PATCH(request: Request) {
   const supabase = getSupabaseServerClient();
 
@@ -56,6 +62,7 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as ClienteUpdateRequest | null;
+  const empresaId = getEmpresaId(body?.empresaId);
   const id = Number(body?.id);
   const nome = body?.nome?.trim();
   const telefone = normalizarTelefoneBrasil(body?.telefone || "");
@@ -80,7 +87,7 @@ export async function PATCH(request: Request) {
       telefone: telefone || null,
     })
     .eq("id", id)
-    .eq("empresa_id", EMPRESA_ID)
+    .eq("empresa_id", empresaId)
     .select("id,nome,telefone,data_nascimento")
     .maybeSingle();
 

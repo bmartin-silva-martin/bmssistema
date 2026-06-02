@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const EMPRESA_ID = 1;
+const EMPRESA_ID_LEGADO = 1;
 const MISSING_COLUMN_HINT =
   'Rode no Supabase: alter table empresas add column if not exists nome_responsavel text;';
 
 type CompanyProfileRequest = {
+  empresaId?: number;
   nome_responsavel?: string | null;
 };
 
@@ -30,8 +31,14 @@ function isMissingResponsibleNameColumn(errorMessage = "") {
   return errorMessage.toLowerCase().includes("nome_responsavel");
 }
 
-export async function GET() {
+function getEmpresaId(value: unknown) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : EMPRESA_ID_LEGADO;
+}
+
+export async function GET(request: Request) {
   const supabase = getSupabaseServerClient();
+  const empresaId = getEmpresaId(new URL(request.url).searchParams.get("empresaId"));
 
   if (!supabase) {
     return NextResponse.json({ error: "Supabase Service Role nao configurada na Vercel." }, { status: 500 });
@@ -39,13 +46,13 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("empresas")
-    .select("id,nome,nome_responsavel")
-    .eq("id", EMPRESA_ID)
+    .select("id,nome,slug,nome_responsavel")
+    .eq("id", empresaId)
     .maybeSingle();
 
   if (error) {
     if (isMissingResponsibleNameColumn(error.message)) {
-      return NextResponse.json({ empresa: { id: EMPRESA_ID, nome_responsavel: null }, needs_schema: true });
+      return NextResponse.json({ empresa: { id: empresaId, nome_responsavel: null }, needs_schema: true });
     }
 
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -62,13 +69,14 @@ export async function PATCH(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as CompanyProfileRequest | null;
+  const empresaId = getEmpresaId(body?.empresaId);
   const nomeResponsavel = body?.nome_responsavel?.trim() || null;
 
   const { data, error } = await supabase
     .from("empresas")
     .update({ nome_responsavel: nomeResponsavel })
-    .eq("id", EMPRESA_ID)
-    .select("id,nome,nome_responsavel")
+    .eq("id", empresaId)
+    .select("id,nome,slug,nome_responsavel")
     .maybeSingle();
 
   if (error) {
