@@ -306,20 +306,29 @@ export default function AdminDashboard() {
       return;
     }
 
-    const userId = session?.user.id;
+    const token = session?.access_token;
     let empresaAtual: Empresa | null = null;
 
-    if (userId) {
-      const { data } = await supabase
-        .from("empresas")
-        .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id")
-        .eq("owner_user_id", userId)
-        .maybeSingle();
+    if (token) {
+      const empresaResponse = await fetch("/api/my-company", {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const empresaPayload = await empresaResponse.json().catch(() => null);
 
-      empresaAtual = (data as Empresa | null) || null;
-    }
-
-    if (!empresaAtual) {
+      if (empresaResponse.ok && empresaPayload?.empresa) {
+        empresaAtual = empresaPayload.empresa as Empresa;
+      } else {
+        const email = empresaPayload?.user?.email ? ` (${empresaPayload.user.email})` : "";
+        const id = empresaPayload?.user?.id ? ` ID: ${empresaPayload.user.id}` : "";
+        setMensagem(
+          `${empresaPayload?.error || "Nenhuma empresa encontrada para este login."}${email}${id ? `.${id}` : ""}`,
+        );
+        return;
+      }
+    } else {
       const { data } = await supabase
         .from("empresas")
         .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id")
