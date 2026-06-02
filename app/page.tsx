@@ -14,6 +14,9 @@ type Empresa = {
   ativo: boolean | null;
   dias_atendimento?: number[] | null;
   horarios_atendimento?: string[] | null;
+  licenca_expires_at?: string | null;
+  licenca_grace_days?: number | null;
+  licenca_install_id?: string | null;
   nome_responsavel?: string | null;
   owner_user_id?: string | null;
   slug?: string | null;
@@ -107,6 +110,8 @@ const diasCurtos = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const mesesCurtos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const DIAS_ATENDIMENTO_PADRAO = [1, 2, 3, 4, 5, 6];
 const DONO_STORAGE_KEY = "bms_nome_dono";
+const EMPRESA_SELECT =
+  "id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id,licenca_install_id,licenca_expires_at,licenca_grace_days";
 const HORARIOS_ATENDIMENTO_PADRAO = [
   "09:00",
   "09:30",
@@ -176,6 +181,12 @@ function formatarErroSupabase(errorMessage: string) {
   return errorMessage;
 }
 
+function licencaExpirada(empresa: Empresa | null) {
+  if (!empresa?.licenca_expires_at) return false;
+
+  return new Date(empresa.licenca_expires_at).getTime() < Date.now();
+}
+
 export default function AdminDashboard() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -183,6 +194,8 @@ export default function AdminDashboard() {
   const [loginSenha, setLoginSenha] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loginCarregando, setLoginCarregando] = useState(false);
+  const [licencaToken, setLicencaToken] = useState("");
+  const [licencaCarregando, setLicencaCarregando] = useState(false);
   const [activeSection, setActiveSection] = useState<AdminSection>("agenda");
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
@@ -331,7 +344,7 @@ export default function AdminDashboard() {
     } else {
       const { data } = await supabase
         .from("empresas")
-        .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id")
+        .select(EMPRESA_SELECT)
         .eq("id", EMPRESA_ID_LEGADO)
         .maybeSingle();
 
@@ -847,6 +860,40 @@ export default function AdminDashboard() {
     setMensagem(nome ? `Nome salvo. A tela inicial agora mostra Olá, ${nome}.` : "Nome removido da tela inicial.");
   }
 
+  async function ativarLicenca(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!empresa) return;
+
+    const token = licencaToken.trim();
+
+    if (!token) {
+      setMensagem("Cole a chave de liberacao enviada para esta barbearia.");
+      return;
+    }
+
+    setLicencaCarregando(true);
+    setMensagem("Validando licenca...");
+
+    const response = await fetch("/api/license/activate", {
+      body: JSON.stringify({ empresaId: empresa.id, token }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const data = await response.json().catch(() => null);
+    setLicencaCarregando(false);
+
+    if (!response.ok) {
+      setMensagem(data?.error || "Nao foi possivel ativar a licenca.");
+      return;
+    }
+
+    setLicencaToken("");
+    setEmpresa((empresaAtual) => (empresaAtual ? { ...empresaAtual, ...data.empresa } : empresaAtual));
+    await carregarDados();
+    setMensagem("Licenca ativada com sucesso.");
+  }
+
   async function finalizarAtendimento() {
     if (!atendimentoAberto) return;
 
@@ -991,6 +1038,29 @@ export default function AdminDashboard() {
             </p>
           )}
         </section>
+      </main>
+    );
+  }
+
+  if (empresa && licencaExpirada(empresa)) {
+    return (
+      <main className="admin-login-page">
+        {mensagem && (
+          <section className="toast-message">
+            <span>{mensagem}</span>
+            <button aria-label="Fechar notificacao" onClick={() => setMensagem("")} type="button">
+              Fechar
+            </button>
+          </section>
+        )}
+        <LicenseBlockedPanel
+          empresa={empresa}
+          isLoading={licencaCarregando}
+          onLogout={sairDoPainel}
+          onSubmit={ativarLicenca}
+          token={licencaToken}
+          onTokenChange={setLicencaToken}
+        />
       </main>
     );
   }
@@ -1538,6 +1608,62 @@ function AdminSectionShell({
         <p>{description}</p>
       </div>
       {children}
+    </section>
+  );
+}
+
+function LicenseBlockedPanel({
+  empresa,
+  isLoading,
+  onLogout,
+  onSubmit,
+  onTokenChange,
+  token,
+}: {
+  empresa: Empresa;
+  isLoading: boolean;
+  onLogout: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onTokenChange: Dispatch<SetStateAction<string>>;
+  token: string;
+}) {
+  const vencimento = empresa.licenca_expires_at
+    ? new Date(empresa.licenca_expires_at).toLocaleDateString("pt-BR")
+    : "nao informado";
+
+  return (
+    <section className="admin-login-panel license-blocked-panel">
+      <div>
+        <p className="admin-kicker">Licenca bloqueada</p>
+        <h1>{empresa.nome}</h1>
+        <p>
+          O prazo de uso venceu em {vencimento}. Envie o ID abaixo para renovar a licenca e liberar o painel por
+          mais 30 dias.
+        </p>
+      </div>
+
+      <label className="license-install-box">
+        ID da licenca
+        <input readOnly value={empresa.licenca_install_id || "ID nao criado no Supabase"} />
+      </label>
+
+      <form className="admin-login-form" onSubmit={onSubmit}>
+        <label>
+          Chave de liberacao
+          <textarea
+            onChange={(event) => onTokenChange(event.target.value)}
+            placeholder="Cole aqui a chave gerada"
+            value={token}
+          />
+        </label>
+        <button className="admin-pill-button primary" disabled={isLoading} type="submit">
+          {isLoading ? "Validando..." : "Ativar licenca"}
+        </button>
+      </form>
+
+      <button className="admin-pill-button secondary" onClick={onLogout} type="button">
+        Sair
+      </button>
     </section>
   );
 }

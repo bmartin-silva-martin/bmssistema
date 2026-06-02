@@ -190,7 +190,8 @@ export default function AgendamentoPublicoPage() {
     });
 
     if (!response.ok) {
-      setMensagem("Nao consegui carregar os horarios da barbearia. Atualize a pagina e tente novamente.");
+      const erro = await response.json().catch(() => null);
+      setMensagem(erro?.error || "Nao consegui carregar os horarios da barbearia. Atualize a pagina e tente novamente.");
       return;
     }
 
@@ -223,7 +224,8 @@ export default function AgendamentoPublicoPage() {
 
       setServicos(servicosResponse.data || []);
     } else {
-      setMensagem("Nao consegui carregar os horarios da barbearia. Atualize a pagina e tente novamente.");
+      const erro = await empresaResponse.json().catch(() => null);
+      setMensagem(erro?.error || "Nao consegui carregar os horarios da barbearia. Atualize a pagina e tente novamente.");
     }
   }, []);
 

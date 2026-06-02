@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   const empresaSlug = new URL(request.url).searchParams.get("empresa")?.trim();
   let query = supabase
     .from("empresas")
-    .select("id,nome,slug,dias_atendimento,horarios_atendimento")
+    .select("id,nome,slug,dias_atendimento,horarios_atendimento,licenca_expires_at")
     .eq("ativo", true);
 
   query = empresaSlug ? query.eq("slug", empresaSlug) : query.eq("id", EMPRESA_ID_LEGADO);
@@ -39,6 +39,14 @@ export async function GET(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (empresaSlug && !data) {
+    return NextResponse.json({ error: "Empresa nao encontrada." }, { status: 404 });
+  }
+
+  if (data?.licenca_expires_at && new Date(data.licenca_expires_at).getTime() < Date.now()) {
+    return NextResponse.json({ error: "Agenda temporariamente indisponivel." }, { status: 402 });
   }
 
   return NextResponse.json(

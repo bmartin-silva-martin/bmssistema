@@ -39,7 +39,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -66,7 +67,8 @@ a {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -77,12 +79,14 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 4px rgb(22 101 52 / 0.12);
 }
 
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: #94a3b8;
 }
 
@@ -968,6 +972,7 @@ th {
 }
 
 .admin-login-form input,
+.admin-login-form textarea,
 .admin-panel input,
 .admin-link-card input {
   min-height: 3.3rem;
@@ -977,10 +982,34 @@ th {
 }
 
 .admin-login-form input:focus,
+.admin-login-form textarea:focus,
 .admin-panel input:focus,
 .admin-link-card input:focus {
   border-color: #ff704a;
   box-shadow: 0 0 0 4px rgb(255 112 74 / 0.18);
+}
+
+.admin-login-form textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+.license-blocked-panel {
+  width: min(100%, 680px);
+}
+
+.license-install-box {
+  display: grid;
+  gap: 0.45rem;
+  color: #d9dde5;
+  font-weight: 900;
+}
+
+.license-install-box input {
+  border-color: rgb(255 112 74 / 0.28);
+  background: rgb(255 112 74 / 0.1);
+  color: #ffffff;
+  font-weight: 800;
 }
 
 .admin-login-form .password-toggle {

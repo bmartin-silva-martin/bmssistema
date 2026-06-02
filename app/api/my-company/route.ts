@@ -48,7 +48,9 @@ export async function GET(request: Request) {
 
   const { data, error } = await clients.db
     .from("empresas")
-    .select("id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id")
+    .select(
+      "id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id,licenca_install_id,licenca_expires_at,licenca_grace_days",
+    )
     .eq("owner_user_id", userData.user.id)
     .maybeSingle();
 
