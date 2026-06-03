@@ -1312,7 +1312,7 @@ th {
 }
 
 .license-modal-stat {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
   justify-content: space-between;
   padding: 0.6rem 0;
@@ -1333,6 +1333,8 @@ th {
   color: #e2e8f0;
   font-size: 13px !important;
   font-weight: 600 !important;
+  flex-shrink: 0;
+  margin-left: 0.75rem;
 }
 
 .license-modal-stat-value.ok { color: #4ade80; }

@@ -1228,7 +1228,7 @@ export default function AdminDashboard() {
         )}
 
         {activeSection === "agenda" && (
-          <AdminSectionShell description="Veja os clientes do dia, envie lembretes e finalize atendimentos." title="Agenda">
+          <section className="admin-section">
             <AgendaHero
               agendamentos={agendamentosAtivos}
               dias={diasAgendaPainel}
@@ -1284,7 +1284,7 @@ export default function AdminDashboard() {
                 </>
               )}
             </article>
-          </AdminSectionShell>
+          </section>
         )}
 
         {activeSection === "servicos" && (
