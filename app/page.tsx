@@ -3105,10 +3105,4 @@ function InteligenciaPanel({
     </div>
   );
 }
-article>
-        )}
 
-      </div>
-    </div>
-  );
-}
