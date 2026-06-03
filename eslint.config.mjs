@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Scripts locais (nao fazem parte do app Next.js)
+    "gerar-licenca.js",
+    "*.sql",
   ]),
 ]);
 
