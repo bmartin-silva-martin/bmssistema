@@ -35,6 +35,7 @@ type Produto = {
   id: number;
   nome: string;
   preco: number | null;
+  preco_custo: number | null;
   estoque: number | null;
 };
 
@@ -97,7 +98,8 @@ type PaymentItem = RankingItem & {
   valor: number;
 };
 
-type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "financeiro" | "clientes" | "configuracoes";
+type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "financeiro" | "clientes" | "inteligencia" | "configuracoes";
+type AbaClientes = "cadastro" | "historico" | "ranking";
 type PeriodoFinanceiro = "hoje" | "7" | "30" | "todos";
 type DiaPainel = {
   dia: string;
@@ -187,6 +189,14 @@ function licencaExpirada(empresa: Empresa | null) {
   return new Date(empresa.licenca_expires_at).getTime() < Date.now();
 }
 
+function diasRestantesLicenca(empresa: Empresa | null) {
+  if (!empresa?.licenca_expires_at) return null;
+
+  const diffMs = new Date(empresa.licenca_expires_at).getTime() - Date.now();
+
+  return Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+}
+
 export default function AdminDashboard() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -208,7 +218,8 @@ export default function AdminDashboard() {
   const [produtoAviso, setProdutoAviso] = useState("");
   const [financeiroAviso, setFinanceiroAviso] = useState("");
   const [servicoForm, setServicoForm] = useState({ duracao: "30", nome: "", preco: "" });
-  const [produtoForm, setProdutoForm] = useState({ comissao: "", estoque: "0", foto_url: "", nome: "", preco: "" });
+  const [produtoForm, setProdutoForm] = useState({ comissao: "", custo: "", estoque: "0", foto_url: "", nome: "", preco: "" });
+  const [abaClientes, setAbaClientes] = useState<AbaClientes>("cadastro");
   const [periodoFinanceiro, setPeriodoFinanceiro] = useState<PeriodoFinanceiro>("hoje");
   const [atendimentoAberto, setAtendimentoAberto] = useState<Agendamento | null>(null);
   const [itensVenda, setItensVenda] = useState<Record<number, string>>({});
@@ -376,7 +387,7 @@ export default function AdminDashboard() {
         .order("data_agendamento", { ascending: true }),
       supabase
         .from("produtos")
-        .select("id,nome,preco,estoque,foto_url,comissao_percentual")
+        .select("id,nome,preco,preco_custo,estoque,foto_url,comissao_percentual")
         .eq("empresa_id", empresaId)
         .order("nome"),
       supabase
@@ -574,6 +585,7 @@ export default function AdminDashboard() {
       foto_url: produtoForm.foto_url.trim() || null,
       nome: produtoForm.nome.trim(),
       preco: produtoForm.preco ? Number(produtoForm.preco) : null,
+      preco_custo: produtoForm.custo ? Number(produtoForm.custo) : null,
     });
     setSalvandoProduto(false);
 
@@ -582,7 +594,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    setProdutoForm({ comissao: "", estoque: "0", foto_url: "", nome: "", preco: "" });
+    setProdutoForm({ comissao: "", custo: "", estoque: "0", foto_url: "", nome: "", preco: "" });
     await carregarDados();
     setMensagem("Produto cadastrado com sucesso.");
   }
@@ -616,6 +628,7 @@ export default function AdminDashboard() {
         foto_url: produto.foto_url || null,
         nome: produto.nome,
         preco: produto.preco,
+        preco_custo: produto.preco_custo || null,
       })
       .eq("id", produto.id)
       .eq("empresa_id", empresaIdAtual);
@@ -1112,6 +1125,7 @@ export default function AdminDashboard() {
             onClick={() => abrirSecao("financeiro")}
           />
           <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => abrirSecao("clientes")} />
+          <AdminMenuButton active={activeSection === "inteligencia"} icon="✦" label="Inteligencia" onClick={() => abrirSecao("inteligencia")} />
           <AdminMenuButton
             active={activeSection === "configuracoes"}
             icon="⚙"
@@ -1121,6 +1135,7 @@ export default function AdminDashboard() {
         </nav>
 
         <div className="admin-sidebar-footer">
+          <LicenseStatusChip empresa={empresa} />
           <Link href="/agendamentos">Link do cliente</Link>
           <button onClick={sairDoPainel} type="button">
             Sair
@@ -1154,6 +1169,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="admin-header-actions">
+            <LicenseStatusChip empresa={empresa} />
             <button className="admin-pill-button secondary" onClick={copiarLink} type="button">
               Copiar link do cliente
             </button>
@@ -1337,7 +1353,7 @@ export default function AdminDashboard() {
                     />
                   </label>
                   <label>
-                    Preco
+                    Preco de venda
                     <input
                       inputMode="decimal"
                       onChange={(event) => setProdutoForm((form) => ({ ...form, preco: event.target.value }))}
@@ -1346,6 +1362,25 @@ export default function AdminDashboard() {
                       value={produtoForm.preco}
                     />
                   </label>
+                  <label>
+                    Preco de custo
+                    <input
+                      inputMode="decimal"
+                      onChange={(event) => setProdutoForm((form) => ({ ...form, custo: event.target.value }))}
+                      placeholder="R$ 0,00"
+                      type="number"
+                      value={produtoForm.custo}
+                    />
+                  </label>
+                  {produtoForm.preco && produtoForm.custo && Number(produtoForm.custo) > 0 && (
+                    <p className="produto-lucro-preview">
+                      Margem:{" "}
+                      <strong>
+                        {(((Number(produtoForm.preco) - Number(produtoForm.custo)) / Number(produtoForm.custo)) * 100).toFixed(1)}%
+                      </strong>{" "}
+                      de lucro
+                    </p>
+                  )}
                   <label>
                     Comissao (%)
                     <input
@@ -1451,13 +1486,44 @@ export default function AdminDashboard() {
 
         {activeSection === "clientes" && (
           <AdminSectionShell
-            description="Pesquise clientes, corrija WhatsApp e mantenha aniversarios atualizados."
+            description="Cadastro, historico e ranking dos seus clientes."
             title="Clientes"
           >
-            <article className="admin-panel">
-              <h2>Cadastro de clientes</h2>
-              <EditableClienteList clientes={clientes} setClientes={setClientes} onSave={atualizarCliente} />
-            </article>
+            <div className="section-tabs">
+              <button className={abaClientes === "cadastro" ? "active" : ""} onClick={() => setAbaClientes("cadastro")} type="button">Cadastro</button>
+              <button className={abaClientes === "historico" ? "active" : ""} onClick={() => setAbaClientes("historico")} type="button">Historico</button>
+              <button className={abaClientes === "ranking" ? "active" : ""} onClick={() => setAbaClientes("ranking")} type="button">Ranking</button>
+            </div>
+
+            {abaClientes === "cadastro" && (
+              <article className="admin-panel">
+                <h2>Cadastro de clientes</h2>
+                <EditableClienteList clientes={clientes} setClientes={setClientes} onSave={atualizarCliente} />
+              </article>
+            )}
+
+            {abaClientes === "historico" && (
+              <article className="admin-panel">
+                <h2>Historico por cliente</h2>
+                <HistoricoClientePanel agendamentos={agendamentos} clientes={clientes} vendas={vendas} />
+              </article>
+            )}
+
+            {abaClientes === "ranking" && (
+              <article className="admin-panel">
+                <h2>Ranking de clientes</h2>
+                <RankingClientePanel agendamentos={agendamentos} clientes={clientes} />
+              </article>
+            )}
+          </AdminSectionShell>
+        )}
+
+        {activeSection === "inteligencia" && (
+          <AdminSectionShell
+            description="Analise inteligente dos seus dados: receita, produtos, sugestoes de compra e promocoes."
+            title="Inteligencia"
+          >
+            <InteligenciaPanel agendamentos={agendamentos} clientes={clientes} produtos={produtos} vendas={vendas} />
           </AdminSectionShell>
         )}
 
@@ -1549,6 +1615,7 @@ export default function AdminDashboard() {
         />
         <AdminMenuButton active={activeSection === "financeiro"} icon="$" label="Financeiro" onClick={() => abrirSecao("financeiro")} />
         <AdminMenuButton active={activeSection === "clientes"} icon="♡" label="Clientes" onClick={() => abrirSecao("clientes")} />
+        <AdminMenuButton active={activeSection === "inteligencia"} icon="✦" label="IA" onClick={() => abrirSecao("inteligencia")} />
         <AdminMenuButton
           active={activeSection === "configuracoes"}
           icon="⚙"
@@ -1589,6 +1656,24 @@ function AdminMenuButton({
       <span aria-hidden="true">{icon}</span>
       <strong>{label}</strong>
     </button>
+  );
+}
+
+function LicenseStatusChip({ empresa }: { empresa: Empresa | null }) {
+  const diasRestantes = diasRestantesLicenca(empresa);
+
+  if (diasRestantes === null) return null;
+
+  const vencimento = empresa?.licenca_expires_at
+    ? new Date(empresa.licenca_expires_at).toLocaleDateString("pt-BR")
+    : "";
+  const statusClass = diasRestantes <= 3 ? "warning" : diasRestantes <= 7 ? "attention" : "";
+
+  return (
+    <span className={`license-status-chip ${statusClass}`} title={`Licenca valida ate ${vencimento}`}>
+      <small>Licenca</small>
+      <strong>{diasRestantes} dias</strong>
+    </span>
   );
 }
 
@@ -2375,6 +2460,11 @@ function EditableProdutoList({
                 <strong>{produto.nome}</strong>
                 <span>
                   {produto.estoque || 0} un. - {formatarMoeda(produto.preco || 0)}
+                  {produto.preco_custo && produto.preco_custo > 0 && produto.preco ? (
+                    <em className="produto-margem-chip">
+                      {(((produto.preco - produto.preco_custo) / produto.preco_custo) * 100).toFixed(0)}% lucro
+                    </em>
+                  ) : null}
                 </span>
               </div>
               <button className="row-icon-button" onClick={() => setEditandoId(editando ? null : produto.id)} type="button">
@@ -2395,7 +2485,7 @@ function EditableProdutoList({
                     />
                   </label>
                   <label>
-                    Preco
+                    Preco de venda
                     <input
                       onChange={(event) =>
                         setProdutos(
@@ -2408,6 +2498,25 @@ function EditableProdutoList({
                       value={produto.preco || 0}
                     />
                   </label>
+                  <label>
+                    Preco de custo
+                    <input
+                      onChange={(event) =>
+                        setProdutos(
+                          produtos.map((item) =>
+                            item.id === produto.id ? { ...item, preco_custo: Number(event.target.value) || null } : item,
+                          ),
+                        )
+                      }
+                      type="number"
+                      value={produto.preco_custo || 0}
+                    />
+                  </label>
+                  {produto.preco && produto.preco_custo && produto.preco_custo > 0 && (
+                    <p className="produto-lucro-preview">
+                      Margem: <strong>{(((produto.preco - produto.preco_custo) / produto.preco_custo) * 100).toFixed(1)}%</strong> de lucro
+                    </p>
+                  )}
                   <label>
                     Estoque
                     <input
@@ -2599,6 +2708,399 @@ function RankingList({ items }: { items: RankingItem[] }) {
           <span>{item.total} agendamento(s)</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ---------- Historico por cliente ----------
+
+function HistoricoClientePanel({
+  agendamentos,
+  clientes,
+  vendas,
+}: {
+  agendamentos: Agendamento[];
+  clientes: ClienteResumo[];
+  vendas: Venda[];
+}) {
+  const [busca, setBusca] = useState("");
+  const [clienteSelecionadoId, setClienteSelecionadoId] = useState<number | null>(null);
+
+  const termoBusca = normalizarBusca(busca);
+  const clientesFiltrados = busca
+    ? clientes.filter((c) => normalizarBusca(c.nome).includes(termoBusca))
+    : clientes;
+
+  const clienteSelecionado = clientes.find((c) => c.id === clienteSelecionadoId) || null;
+
+  const agendamentosCliente = agendamentos
+    .filter((ag) => firstRelation(ag.clientes)?.id === clienteSelecionadoId)
+    .sort((a, b) => b.data_agendamento.localeCompare(a.data_agendamento));
+
+  const vendasCliente = vendas.filter((v) => {
+    if (!v.agendamento_id) return false;
+    return agendamentosCliente.some((ag) => ag.id === v.agendamento_id);
+  });
+
+  const totalGasto = vendasCliente.reduce((acc, v) => acc + (v.total || 0), 0);
+
+  return (
+    <div className="historico-cliente-panel">
+      <div className="historico-busca-row">
+        <input
+          className="manager-search"
+          onChange={(e) => {
+            setBusca(e.target.value);
+            setClienteSelecionadoId(null);
+          }}
+          placeholder="Buscar cliente pelo nome"
+          value={busca}
+        />
+      </div>
+
+      {!clienteSelecionado && busca && (
+        <div className="historico-sugestoes">
+          {clientesFiltrados.slice(0, 8).map((c) => (
+            <button
+              className="historico-sugestao-item"
+              key={c.id}
+              onClick={() => {
+                setClienteSelecionadoId(c.id);
+                setBusca(c.nome);
+              }}
+              type="button"
+            >
+              <span className="client-avatar" aria-hidden="true">{c.nome.slice(0, 2)}</span>
+              {c.nome}
+              {c.telefone && <small>{c.telefone}</small>}
+            </button>
+          ))}
+          {clientesFiltrados.length === 0 && <div className="empty-state">Nenhum cliente encontrado.</div>}
+        </div>
+      )}
+
+      {clienteSelecionado && (
+        <div className="historico-detalhe">
+          <div className="historico-cliente-header">
+            <div className="client-avatar" aria-hidden="true">{clienteSelecionado.nome.slice(0, 2)}</div>
+            <div>
+              <strong>{clienteSelecionado.nome}</strong>
+              <span>{clienteSelecionado.telefone || "Sem WhatsApp"}</span>
+            </div>
+            <div className="historico-totais">
+              <span>{agendamentosCliente.length} visitas</span>
+              <strong>{formatarMoeda(totalGasto)} gastos</strong>
+            </div>
+          </div>
+
+          {agendamentosCliente.length === 0 ? (
+            <div className="empty-state">Nenhum agendamento encontrado para este cliente.</div>
+          ) : (
+            <div className="historico-lista">
+              {agendamentosCliente.map((ag) => {
+                const servico = firstRelation(ag.servicos);
+                const venda = vendasCliente.find((v) => v.agendamento_id === ag.id);
+                const itens = venda?.venda_itens || [];
+                return (
+                  <article className="historico-item" key={ag.id}>
+                    <div className="historico-item-data">
+                      {new Date(ag.data_agendamento + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                    </div>
+                    <div className="historico-item-corpo">
+                      <strong>{servico?.nome || "Servico nao informado"}</strong>
+                      {servico?.preco ? <span className="historico-valor">{formatarMoeda(servico.preco)}</span> : null}
+                      {itens.length > 0 && (
+                        <ul className="historico-produtos">
+                          {itens.map((item, idx) => {
+                            const nomeProd = (Array.isArray(item.produtos) ? item.produtos[0] : item.produtos)?.nome || "Produto";
+                            return (
+                              <li key={idx}>
+                                {nomeProd} x{item.quantidade}
+                                {item.valor_unitario ? <em> — {formatarMoeda(item.valor_unitario * item.quantidade)}</em> : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      {venda?.total ? <span className="historico-total-venda">Total: {formatarMoeda(venda.total)}</span> : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!busca && (
+        <div className="empty-state">Digite o nome do cliente para ver o historico completo.</div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Ranking de clientes ----------
+
+function RankingClientePanel({
+  agendamentos,
+  clientes,
+}: {
+  agendamentos: Agendamento[];
+  clientes: ClienteResumo[];
+}) {
+  const hoje = new Date();
+  const limite30 = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const mapaClientes = new Map<number, { nome: string; telefone: string | null; total: number; ultimaVisita: Date }>();
+  for (const ag of agendamentos) {
+    const cliente = firstRelation(ag.clientes);
+    if (!cliente) continue;
+    const data = new Date(ag.data_agendamento + "T12:00:00");
+    const atual = mapaClientes.get(cliente.id);
+    if (!atual) {
+      mapaClientes.set(cliente.id, { nome: cliente.nome, telefone: cliente.telefone, total: 1, ultimaVisita: data });
+    } else {
+      mapaClientes.set(cliente.id, {
+        ...atual,
+        total: atual.total + 1,
+        ultimaVisita: data > atual.ultimaVisita ? data : atual.ultimaVisita,
+      });
+    }
+  }
+
+  for (const c of clientes) {
+    if (!mapaClientes.has(c.id)) {
+      mapaClientes.set(c.id, { nome: c.nome, telefone: c.telefone, total: 0, ultimaVisita: new Date(0) });
+    }
+  }
+
+  const lista = Array.from(mapaClientes.values()).sort((a, b) => b.total - a.total);
+  const inativos30 = lista.filter((c) => c.ultimaVisita < limite30);
+  const top10 = lista.slice(0, 10);
+
+  return (
+    <div className="ranking-cliente-panel">
+      {inativos30.length > 0 && (
+        <div className="ranking-alerta-inativos">
+          <div className="ranking-alerta-header">
+            <span className="ranking-alerta-icon">⚠</span>
+            <div>
+              <strong>{inativos30.length} cliente{inativos30.length > 1 ? "s" : ""} sem visita ha mais de 30 dias</strong>
+              <p>Considere mandar uma mensagem para traz-los de volta.</p>
+            </div>
+          </div>
+          <div className="ranking-inativos-lista">
+            {inativos30.map((c) => (
+              <div className="ranking-inativo-item" key={c.nome}>
+                <span className="client-avatar" aria-hidden="true">{c.nome.slice(0, 2)}</span>
+                <div>
+                  <strong>{c.nome}</strong>
+                  <small>
+                    {c.total === 0
+                      ? "Nunca agendou"
+                      : "Ultima visita: " + c.ultimaVisita.toLocaleDateString("pt-BR")}
+                  </small>
+                </div>
+                {c.telefone && (
+                  <a
+                    className="admin-pill-button secondary"
+                    href={"https://wa.me/55" + c.telefone.replace(/\D/g, "") + "?text=" + encodeURIComponent("Oi " + c.nome + "! Sentimos sua falta, que tal agendar um horario?")}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Whats
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <h3>Top clientes</h3>
+      {top10.length === 0 ? (
+        <div className="empty-state">Nenhum agendamento registrado ainda.</div>
+      ) : (
+        <div className="simple-list">
+          {top10.map((item, index) => (
+            <div key={item.nome}>
+              <strong>{index + 1}. {item.nome}</strong>
+              <span>
+                {item.total} visita{item.total !== 1 ? "s" : ""}
+                {item.total > 0 ? " — ultima: " + item.ultimaVisita.toLocaleDateString("pt-BR") : ""}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Inteligencia / IA ----------
+
+function InteligenciaPanel({
+  agendamentos,
+  clientes,
+  produtos,
+  vendas,
+}: {
+  agendamentos: Agendamento[];
+  clientes: ClienteResumo[];
+  produtos: Produto[];
+  vendas: Venda[];
+}) {
+  const hoje = new Date();
+  const inicio30 = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const inicio7 = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const vendas30 = vendas.filter((v) => new Date(v.created_at) >= inicio30);
+  const receita30 = vendas30.reduce((acc, v) => acc + (v.total || 0), 0);
+  const vendas7 = vendas.filter((v) => new Date(v.created_at) >= inicio7);
+  const receita7 = vendas7.reduce((acc, v) => acc + (v.total || 0), 0);
+  const ticketMedio = vendas30.length > 0 ? receita30 / vendas30.length : 0;
+
+  const giroMap = new Map<number, number>();
+  for (const v of vendas30) {
+    for (const item of v.venda_itens || []) {
+      if (item.produto_id) giroMap.set(item.produto_id, (giroMap.get(item.produto_id) || 0) + item.quantidade);
+    }
+  }
+
+  const produtosBaixoGiro = produtos
+    .filter((p) => (giroMap.get(p.id) || 0) < 2)
+    .sort((a, b) => (giroMap.get(a.id) || 0) - (giroMap.get(b.id) || 0));
+
+  const produtosMaisVendidos = [...produtos]
+    .filter((p) => (giroMap.get(p.id) || 0) >= 2)
+    .sort((a, b) => (giroMap.get(b.id) || 0) - (giroMap.get(a.id) || 0))
+    .slice(0, 5);
+
+  const ultimaVisitaMap = new Map<number, Date>();
+  for (const ag of agendamentos) {
+    const cliente = firstRelation(ag.clientes);
+    if (!cliente) continue;
+    const data = new Date(ag.data_agendamento + "T12:00:00");
+    const atual = ultimaVisitaMap.get(cliente.id);
+    if (!atual || data > atual) ultimaVisitaMap.set(cliente.id, data);
+  }
+  const clientesInativos = clientes.filter((c) => {
+    const ultima = ultimaVisitaMap.get(c.id);
+    return !ultima || ultima < inicio30;
+  });
+
+  const servicoGiro = new Map<string, number>();
+  for (const ag of agendamentos.filter((a) => new Date(a.data_agendamento) >= inicio30)) {
+    const s = firstRelation(ag.servicos);
+    if (s?.nome) servicoGiro.set(s.nome, (servicoGiro.get(s.nome) || 0) + 1);
+  }
+  const topServicos = Array.from(servicoGiro.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+  return (
+    <div className="inteligencia-panel">
+      <div className="inteligencia-grid">
+
+        <article className="inteligencia-card">
+          <h3>Receita dos ultimos 30 dias</h3>
+          <strong className="inteligencia-numero">{formatarMoeda(receita30)}</strong>
+          <span>Ultimos 7 dias: {formatarMoeda(receita7)}</span>
+          <span>Ticket medio: {formatarMoeda(ticketMedio)}</span>
+          <span>{vendas30.length} atendimento{vendas30.length !== 1 ? "s" : ""} no periodo</span>
+        </article>
+
+        <article className="inteligencia-card">
+          <h3>Servicos mais populares (30 dias)</h3>
+          {topServicos.length === 0 ? (
+            <span className="inteligencia-vazio">Sem dados suficientes</span>
+          ) : (
+            <ul>
+              {topServicos.map(([nome, qtd]) => (
+                <li key={nome}><strong>{nome}</strong> — {qtd}x</li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="inteligencia-card destaque-alerta">
+          <h3>Produtos com baixo giro</h3>
+          <p className="inteligencia-subtitulo">Menos de 2 unidades vendidas em 30 dias — considere fazer uma promocao.</p>
+          {produtosBaixoGiro.length === 0 ? (
+            <span className="inteligencia-vazio">Todos os produtos estao girando bem!</span>
+          ) : (
+            <ul>
+              {produtosBaixoGiro.slice(0, 6).map((p) => (
+                <li key={p.id}>
+                  <strong>{p.nome}</strong>
+                  <span>{giroMap.get(p.id) || 0} vend. — estoque: {p.estoque || 0}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="inteligencia-card destaque-positivo">
+          <h3>Sugestao de recompra</h3>
+          <p className="inteligencia-subtitulo">Produtos que mais saem — mantenha estoque em dia.</p>
+          {produtosMaisVendidos.length === 0 ? (
+            <span className="inteligencia-vazio">Sem dados de venda ainda.</span>
+          ) : (
+            <ul>
+              {produtosMaisVendidos.map((p) => (
+                <li key={p.id}>
+                  <strong>{p.nome}</strong>
+                  <span>{giroMap.get(p.id)} vendidos — estoque: {p.estoque || 0}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="inteligencia-card destaque-alerta">
+          <h3>Clientes para reativar</h3>
+          <p className="inteligencia-subtitulo">{clientesInativos.length} clientes sem visita ha mais de 30 dias.</p>
+          {clientesInativos.length === 0 ? (
+            <span className="inteligencia-vazio">Nenhum cliente inativo!</span>
+          ) : (
+            <ul>
+              {clientesInativos.slice(0, 5).map((c) => (
+                <li key={c.id}>
+                  <strong>{c.nome}</strong>
+                  {c.telefone && (
+                    <a
+                      href={"https://wa.me/55" + c.telefone.replace(/\D/g, "") + "?text=" + encodeURIComponent("Oi " + c.nome + "! Que tal dar uma passada na barbearia?")}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Whats
+                    </a>
+                  )}
+                </li>
+              ))}
+              {clientesInativos.length > 5 && <li>...e mais {clientesInativos.length - 5} clientes</li>}
+            </ul>
+          )}
+        </article>
+
+        {produtosBaixoGiro.length > 0 && (
+          <article className="inteligencia-card destaque-sugestao">
+            <h3>Sugestao de promocao</h3>
+            <p className="inteligencia-subtitulo">Produtos parados + clientes inativos = oportunidade.</p>
+            <ul>
+              {produtosBaixoGiro.slice(0, 3).map((p) => (
+                <li key={p.id}>
+                  <strong>Promocao de {p.nome}</strong>
+                  <span>
+                    {p.preco_custo && p.preco
+                      ? "Custo " + formatarMoeda(p.preco_custo) + " — venda " + formatarMoeda(p.preco) + ". Pode dar desconto de ate " + Math.floor(((p.preco - p.preco_custo) / p.preco) * 100) + "%."
+                      : "Preco atual: " + formatarMoeda(p.preco || 0) + ". Considere um desconto para girar o estoque."}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        )}
+
+      </div>
     </div>
   );
 }

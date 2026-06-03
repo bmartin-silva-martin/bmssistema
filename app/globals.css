@@ -1144,6 +1144,49 @@ th {
   margin-top: auto;
 }
 
+.license-status-chip {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgb(34 197 94 / 0.22);
+  border-radius: 999px;
+  background: rgb(22 101 52 / 0.16);
+  color: #d9fbe5;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.7rem;
+}
+
+.license-status-chip small {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.license-status-chip strong {
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.license-status-chip.attention {
+  border-color: rgb(251 191 36 / 0.28);
+  background: rgb(251 191 36 / 0.13);
+  color: #fde68a;
+}
+
+.license-status-chip.warning {
+  border-color: rgb(255 112 74 / 0.38);
+  background: rgb(255 112 74 / 0.15);
+  color: #ffcabd;
+}
+
+.admin-sidebar-footer .license-status-chip {
+  justify-content: center;
+  width: 100%;
+}
+
 .admin-sidebar-footer a {
   background: #166534;
   color: #ffffff;
@@ -2958,5 +3001,415 @@ th {
 
   .owner-name-row {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ===== TABS DE SECAO ===== */
+.section-tabs {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.25rem;
+  background: rgb(255 255 255 / 0.05);
+  border-radius: 10px;
+  width: fit-content;
+}
+
+.section-tabs button {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 1rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.section-tabs button.active {
+  background: rgb(255 255 255 / 0.1);
+  color: #f1f5f9;
+}
+
+/* ===== PRODUTO LUCRO ===== */
+.produto-lucro-preview {
+  background: rgb(34 197 94 / 0.1);
+  border: 1px solid rgb(34 197 94 / 0.2);
+  border-radius: 8px;
+  color: #86efac;
+  font-size: 0.85rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+}
+
+.produto-lucro-preview strong {
+  color: #4ade80;
+  font-weight: 800;
+}
+
+.produto-margem-chip {
+  background: rgb(34 197 94 / 0.12);
+  border-radius: 4px;
+  color: #86efac;
+  font-size: 0.72rem;
+  font-style: normal;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.35rem;
+}
+
+/* ===== HISTORICO CLIENTE ===== */
+.historico-cliente-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.historico-busca-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.historico-sugestoes {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.historico-sugestao-item {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  color: #e2e8f0;
+  cursor: pointer;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.historico-sugestao-item:last-child {
+  border-bottom: none;
+}
+
+.historico-sugestao-item:hover {
+  background: rgb(255 255 255 / 0.05);
+}
+
+.historico-sugestao-item small {
+  color: #64748b;
+  font-size: 0.78rem;
+  margin-left: auto;
+}
+
+.historico-detalhe {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.historico-cliente-header {
+  align-items: center;
+  background: rgb(255 255 255 / 0.04);
+  border-radius: 12px;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.historico-cliente-header div strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.historico-cliente-header div span {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.historico-totais {
+  display: flex;
+  flex-direction: column;
+  margin-left: auto;
+  text-align: right;
+}
+
+.historico-totais span {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.historico-totais strong {
+  color: #4ade80;
+  font-size: 1rem;
+}
+
+.historico-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.historico-item {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 10px;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 100px 1fr;
+  padding: 0.75rem 1rem;
+}
+
+.historico-item-data {
+  color: #64748b;
+  font-size: 0.78rem;
+  padding-top: 0.1rem;
+}
+
+.historico-item-corpo strong {
+  color: #e2e8f0;
+  display: block;
+  font-size: 0.9rem;
+}
+
+.historico-valor {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.historico-produtos {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+}
+
+.historico-produtos li {
+  padding: 0.1rem 0;
+}
+
+.historico-produtos em {
+  color: #64748b;
+  font-style: normal;
+}
+
+.historico-total-venda {
+  color: #4ade80;
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 0.4rem;
+}
+
+/* ===== RANKING CLIENTES ===== */
+.ranking-cliente-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ranking-alerta-inativos {
+  border: 1px solid rgb(251 191 36 / 0.25);
+  border-radius: 12px;
+  background: rgb(251 191 36 / 0.07);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ranking-alerta-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.ranking-alerta-icon {
+  color: #fbbf24;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.ranking-alerta-header strong {
+  color: #fde68a;
+  display: block;
+  font-size: 0.9rem;
+}
+
+.ranking-alerta-header p {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  margin: 0.2rem 0 0;
+}
+
+.ranking-inativos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ranking-inativo-item {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.ranking-inativo-item div {
+  flex: 1;
+}
+
+.ranking-inativo-item strong {
+  color: #e2e8f0;
+  display: block;
+  font-size: 0.85rem;
+}
+
+.ranking-inativo-item small {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.ranking-inativo-item a {
+  background: rgb(37 211 102 / 0.15);
+  border: 1px solid rgb(37 211 102 / 0.3);
+  border-radius: 6px;
+  color: #4ade80;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* ===== INTELIGENCIA / IA ===== */
+.inteligencia-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.inteligencia-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.inteligencia-card {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.1rem 1.25rem;
+}
+
+.inteligencia-card h3 {
+  color: #e2e8f0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.inteligencia-numero {
+  color: #4ade80;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.inteligencia-card span {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.inteligencia-subtitulo {
+  color: #64748b;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.inteligencia-vazio {
+  color: #4ade80 !important;
+  font-size: 0.85rem !important;
+}
+
+.inteligencia-card ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inteligencia-card ul li {
+  display: flex;
+  flex-direction: column;
+}
+
+.inteligencia-card ul li strong {
+  color: #e2e8f0;
+  font-size: 0.88rem;
+}
+
+.inteligencia-card ul li span {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.inteligencia-card ul li a {
+  background: rgb(37 211 102 / 0.12);
+  border: 1px solid rgb(37 211 102 / 0.25);
+  border-radius: 5px;
+  color: #4ade80;
+  font-size: 0.75rem;
+  margin-top: 0.2rem;
+  padding: 0.25rem 0.5rem;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.inteligencia-card.destaque-alerta {
+  border-color: rgb(251 191 36 / 0.2);
+  background: rgb(251 191 36 / 0.04);
+}
+
+.inteligencia-card.destaque-alerta h3 {
+  color: #fde68a;
+}
+
+.inteligencia-card.destaque-positivo {
+  border-color: rgb(34 197 94 / 0.2);
+  background: rgb(34 197 94 / 0.04);
+}
+
+.inteligencia-card.destaque-positivo h3 {
+  color: #86efac;
+}
+
+.inteligencia-card.destaque-sugestao {
+  border-color: rgb(139 92 246 / 0.25);
+  background: rgb(139 92 246 / 0.05);
+}
+
+.inteligencia-card.destaque-sugestao h3 {
+  color: #c4b5fd;
+}
+
+@media (max-width: 600px) {
+  .inteligencia-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .historico-item {
+    grid-template-columns: 1fr;
+  }
+
+  .historico-item-data {
+    font-size: 0.72rem;
   }
 }
