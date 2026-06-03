@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import type { Session } from "@supabase/supabase-js";
@@ -1154,14 +1154,16 @@ export default function AdminDashboard() {
               <span />
             )}
             {activeSection !== "agenda" ? (
-              <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
-                ☰
-              </button>
+              <div className="topbar-right-group">
+                <LicenseStatusChip empresa={empresa} />
+                <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
+                  ☰
+                </button>
+              </div>
             ) : (
-              <span />
+              <LicenseStatusChip empresa={empresa} />
             )}
           </div>
-          <LicenseStatusChip empresa={empresa} />
 
           <div>
             <p className="admin-kicker">Painel da barbearia</p>

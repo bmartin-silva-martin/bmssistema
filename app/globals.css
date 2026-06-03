@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   --background: #f6f7f9;
@@ -1153,12 +1153,8 @@ th {
   display: grid;
   height: 3.4rem;
   place-items: center;
-  position: fixed;
-  right: 4.65rem;
-  top: 0.75rem;
   transition: background 0.15s;
   width: 3.4rem;
-  z-index: 40;
 }
 
 .license-status-chip:hover {
@@ -1228,12 +1224,8 @@ th {
   display: grid;
   height: 3.4rem;
   place-items: center;
-  position: fixed;
-  right: 4.65rem;
-  top: 0.75rem;
   transition: background 0.15s;
   width: 3.4rem;
-  z-index: 40;
 }
 
 /* ===== MODAL DE LICENÇA ===== */
