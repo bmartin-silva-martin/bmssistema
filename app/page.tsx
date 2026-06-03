@@ -1661,7 +1661,7 @@ function AdminMenuButton({
 }
 
 function LicenseStatusChip({ empresa }: { empresa: Empresa | null }) {
-  const [mostrarInfo, setMostrarInfo] = useState(false);
+  const [aberto, setAberto] = useState(false);
   const diasRestantes = diasRestantesLicenca(empresa);
 
   if (diasRestantes === null) return null;
@@ -1670,47 +1670,54 @@ function LicenseStatusChip({ empresa }: { empresa: Empresa | null }) {
     ? new Date(empresa.licenca_expires_at).toLocaleDateString("pt-BR")
     : "";
   const statusClass = diasRestantes <= 3 ? "warning" : diasRestantes <= 7 ? "attention" : "";
+  const valorClass = diasRestantes <= 3 ? "danger" : diasRestantes <= 7 ? "alert" : "ok";
   const installId = empresa?.licenca_install_id || "ID nao gerado";
 
   return (
     <>
       <button
+        aria-label="Informacoes da licenca"
         className={`license-status-chip ${statusClass}`}
-        onClick={() => setMostrarInfo((v) => !v)}
+        onClick={() => setAberto(true)}
         type="button"
       >
         <span className="license-dot" aria-hidden="true" />
-        <span className="license-chip-text">
-          {diasRestantes}d
-        </span>
+        <span className="license-chip-text">{diasRestantes}d</span>
       </button>
 
-      {mostrarInfo && (
-        <div className="license-info-popover" role="dialog" aria-label="Informacoes da licenca">
-          <div className="license-info-header">
-            <strong>Licenca ativa</strong>
-            <button onClick={() => setMostrarInfo(false)} type="button" aria-label="Fechar">×</button>
-          </div>
-          <div className="license-info-body">
-            <div className="license-info-row">
-              <span>Validade</span>
-              <strong>{vencimento}</strong>
+      {aberto && (
+        <div className="license-modal-overlay" onClick={() => setAberto(false)}>
+          <div className="license-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Licenca">
+            <div className="license-modal-header">
+              <strong>Licenca</strong>
+              <button aria-label="Fechar" className="license-modal-close" onClick={() => setAberto(false)} type="button">×</button>
             </div>
-            <div className="license-info-row">
-              <span>Dias restantes</span>
-              <strong className={diasRestantes <= 7 ? "license-info-alerta" : ""}>{diasRestantes} dias</strong>
-            </div>
-            <div className="license-info-divider" />
-            <div className="license-info-row col">
-              <span>ID da licenca (envie para renovar)</span>
-              <div className="license-id-copy">
-                <code>{installId}</code>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(installId); }}
-                  type="button"
-                >
-                  Copiar
-                </button>
+            <div className="license-modal-body">
+              <div className="license-modal-stat">
+                <span className="license-modal-stat-label">Status</span>
+                <span className="license-modal-stat-value ok">Ativa</span>
+              </div>
+              <div className="license-modal-stat">
+                <span className="license-modal-stat-label">Validade</span>
+                <span className="license-modal-stat-value">{vencimento}</span>
+              </div>
+              <div className="license-modal-stat">
+                <span className="license-modal-stat-label">Dias restantes</span>
+                <span className={`license-modal-stat-value ${valorClass}`}>{diasRestantes} dias</span>
+              </div>
+              <div className="license-modal-divider" />
+              <div className="license-modal-id-section">
+                <span className="license-modal-id-label">ID da licenca — envie para renovar</span>
+                <div className="license-modal-id-box">
+                  <code>{installId}</code>
+                  <button
+                    className="license-modal-copy-btn"
+                    onClick={() => navigator.clipboard.writeText(installId)}
+                    type="button"
+                  >
+                    Copiar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -3126,14 +3133,13 @@ function InteligenciaPanel({
         {produtosBaixoGiro.length > 0 && (
           <article className="inteligencia-card destaque-sugestao">
             <h3>Sugestao de promocao</h3>
-            <p className="inteligencia-subtitulo">Produtos parados + clientes inativos = oportunidade.</p>
             <ul>
               {produtosBaixoGiro.slice(0, 3).map((p) => (
                 <li key={p.id}>
                   <strong>Promocao de {p.nome}</strong>
                   <span>
                     {p.preco_custo && p.preco
-                      ? "Custo " + formatarMoeda(p.preco_custo) + " \u2014 venda " + formatarMoeda(p.preco) + ". Pode dar desconto de ate " + Math.floor(((p.preco - p.preco_custo) / p.preco) * 100) + "%."
+                      ? "Custo " + formatarMoeda(p.preco_custo) + " — venda " + formatarMoeda(p.preco) + ". Pode dar desconto de ate " + Math.floor(((p.preco - p.preco_custo) / p.preco) * 100) + "%."
                       : "Preco atual: " + formatarMoeda(p.preco || 0) + ". Considere um desconto para girar o estoque."}
                   </span>
                 </li>
