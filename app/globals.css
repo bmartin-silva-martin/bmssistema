@@ -1146,18 +1146,18 @@ th {
 
 /* ===== CHIP DE LICENÇA (fixo, canto superior direito) ===== */
 .license-status-chip {
-  align-items: center;
-  background: rgb(34 197 94 / 0.12);
-  border: 1.5px solid rgb(34 197 94 / 0.35);
-  border-radius: 999px;
+  background: #16a34a;
+  border: none;
+  border-radius: 18px;
   cursor: pointer;
-  display: flex;
-  gap: 0.45rem;
-  padding: 0.4rem 0.75rem;
+  display: grid;
+  height: 3.4rem;
+  place-items: center;
   position: fixed;
-  right: 5rem;
-  top: 0.85rem;
-  transition: background 0.15s, border-color 0.15s;
+  right: 4.65rem;
+  top: 0.75rem;
+  transition: background 0.15s;
+  width: 3.4rem;
   z-index: 40;
 }
 
@@ -1165,15 +1165,7 @@ th {
   background: rgb(34 197 94 / 0.2);
 }
 
-.license-dot {
-  animation: pulse-green 2s infinite;
-  background: #4ade80;
-  border-radius: 999px;
-  display: block;
-  height: 8px;
-  width: 8px;
-  flex-shrink: 0;
-}
+.license-dot { display: none; }
 
 @keyframes pulse-green {
   0%, 100% { box-shadow: 0 0 0 0 rgb(74 222 128 / 0.5); }
@@ -1181,10 +1173,9 @@ th {
 }
 
 .license-chip-text {
-  color: #86efac;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
   line-height: 1;
   white-space: nowrap;
 }
@@ -1194,40 +1185,55 @@ th {
   border-color: rgb(251 191 36 / 0.35);
 }
 
-.license-status-chip.attention .license-dot {
-  animation: pulse-yellow 2s infinite;
-  background: #fbbf24;
-}
+.license-status-chip.attention .license-dot { display: none; }
 
 @keyframes pulse-yellow {
   0%, 100% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0.5); }
   50%       { box-shadow: 0 0 0 5px rgb(251 191 36 / 0); }
 }
 
-.license-status-chip.attention .license-chip-text { color: #fde68a; }
+.license-status-chip.attention .license-chip-text {
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
 
 .license-status-chip.warning {
   background: rgb(239 68 68 / 0.12);
   border-color: rgb(239 68 68 / 0.35);
 }
 
-.license-status-chip.warning .license-dot {
-  animation: pulse-red 2s infinite;
-  background: #f87171;
-}
+.license-status-chip.warning .license-dot { display: none; }
 
 @keyframes pulse-red {
   0%, 100% { box-shadow: 0 0 0 0 rgb(248 113 113 / 0.5); }
   50%       { box-shadow: 0 0 0 5px rgb(248 113 113 / 0); }
 }
 
-.license-status-chip.warning .license-chip-text { color: #fca5a5; }
+.license-status-chip.warning .license-chip-text {
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
 
 .admin-sidebar-footer .license-status-chip {
-  border-radius: 10px;
-  justify-content: center;
-  position: static;
-  width: 100%;
+  background: #16a34a;
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  display: grid;
+  height: 3.4rem;
+  place-items: center;
+  position: fixed;
+  right: 4.65rem;
+  top: 0.75rem;
+  transition: background 0.15s;
+  width: 3.4rem;
+  z-index: 40;
 }
 
 /* ===== MODAL DE LICENÇA ===== */
