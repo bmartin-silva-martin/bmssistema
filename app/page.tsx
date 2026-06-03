@@ -1153,14 +1153,16 @@ export default function AdminDashboard() {
             ) : (
               <span />
             )}
-            <LicenseStatusChip empresa={empresa} />
-            {activeSection !== "agenda" ? (
-              <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
-                ☰
-              </button>
-            ) : (
-              <span />
-            )}
+            <div className="topbar-right-group">
+              <LicenseStatusChip empresa={empresa} />
+              {activeSection !== "agenda" ? (
+                <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
+                  ☰
+                </button>
+              ) : (
+                <span />
+              )}
+            </div>
           </div>
 
           <div>

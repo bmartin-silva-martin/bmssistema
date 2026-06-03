@@ -1231,7 +1231,9 @@ th {
   border: 1px solid rgb(255 255 255 / 0.08);
   border-radius: 20px;
   box-shadow: 0 24px 80px rgb(0 0 0 / 0.6);
-  max-width: 340px;
+  font-size: 14px;
+  line-height: 1.4;
+  max-width: 320px;
   overflow: hidden;
   width: calc(100vw - 2rem);
 }
@@ -1251,8 +1253,8 @@ th {
 
 .license-modal-header strong {
   color: #f1f5f9;
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .license-modal-close {
@@ -1292,12 +1294,12 @@ th {
 
 .license-modal-stat-label {
   color: #64748b;
-  font-size: 0.8rem;
+  font-size: 12px;
 }
 
 .license-modal-stat-value {
   color: #e2e8f0;
-  font-size: 0.85rem;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -1318,7 +1320,7 @@ th {
 
 .license-modal-id-label {
   color: #64748b;
-  font-size: 0.78rem;
+  font-size: 11px;
 }
 
 .license-modal-id-box {
@@ -2414,10 +2416,17 @@ th {
 }
 
 .mobile-app-topbar {
+  align-items: center;
   display: flex;
   justify-content: space-between;
   margin-bottom: 1.5rem;
   width: 100%;
+}
+
+.topbar-right-group {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
 }
 
 .mobile-app-topbar button,
