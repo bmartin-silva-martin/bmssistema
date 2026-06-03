@@ -1146,15 +1146,16 @@ th {
 
 /* ===== CHIP DE LICENÇA (fixo, canto superior direito) ===== */
 .license-status-chip {
-  background: #16a34a;
-  border: none;
-  border-radius: 18px;
+  background: #16a34a !important;
+  border: none !important;
+  border-radius: 18px !important;
   cursor: pointer;
-  display: grid;
-  height: 3.4rem;
-  place-items: center;
+  display: grid !important;
+  font-size: 11px !important;
+  height: 3.4rem !important;
+  place-items: center !important;
   transition: background 0.15s;
-  width: 3.4rem;
+  width: 3.4rem !important;
 }
 
 .license-status-chip:hover {
@@ -1170,9 +1171,9 @@ th {
 
 .license-chip-text {
   color: #ffffff;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
   white-space: nowrap;
 }
 
@@ -1190,9 +1191,9 @@ th {
 
 .license-status-chip.attention .license-chip-text {
   color: #ffffff;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
   white-space: nowrap;
 }
 
@@ -1210,22 +1211,23 @@ th {
 
 .license-status-chip.warning .license-chip-text {
   color: #ffffff;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
   white-space: nowrap;
 }
 
 .admin-sidebar-footer .license-status-chip {
-  background: #16a34a;
-  border: none;
-  border-radius: 18px;
+  background: #16a34a !important;
+  border: none !important;
+  border-radius: 18px !important;
   cursor: pointer;
-  display: grid;
-  height: 3.4rem;
-  place-items: center;
+  display: grid !important;
+  font-size: 11px !important;
+  height: 3.4rem !important;
+  place-items: center !important;
   transition: background 0.15s;
-  width: 3.4rem;
+  width: 3.4rem !important;
 }
 
 /* ===== MODAL DE LICENÇA ===== */
