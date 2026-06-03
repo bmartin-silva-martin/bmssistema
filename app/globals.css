@@ -1144,70 +1144,90 @@ th {
   margin-top: auto;
 }
 
-/* ===== CHIP DE LICENÇA ===== */
+/* ===== CHIP DE LICENÇA (fixo, canto superior direito) ===== */
 .license-status-chip {
   align-items: center;
-  background: #1c2029;
-  border: 0;
-  border-radius: 18px;
+  background: rgb(34 197 94 / 0.12);
+  border: 1.5px solid rgb(34 197 94 / 0.35);
+  border-radius: 999px;
   cursor: pointer;
-  display: grid !important;
-  flex-direction: column;
-  gap: 0.15rem;
-  height: 3.4rem !important;
-  justify-items: center;
-  padding: 0.5rem 0.6rem !important;
-  transition: background 0.15s;
-  width: 3.4rem !important;
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  position: fixed;
+  right: 5rem;
+  top: 0.85rem;
+  transition: background 0.15s, border-color 0.15s;
+  z-index: 40;
 }
 
 .license-status-chip:hover {
-  background: #252a38;
+  background: rgb(34 197 94 / 0.2);
 }
 
 .license-dot {
+  animation: pulse-green 2s infinite;
+  background: #4ade80;
   border-radius: 999px;
   display: block;
+  height: 8px;
+  width: 8px;
   flex-shrink: 0;
-  height: 9px;
-  width: 9px;
-  background: #4ade80;
-  box-shadow: 0 0 7px #4ade80;
+}
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(74 222 128 / 0.5); }
+  50%       { box-shadow: 0 0 0 5px rgb(74 222 128 / 0); }
 }
 
 .license-chip-text {
-  color: #e2e8f0;
-  font-size: 0.6rem !important;
+  color: #86efac;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   line-height: 1;
   white-space: nowrap;
 }
 
+.license-status-chip.attention {
+  background: rgb(251 191 36 / 0.12);
+  border-color: rgb(251 191 36 / 0.35);
+}
+
 .license-status-chip.attention .license-dot {
+  animation: pulse-yellow 2s infinite;
   background: #fbbf24;
-  box-shadow: 0 0 7px #fbbf24;
+}
+
+@keyframes pulse-yellow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0.5); }
+  50%       { box-shadow: 0 0 0 5px rgb(251 191 36 / 0); }
+}
+
+.license-status-chip.attention .license-chip-text { color: #fde68a; }
+
+.license-status-chip.warning {
+  background: rgb(239 68 68 / 0.12);
+  border-color: rgb(239 68 68 / 0.35);
 }
 
 .license-status-chip.warning .license-dot {
+  animation: pulse-red 2s infinite;
   background: #f87171;
-  box-shadow: 0 0 7px #f87171;
 }
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(248 113 113 / 0.5); }
+  50%       { box-shadow: 0 0 0 5px rgb(248 113 113 / 0); }
+}
+
+.license-status-chip.warning .license-chip-text { color: #fca5a5; }
 
 .admin-sidebar-footer .license-status-chip {
   border-radius: 10px;
-  height: auto !important;
-  padding: 0.6rem 1rem !important;
-  width: 100% !important;
-  display: flex !important;
-  flex-direction: row;
-  gap: 0.5rem;
   justify-content: center;
-}
-
-.admin-sidebar-footer .license-chip-text {
-  font-size: 0.8rem !important;
-  color: #94a3b8;
+  position: static;
+  width: 100%;
 }
 
 /* ===== MODAL DE LICENÇA ===== */
@@ -1231,11 +1251,17 @@ th {
   border: 1px solid rgb(255 255 255 / 0.08);
   border-radius: 20px;
   box-shadow: 0 24px 80px rgb(0 0 0 / 0.6);
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 14px !important;
+  line-height: 1.5;
   max-width: 320px;
   overflow: hidden;
   width: calc(100vw - 2rem);
+}
+
+.license-modal * {
+  font-size: inherit !important;
+  font-weight: normal;
+  line-height: inherit;
 }
 
 @keyframes licenseModalIn {
@@ -1253,8 +1279,8 @@ th {
 
 .license-modal-header strong {
   color: #f1f5f9;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13px !important;
+  font-weight: 600 !important;
 }
 
 .license-modal-close {
@@ -1294,13 +1320,14 @@ th {
 
 .license-modal-stat-label {
   color: #64748b;
-  font-size: 12px;
+  font-size: 12px !important;
+  font-weight: 400 !important;
 }
 
 .license-modal-stat-value {
   color: #e2e8f0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13px !important;
+  font-weight: 600 !important;
 }
 
 .license-modal-stat-value.ok { color: #4ade80; }
@@ -1320,7 +1347,8 @@ th {
 
 .license-modal-id-label {
   color: #64748b;
-  font-size: 11px;
+  font-size: 11px !important;
+  font-weight: 400 !important;
 }
 
 .license-modal-id-box {
