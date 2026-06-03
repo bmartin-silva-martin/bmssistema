@@ -1661,6 +1661,7 @@ function AdminMenuButton({
 }
 
 function LicenseStatusChip({ empresa }: { empresa: Empresa | null }) {
+  const [mostrarInfo, setMostrarInfo] = useState(false);
   const diasRestantes = diasRestantesLicenca(empresa);
 
   if (diasRestantes === null) return null;
@@ -1669,12 +1670,53 @@ function LicenseStatusChip({ empresa }: { empresa: Empresa | null }) {
     ? new Date(empresa.licenca_expires_at).toLocaleDateString("pt-BR")
     : "";
   const statusClass = diasRestantes <= 3 ? "warning" : diasRestantes <= 7 ? "attention" : "";
+  const installId = empresa?.licenca_install_id || "ID nao gerado";
 
   return (
-    <span className={`license-status-chip ${statusClass}`} title={`Licenca valida ate ${vencimento}`}>
-      <small>Licenca</small>
-      <strong>{diasRestantes} dias</strong>
-    </span>
+    <>
+      <button
+        className={`license-status-chip ${statusClass}`}
+        onClick={() => setMostrarInfo((v) => !v)}
+        type="button"
+      >
+        <span className="license-dot" aria-hidden="true" />
+        <span className="license-chip-text">
+          {diasRestantes}d
+        </span>
+      </button>
+
+      {mostrarInfo && (
+        <div className="license-info-popover" role="dialog" aria-label="Informacoes da licenca">
+          <div className="license-info-header">
+            <strong>Licenca ativa</strong>
+            <button onClick={() => setMostrarInfo(false)} type="button" aria-label="Fechar">×</button>
+          </div>
+          <div className="license-info-body">
+            <div className="license-info-row">
+              <span>Validade</span>
+              <strong>{vencimento}</strong>
+            </div>
+            <div className="license-info-row">
+              <span>Dias restantes</span>
+              <strong className={diasRestantes <= 7 ? "license-info-alerta" : ""}>{diasRestantes} dias</strong>
+            </div>
+            <div className="license-info-divider" />
+            <div className="license-info-row col">
+              <span>ID da licenca (envie para renovar)</span>
+              <div className="license-id-copy">
+                <code>{installId}</code>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(installId); }}
+                  type="button"
+                >
+                  Copiar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -3065,7 +3107,6 @@ function InteligenciaPanel({
             <ul>
               {clientesInativos.slice(0, 5).map((c) => (
                 <li key={c.id}>
-                  <strong>{c.nome}</strong>
                   {c.telefone && (
                     <a
                       href={"https://wa.me/55" + c.telefone.replace(/\D/g, "") + "?text=" + encodeURIComponent("Oi " + c.nome + "! Que tal dar uma passada na barbearia?")}
@@ -3092,7 +3133,7 @@ function InteligenciaPanel({
                   <strong>Promocao de {p.nome}</strong>
                   <span>
                     {p.preco_custo && p.preco
-                      ? "Custo " + formatarMoeda(p.preco_custo) + " — venda " + formatarMoeda(p.preco) + ". Pode dar desconto de ate " + Math.floor(((p.preco - p.preco_custo) / p.preco) * 100) + "%."
+                      ? "Custo " + formatarMoeda(p.preco_custo) + " \u2014 venda " + formatarMoeda(p.preco) + ". Pode dar desconto de ate " + Math.floor(((p.preco - p.preco_custo) / p.preco) * 100) + "%."
                       : "Preco atual: " + formatarMoeda(p.preco || 0) + ". Considere um desconto para girar o estoque."}
                   </span>
                 </li>
@@ -3105,4 +3146,3 @@ function InteligenciaPanel({
     </div>
   );
 }
-

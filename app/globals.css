@@ -1145,46 +1145,177 @@ th {
 }
 
 .license-status-chip {
-  display: inline-flex;
-  width: fit-content;
   align-items: center;
-  gap: 0.45rem;
-  border: 1px solid rgb(34 197 94 / 0.22);
+  background: rgb(34 197 94 / 0.1);
+  border: 1px solid rgb(34 197 94 / 0.2);
   border-radius: 999px;
-  background: rgb(22 101 52 / 0.16);
-  color: #d9fbe5;
-  font-size: 0.82rem;
-  padding: 0.45rem 0.7rem;
+  color: #86efac;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  transition: background 0.15s;
+  width: fit-content;
 }
 
-.license-status-chip small {
-  color: #94a3b8;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.license-status-chip:hover {
+  background: rgb(34 197 94 / 0.17);
 }
 
-.license-status-chip strong {
-  font-weight: 900;
+.license-dot {
+  background: #4ade80;
+  border-radius: 999px;
+  box-shadow: 0 0 6px #4ade80;
+  display: block;
+  flex-shrink: 0;
+  height: 7px;
+  width: 7px;
+}
+
+.license-chip-text {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
 .license-status-chip.attention {
-  border-color: rgb(251 191 36 / 0.28);
-  background: rgb(251 191 36 / 0.13);
+  background: rgb(251 191 36 / 0.1);
+  border-color: rgb(251 191 36 / 0.25);
   color: #fde68a;
 }
 
+.license-status-chip.attention .license-dot {
+  background: #fbbf24;
+  box-shadow: 0 0 6px #fbbf24;
+}
+
 .license-status-chip.warning {
-  border-color: rgb(255 112 74 / 0.38);
-  background: rgb(255 112 74 / 0.15);
-  color: #ffcabd;
+  background: rgb(239 68 68 / 0.1);
+  border-color: rgb(239 68 68 / 0.25);
+  color: #fca5a5;
+}
+
+.license-status-chip.warning .license-dot {
+  background: #f87171;
+  box-shadow: 0 0 6px #f87171;
 }
 
 .admin-sidebar-footer .license-status-chip {
   justify-content: center;
   width: 100%;
+}
+
+/* Popover de info da licenca */
+.license-info-popover {
+  background: #1a1d27;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.5);
+  left: 50%;
+  max-width: 320px;
+  position: fixed;
+  top: 5rem;
+  transform: translateX(-50%);
+  width: calc(100vw - 2rem);
+  z-index: 100;
+}
+
+.license-info-header {
+  align-items: center;
+  border-bottom: 1px solid rgb(255 255 255 / 0.07);
+  display: flex;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem;
+}
+
+.license-info-header strong {
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.license-info-header button {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.license-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+}
+
+.license-info-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.license-info-row.col {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.license-info-row span {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.license-info-row strong {
+  color: #e2e8f0;
+  font-size: 0.85rem;
+}
+
+.license-info-alerta {
+  color: #fbbf24 !important;
+}
+
+.license-info-divider {
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+  margin: 0.2rem 0;
+}
+
+.license-id-copy {
+  align-items: center;
+  background: rgb(0 0 0 / 0.25);
+  border: 1px solid rgb(255 255 255 / 0.07);
+  border-radius: 8px;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  width: 100%;
+}
+
+.license-id-copy code {
+  color: #94a3b8;
+  flex: 1;
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.license-id-copy button {
+  background: rgb(34 197 94 / 0.15);
+  border: 1px solid rgb(34 197 94 / 0.25);
+  border-radius: 6px;
+  color: #4ade80;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+}
+
+.license-id-copy button:hover {
+  background: rgb(34 197 94 / 0.25);
 }
 
 .admin-sidebar-footer a {
@@ -2263,19 +2394,6 @@ th {
   font-weight: 900;
 }
 
-.mobile-app-topbar .license-status-chip {
-  font-size: 0.72rem;
-  padding: 0.3rem 0.55rem;
-  gap: 0.3rem;
-}
-
-.mobile-app-topbar .license-status-chip small {
-  font-size: 0.6rem;
-}
-
-.mobile-app-topbar .license-status-chip strong {
-  font-size: 0.78rem;
-}
 
 .admin-section-heading {
   text-align: center;
