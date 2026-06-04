@@ -2179,7 +2179,7 @@ th {
   }
 
   .mobile-app-topbar button,
-  .mobile-app-topbar span {
+  .mobile-app-topbar > span {
     display: grid;
     width: 3.4rem;
     height: 3.4rem;
@@ -2465,7 +2465,7 @@ th {
 }
 
 .mobile-app-topbar button,
-.mobile-app-topbar span {
+.mobile-app-topbar > span {
   display: grid;
   width: 3.4rem;
   height: 3.4rem;
