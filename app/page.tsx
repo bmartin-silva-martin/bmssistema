@@ -237,6 +237,8 @@ export default function AdminDashboard() {
   const [configDias, setConfigDias] = useState<number[]>(DIAS_ATENDIMENTO_PADRAO);
   const [configHorarios, setConfigHorarios] = useState<string[]>(HORARIOS_ATENDIMENTO_PADRAO);
   const [novoHorario, setNovoHorario] = useState("");
+  const [addServicoOpen, setAddServicoOpen] = useState(false);
+  const [addProdutoOpen, setAddProdutoOpen] = useState(false);
 
   const empresaIdAtual = empresa?.id || EMPRESA_ID_LEGADO;
   const empresaSlugAtual = empresa?.slug?.trim();
@@ -565,6 +567,7 @@ export default function AdminDashboard() {
     }
 
     setServicoForm({ duracao: "30", nome: "", preco: "" });
+    setAddServicoOpen(false);
     await carregarDados();
     setMensagem("Servico cadastrado com sucesso.");
   }
@@ -595,6 +598,7 @@ export default function AdminDashboard() {
     }
 
     setProdutoForm({ comissao: "", custo: "", estoque: "0", foto_url: "", nome: "", preco: "" });
+    setAddProdutoOpen(false);
     await carregarDados();
     setMensagem("Produto cadastrado com sucesso.");
   }
@@ -1292,49 +1296,51 @@ export default function AdminDashboard() {
             description="Cadastre os servicos que aparecem no link publico e edite valores ou duracao."
             title="Servicos"
           >
-            <section className="admin-two-columns">
-              <article className="admin-panel">
-                <h2>Inserir um novo servico</h2>
-                <form className="form-stack admin-form" onSubmit={cadastrarServico}>
-                  <label>
-                    Nome
-                    <input
-                      onChange={(event) => setServicoForm((form) => ({ ...form, nome: event.target.value }))}
-                      placeholder="Ex: Corte masculino"
-                      value={servicoForm.nome}
-                    />
-                  </label>
-                  <label>
-                    Preco
-                    <input
-                      inputMode="decimal"
-                      onChange={(event) => setServicoForm((form) => ({ ...form, preco: event.target.value }))}
-                      placeholder="R$ 0,00"
-                      type="number"
-                      value={servicoForm.preco}
-                    />
-                  </label>
-                  <label>
-                    Duracao em minutos
-                    <input
-                      inputMode="numeric"
-                      onChange={(event) => setServicoForm((form) => ({ ...form, duracao: event.target.value }))}
-                      type="number"
-                      value={servicoForm.duracao}
-                    />
-                  </label>
-                  <button className="admin-pill-button primary wide" disabled={salvandoServico} type="submit">
-                    {salvandoServico ? "Salvando..." : "Adicionar a lista"}
-                  </button>
-                </form>
-              </article>
-
-              <article className="admin-panel">
-                <h2>Lista de servicos</h2>
-                <EditableServicoList servicos={servicos} setServicos={setServicos} onSave={atualizarServico} />
-              </article>
-            </section>
+            <article className="admin-panel">
+              <div className="panel-header-with-action">
+                <h2>Servicos</h2>
+                <button className="add-item-btn" onClick={() => setAddServicoOpen(true)} type="button">+ Novo</button>
+              </div>
+              <EditableServicoList servicos={servicos} setServicos={setServicos} onSave={atualizarServico} />
+            </article>
           </AdminSectionShell>
+        )}
+
+        {addServicoOpen && (
+          <AddFormSheet onClose={() => setAddServicoOpen(false)} title="Novo servico">
+            <form className="form-stack add-sheet-form" onSubmit={cadastrarServico}>
+              <label>
+                Nome
+                <input
+                  onChange={(event) => setServicoForm((form) => ({ ...form, nome: event.target.value }))}
+                  placeholder="Ex: Corte masculino"
+                  value={servicoForm.nome}
+                />
+              </label>
+              <label>
+                Preco
+                <input
+                  inputMode="decimal"
+                  onChange={(event) => setServicoForm((form) => ({ ...form, preco: event.target.value }))}
+                  placeholder="R$ 0,00"
+                  type="number"
+                  value={servicoForm.preco}
+                />
+              </label>
+              <label>
+                Duracao em minutos
+                <input
+                  inputMode="numeric"
+                  onChange={(event) => setServicoForm((form) => ({ ...form, duracao: event.target.value }))}
+                  type="number"
+                  value={servicoForm.duracao}
+                />
+              </label>
+              <button className="admin-pill-button primary wide" disabled={salvandoServico} type="submit">
+                {salvandoServico ? "Salvando..." : "Adicionar servico"}
+              </button>
+            </form>
+          </AddFormSheet>
         )}
 
         {activeSection === "produtos" && (
@@ -1342,92 +1348,94 @@ export default function AdminDashboard() {
             description="Controle produtos vendidos na barbearia e mantenha estoque e preco organizados."
             title="Produtos"
           >
-            <section className="admin-two-columns">
-              <article className="admin-panel">
-                <h2>Insira um novo produto</h2>
-                {produtoAviso && <p className="notice notice-error">{produtoAviso}</p>}
-                <form className="form-stack admin-form" onSubmit={cadastrarProduto}>
-                  <label>
-                    Nome
-                    <input
-                      onChange={(event) => setProdutoForm((form) => ({ ...form, nome: event.target.value }))}
-                      placeholder="Ex: Pomada"
-                      value={produtoForm.nome}
-                    />
-                  </label>
-                  <label>
-                    Preco de venda
-                    <input
-                      inputMode="decimal"
-                      onChange={(event) => setProdutoForm((form) => ({ ...form, preco: event.target.value }))}
-                      placeholder="R$ 0,00"
-                      type="number"
-                      value={produtoForm.preco}
-                    />
-                  </label>
-                  <label>
-                    Preco de custo
-                    <input
-                      inputMode="decimal"
-                      onChange={(event) => setProdutoForm((form) => ({ ...form, custo: event.target.value }))}
-                      placeholder="R$ 0,00"
-                      type="number"
-                      value={produtoForm.custo}
-                    />
-                  </label>
-                  {produtoForm.preco && produtoForm.custo && Number(produtoForm.custo) > 0 && (
-                    <p className="produto-lucro-preview">
-                      Margem:{" "}
-                      <strong>
-                        {(((Number(produtoForm.preco) - Number(produtoForm.custo)) / Number(produtoForm.custo)) * 100).toFixed(1)}%
-                      </strong>{" "}
-                      de lucro
-                    </p>
-                  )}
-                  <label>
-                    Comissao (%)
-                    <input
-                      inputMode="decimal"
-                      onChange={(event) => setProdutoForm((form) => ({ ...form, comissao: event.target.value }))}
-                      placeholder="Ex: 20%"
-                      type="number"
-                      value={produtoForm.comissao}
-                    />
-                  </label>
-                  <label>
-                    Estoque
-                    <input
-                      inputMode="numeric"
-                      onChange={(event) => setProdutoForm((form) => ({ ...form, estoque: event.target.value }))}
-                      type="number"
-                      value={produtoForm.estoque}
-                    />
-                  </label>
-                  <label>
-                    Foto do produto opcional
-                    <input
-                      onChange={(event) => setProdutoForm((form) => ({ ...form, foto_url: event.target.value }))}
-                      placeholder="Cole uma URL de imagem"
-                      type="url"
-                      value={produtoForm.foto_url}
-                    />
-                  </label>
-                  <button
-                    className="admin-pill-button primary wide"
-                    disabled={salvandoProduto || Boolean(produtoAviso)}
-                    type="submit"
-                  >
-                    {salvandoProduto ? "Salvando..." : "Adicionar a lista"}
-                  </button>
-                </form>
-              </article>
-
-              <article className="admin-panel">
-                <h2>Lista de produtos</h2>
-                <EditableProdutoList produtos={produtos} setProdutos={setProdutos} onSave={atualizarProduto} />
-              </article>
-            </section>
+            {produtoAviso && <p className="notice notice-error">{produtoAviso}</p>}
+            <article className="admin-panel">
+              <div className="panel-header-with-action">
+                <h2>Produtos</h2>
+                <button className="add-item-btn" disabled={Boolean(produtoAviso)} onClick={() => setAddProdutoOpen(true)} type="button">+ Novo</button>
+              </div>
+              <EditableProdutoList produtos={produtos} setProdutos={setProdutos} onSave={atualizarProduto} />
+            </article>
           </AdminSectionShell>
+        )}
+
+        {addProdutoOpen && (
+          <AddFormSheet onClose={() => setAddProdutoOpen(false)} title="Novo produto">
+            <form className="form-stack add-sheet-form" onSubmit={cadastrarProduto}>
+              <label>
+                Nome
+                <input
+                  onChange={(event) => setProdutoForm((form) => ({ ...form, nome: event.target.value }))}
+                  placeholder="Ex: Pomada"
+                  value={produtoForm.nome}
+                />
+              </label>
+              <label>
+                Preco de venda
+                <input
+                  inputMode="decimal"
+                  onChange={(event) => setProdutoForm((form) => ({ ...form, preco: event.target.value }))}
+                  placeholder="R$ 0,00"
+                  type="number"
+                  value={produtoForm.preco}
+                />
+              </label>
+              <label>
+                Preco de custo
+                <input
+                  inputMode="decimal"
+                  onChange={(event) => setProdutoForm((form) => ({ ...form, custo: event.target.value }))}
+                  placeholder="R$ 0,00"
+                  type="number"
+                  value={produtoForm.custo}
+                />
+              </label>
+              {produtoForm.preco && produtoForm.custo && Number(produtoForm.custo) > 0 && (
+                <p className="produto-lucro-preview">
+                  Margem:{" "}
+                  <strong>
+                    {(((Number(produtoForm.preco) - Number(produtoForm.custo)) / Number(produtoForm.custo)) * 100).toFixed(1)}%
+                  </strong>{" "}
+                  de lucro
+                </p>
+              )}
+              <label>
+                Comissao (%)
+                <input
+                  inputMode="decimal"
+                  onChange={(event) => setProdutoForm((form) => ({ ...form, comissao: event.target.value }))}
+                  placeholder="Ex: 20%"
+                  type="number"
+                  value={produtoForm.comissao}
+                />
+              </label>
+              <label>
+                Estoque
+                <input
+                  inputMode="numeric"
+                  onChange={(event) => setProdutoForm((form) => ({ ...form, estoque: event.target.value }))}
+                  type="number"
+                  value={produtoForm.estoque}
+                />
+              </label>
+              <label>
+                Foto do produto opcional
+                <input
+                  onChange={(event) => setProdutoForm((form) => ({ ...form, foto_url: event.target.value }))}
+                  placeholder="Cole uma URL de imagem"
+                  type="url"
+                  value={produtoForm.foto_url}
+                />
+              </label>
+              <button
+                className="admin-pill-button primary wide"
+                disabled={salvandoProduto}
+                type="submit"
+              >
+                {salvandoProduto ? "Salvando..." : "Adicionar produto"}
+              </button>
+            </form>
+          </AddFormSheet>
         )}
 
         {activeSection === "financeiro" && (
@@ -3150,6 +3158,30 @@ function InteligenciaPanel({
           </article>
         )}
 
+      </div>
+    </div>
+  );
+}
+
+function AddFormSheet({
+  children,
+  onClose,
+  title,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  title: string;
+}) {
+  return (
+    <div className="add-sheet-backdrop" onClick={onClose}>
+      <div className="add-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="add-sheet-header">
+          <strong>{title}</strong>
+          <button aria-label="Fechar" className="add-sheet-close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="add-sheet-body">
+          {children}
+        </div>
       </div>
     </div>
   );
