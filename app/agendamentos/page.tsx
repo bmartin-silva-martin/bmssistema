@@ -135,6 +135,14 @@ export default function AgendamentoPublicoPage() {
   const [mensagem, setMensagem] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [agendamentoConcluido, setAgendamentoConcluido] = useState(false);
+  const [agendamentoIdConfirmado, setAgendamentoIdConfirmado] = useState<number | null>(null);
+  const [agendamentoCancelado, setAgendamentoCancelado] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
+  const [modoCancelamento, setModoCancelamento] = useState(false);
+  const [telefoneCancelamento, setTelefoneCancelamento] = useState("");
+  const [buscandoAgendamentos, setBuscandoAgendamentos] = useState(false);
+  const [agendamentosCliente, setAgendamentosCliente] = useState<{ id: number; data_agendamento: string; servico: string; status: string }[]>([]);
   const [nomeConfirmado, setNomeConfirmado] = useState(false);
   const [notificacaoRespondida, setNotificacaoRespondida] = useState(false);
   const [aceitaLembrete, setAceitaLembrete] = useState(false);
@@ -428,8 +436,94 @@ export default function AgendamentoPublicoPage() {
     }
 
     setSalvando(false);
-    setMensagem("Agendamento confirmado! A barbearia recebeu sua reserva.");
+    setAgendamentoIdConfirmado(agendamento.id);
+    setAgendamentoConcluido(true);
     rolarParaProximaEtapa();
+  }
+
+  async function buscarAgendamentosCliente() {
+    const tel = normalizarTelefoneBrasil(telefoneCancelamento);
+    if (!telefoneBrasilValido(tel)) {
+      setMensagem("Informe um WhatsApp valido com DDD.");
+      return;
+    }
+    setMensagem("");
+    setBuscandoAgendamentos(true);
+
+    const { data: clienteData } = await supabase
+      .from("clientes")
+      .select("id")
+      .eq("empresa_id", empresaId)
+      .eq("telefone", tel)
+      .maybeSingle();
+
+    if (!clienteData) {
+      setBuscandoAgendamentos(false);
+      setMensagem("Nenhum agendamento encontrado para este WhatsApp.");
+      return;
+    }
+
+    const agora = new Date().toISOString();
+    const { data: ags } = await supabase
+      .from("agendamentos")
+      .select("id,data_agendamento,status,servicos(nome)")
+      .eq("empresa_id", empresaId)
+      .eq("cliente_id", clienteData.id)
+      .neq("status", "cancelado")
+      .neq("status", "finalizado")
+      .gte("data_agendamento", agora)
+      .order("data_agendamento", { ascending: true });
+
+    setBuscandoAgendamentos(false);
+
+    if (!ags || ags.length === 0) {
+      setMensagem("Nenhum agendamento futuro encontrado.");
+      return;
+    }
+
+    setAgendamentosCliente(
+      ags.map((ag: { id: number; data_agendamento: string; status: string; servicos: { nome: string } | { nome: string }[] | null }) => ({
+        id: ag.id,
+        data_agendamento: ag.data_agendamento,
+        servico: (Array.isArray(ag.servicos) ? ag.servicos[0] : ag.servicos)?.nome || "Servico",
+        status: ag.status,
+      }))
+    );
+  }
+
+  async function cancelarAgendamentoCliente(id: number) {
+    setCancelando(true);
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ status: "cancelado" })
+      .eq("id", id);
+    setCancelando(false);
+    if (error) {
+      setMensagem("Nao foi possivel cancelar. Tente novamente.");
+      return;
+    }
+    setAgendamentosCliente((lista) => lista.filter((ag) => ag.id !== id));
+    setMensagem("Agendamento cancelado com sucesso.");
+  }
+
+  async function cancelarAgendamento() {
+    if (!agendamentoIdConfirmado) return;
+    setCancelando(true);
+
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ status: "cancelado" })
+      .eq("id", agendamentoIdConfirmado);
+
+    setCancelando(false);
+
+    if (error) {
+      setMensagem("Nao foi possivel cancelar. Tente novamente ou entre em contato com a barbearia.");
+      return;
+    }
+
+    setAgendamentoCancelado(true);
+    setMensagem("");
   }
 
   return (
@@ -439,9 +533,71 @@ export default function AgendamentoPublicoPage() {
           Ola, tudo bem? Sou a assistente virtual do(a) {barbeariaNome} e cuido do agendamento dos servicos, ok?
         </AssistantBubble>
 
-        <AssistantBubble>Qual o seu nome? Escreva seu nome e sobrenome, por favor.</AssistantBubble>
+        {!nomeConfirmado && !modoCancelamento && (
+          <button
+            className="chat-secondary-button cancel-entry-btn"
+            onClick={() => setModoCancelamento(true)}
+            type="button"
+          >
+            Cancelar um agendamento existente
+          </button>
+        )}
 
-        {!nomeConfirmado ? (
+        {modoCancelamento && (
+          <div className="cancel-lookup-panel">
+            <p className="cancel-lookup-title">Informe seu WhatsApp para buscar seus agendamentos:</p>
+            <div className="chat-input-stack">
+              <input
+                inputMode="tel"
+                onChange={(e) => setTelefoneCancelamento(e.target.value)}
+                placeholder="Ex: 18981518787"
+                value={telefoneCancelamento}
+              />
+              <button
+                className="chat-action-button"
+                disabled={buscandoAgendamentos}
+                onClick={buscarAgendamentosCliente}
+                type="button"
+              >
+                {buscandoAgendamentos ? "Buscando..." : "Buscar"}
+              </button>
+            </div>
+            {mensagem && <p className="chat-status">{mensagem}</p>}
+            {agendamentosCliente.length > 0 && (
+              <div className="cancel-list">
+                {agendamentosCliente.map((ag) => (
+                  <div className="cancel-item" key={ag.id}>
+                    <div>
+                      <strong>{ag.servico}</strong>
+                      <span>{new Date(ag.data_agendamento).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>
+                    </div>
+                    <button
+                      className="cancel-item-btn"
+                      disabled={cancelando}
+                      onClick={() => cancelarAgendamentoCliente(ag.id)}
+                      type="button"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              className="chat-secondary-button"
+              onClick={() => { setModoCancelamento(false); setAgendamentosCliente([]); setMensagem(""); }}
+              type="button"
+            >
+              Voltar
+            </button>
+          </div>
+        )}
+
+        {!modoCancelamento && (
+        <AssistantBubble>Qual o seu nome? Escreva seu nome e sobrenome, por favor.</AssistantBubble>
+        )}
+
+        {!modoCancelamento && !nomeConfirmado ? (
           <ChatInput
             buttonLabel="Enviar"
             onSubmit={() => {
@@ -458,11 +614,11 @@ export default function AgendamentoPublicoPage() {
             placeholder="Seu nome e sobrenome"
             value={nome}
           />
-        ) : (
+        ) : !modoCancelamento ? (
           <UserBubble>{nome}</UserBubble>
-        )}
+        ) : null}
 
-        {nomeConfirmado && (
+        {nomeConfirmado && !modoCancelamento && (
           <>
             <AssistantBubble>Como vai, {primeiroNome}! Tudo bem?</AssistantBubble>
             <AssistantBubble wide>
@@ -617,17 +773,23 @@ export default function AgendamentoPublicoPage() {
             </AssistantBubble>
 
             <div className="chat-final-form">
-              <input
-                inputMode="tel"
-                onChange={(event) => setTelefone(event.target.value)}
-                placeholder="Seu WhatsApp"
-                value={telefone}
-              />
-              <input
-                onChange={(event) => setDataNascimento(event.target.value)}
-                type="date"
-                value={dataNascimento}
-              />
+              <label className="chat-final-label">
+                WhatsApp com DDD
+                <input
+                  inputMode="tel"
+                  onChange={(event) => setTelefone(event.target.value)}
+                  placeholder="Ex: 18981518787"
+                  value={telefone}
+                />
+              </label>
+              <label className="chat-final-label">
+                Data de nascimento
+                <input
+                  onChange={(event) => setDataNascimento(event.target.value)}
+                  type="date"
+                  value={dataNascimento}
+                />
+              </label>
             </div>
 
             <button className="chat-action-button" disabled={salvando} onClick={confirmarAgendamento} type="button">
@@ -636,9 +798,42 @@ export default function AgendamentoPublicoPage() {
           </>
         )}
 
-        {mensagem && <p className="chat-status">{mensagem}</p>}
+        {mensagem && !agendamentoConcluido && <p className="chat-status">{mensagem}</p>}
         <div ref={fimDoFluxoRef} />
       </section>
+
+      {agendamentoConcluido && (
+        <div className="booking-success-overlay">
+          <div className="booking-success-card">
+            {agendamentoCancelado ? (
+              <>
+                <span className="booking-success-icon cancel">✕</span>
+                <h2>Agendamento cancelado</h2>
+                <p>Esperamos te ver em breve na {barbeariaNome}!</p>
+              </>
+            ) : (
+              <>
+                <span className="booking-success-icon">✓</span>
+                <h2>{barbeariaNome}</h2>
+                <p>agradece o seu agendamento!</p>
+                <div className="booking-success-detail">
+                  <strong>{servicoSelecionado?.nome}</strong>
+                  <span>{diaSelecionado?.label} {diaSelecionado?.mes} às {horario}</span>
+                </div>
+                {mensagem && <p className="booking-success-error">{mensagem}</p>}
+                <button
+                  className="booking-cancel-btn"
+                  disabled={cancelando}
+                  onClick={cancelarAgendamento}
+                  type="button"
+                >
+                  {cancelando ? "Cancelando..." : "Cancelar agendamento"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
