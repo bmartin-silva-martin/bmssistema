@@ -3411,6 +3411,7 @@ function InteligenciaPanel({
             <ul>
               {clientesInativos.slice(0, 5).map((c) => (
                 <li key={c.id}>
+                  <strong>{c.nome}</strong>
                   {c.telefone && (
                     <a
                       href={"https://wa.me/55" + c.telefone.replace(/\D/g, "") + "?text=" + encodeURIComponent("Oi " + c.nome + "! Que tal dar uma passada na barbearia?")}
