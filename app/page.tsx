@@ -2450,7 +2450,7 @@ function EditableServicoList({
                       value={servico.duracao || 30}
                     />
                   </label>
-                  <button className="admin-pill-button primary" onClick={() => onSave(servico)} type="button">
+                  <button className="admin-pill-button primary" onClick={async () => { await onSave(servico); setEditandoId(null); }} type="button">
                     Salvar servico
                   </button>
                 </div>
@@ -2617,7 +2617,7 @@ function EditableProdutoList({
                       value={produto.foto_url || ""}
                     />
                   </label>
-                  <button className="admin-pill-button primary" onClick={() => onSave(produto)} type="button">
+                  <button className="admin-pill-button primary" onClick={async () => { await onSave(produto); setEditandoId(null); }} type="button">
                     Salvar produto
                   </button>
                 </div>
