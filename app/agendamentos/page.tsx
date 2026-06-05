@@ -463,7 +463,7 @@ export default function AgendamentoPublicoPage() {
       return;
     }
 
-    const agora = new Date().toISOString();
+    const hoje = dataLocalISO(); // usa data local, evita problema de fuso horario
     const { data: ags } = await supabase
       .from("agendamentos")
       .select("id,data_agendamento,status,servicos(nome)")
@@ -471,7 +471,7 @@ export default function AgendamentoPublicoPage() {
       .eq("cliente_id", clienteData.id)
       .neq("status", "cancelado")
       .neq("status", "finalizado")
-      .gte("data_agendamento", agora)
+      .gte("data_agendamento", hoje)
       .order("data_agendamento", { ascending: true });
 
     setBuscandoAgendamentos(false);
@@ -798,7 +798,7 @@ export default function AgendamentoPublicoPage() {
           </>
         )}
 
-        {mensagem && !agendamentoConcluido && <p className="chat-status">{mensagem}</p>}
+        {mensagem && !agendamentoConcluido && !modoCancelamento && <p className="chat-status">{mensagem}</p>}
         <div ref={fimDoFluxoRef} />
       </section>
 
