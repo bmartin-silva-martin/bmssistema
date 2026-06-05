@@ -814,6 +814,22 @@ export default function AdminDashboard() {
     setItensVenda({});
   }
 
+  async function cancelarAgendamentoDono(agendamento: Agendamento) {
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ status: "cancelado" })
+      .eq("id", agendamento.id)
+      .eq("empresa_id", empresaIdAtual);
+
+    if (error) {
+      setMensagem(`Erro ao cancelar: ${formatarErroSupabase(error.message)}`);
+      return;
+    }
+
+    await carregarDados();
+    setMensagem("Agendamento cancelado.");
+  }
+
   function abrirSecao(secao: AdminSection) {
     setActiveSection(secao);
     setMobileDrawerOpen(false);
@@ -1284,6 +1300,7 @@ export default function AdminDashboard() {
               <AppointmentList
                 agendamentos={lembretesDeHoje}
                 emptyLabel="Nenhum agendamento ativo para hoje."
+                onCancel={cancelarAgendamentoDono}
                 onFinish={abrirFinalizacao}
                 onNotify={enviarLembrete}
               />
@@ -2127,12 +2144,14 @@ function MetricCard({ helper, label, value }: { helper: string; label: string; v
 function AppointmentList({
   agendamentos,
   emptyLabel = "Nenhum agendamento ativo por enquanto.",
+  onCancel,
   onFinish,
   onNotify,
   variant = "active",
 }: {
   agendamentos: Agendamento[];
   emptyLabel?: string;
+  onCancel?: (agendamento: Agendamento) => void | Promise<void>;
   onFinish?: (agendamento: Agendamento) => void;
   onNotify?: (agendamento: Agendamento) => void | Promise<void>;
   variant?: "active" | "history";
@@ -2169,16 +2188,21 @@ function AppointmentList({
             </dl>
             {variant === "active" && (
               <div className="appointment-actions">
-              {onNotify && agendamento.status.toLowerCase() !== "finalizado" && (
-                <button className="admin-pill-button secondary" onClick={() => onNotify(agendamento)} type="button">
-                  Enviar lembrete
-                </button>
-              )}
-              {onFinish && agendamento.status !== "finalizado" && (
-                <button className="admin-pill-button primary" onClick={() => onFinish(agendamento)} type="button">
-                  Finalizar
-                </button>
-              )}
+                {onNotify && agendamento.status.toLowerCase() !== "finalizado" && (
+                  <button className="admin-pill-button secondary" onClick={() => onNotify(agendamento)} type="button">
+                    Enviar lembrete
+                  </button>
+                )}
+                {onFinish && agendamento.status !== "finalizado" && (
+                  <button className="admin-pill-button primary" onClick={() => onFinish(agendamento)} type="button">
+                    Finalizar
+                  </button>
+                )}
+                {onCancel && agendamento.status !== "finalizado" && (
+                  <button className="admin-pill-button cancel-appt-btn" onClick={() => onCancel(agendamento)} type="button">
+                    Cancelar
+                  </button>
+                )}
               </div>
             )}
           </article>
