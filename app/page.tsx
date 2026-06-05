@@ -430,9 +430,12 @@ export default function AdminDashboard() {
     if (agendamentosResponse.data) setAgendamentos(agendamentosResponse.data as unknown as Agendamento[]);
     if (clientesResponse.data) setClientes(clientesResponse.data as ClienteResumo[]);
 
-    if (perfilResponse?.empresa?.nome_responsavel) {
-      setNomeDono(perfilResponse.empresa.nome_responsavel);
-      window.localStorage.setItem(DONO_STORAGE_KEY, perfilResponse.empresa.nome_responsavel);
+    const nomeResponsavel = perfilResponse?.empresa?.nome_responsavel || "";
+    setNomeDono(nomeResponsavel);
+    if (nomeResponsavel) {
+      window.localStorage.setItem(DONO_STORAGE_KEY, nomeResponsavel);
+    } else {
+      window.localStorage.removeItem(DONO_STORAGE_KEY);
     }
 
     if (produtosResponse.error) {
@@ -1201,7 +1204,7 @@ export default function AdminDashboard() {
 
           <div>
             <p className="admin-kicker">Painel da barbearia</p>
-            <h1>{activeSection === "agenda" ? `Olá, ${nomeDono || "barbeiro"}` : empresa?.nome || "BMS Sistema"}</h1>
+            <h1>{activeSection === "agenda" ? `Olá, ${nomeDono || empresa?.nome || "barbeiro"}` : empresa?.nome || "BMS Sistema"}</h1>
             <p>{activeSection === "agenda" ? "Você está em sua agenda." : "Gerencie sua barbearia em uma tela simples."}</p>
           </div>
 
@@ -1997,7 +2000,7 @@ function AgendaHero({
             // eslint-disable-next-line @next/next/no-img-element
             <img alt="Logo" className="empresa-logo-hero" src={empresa.features.logo_url} />
           )}
-          <h2>Olá, {nomeDono || "barbeiro"}</h2>
+          <h2>Olá, {nomeDono || empresa?.nome || "barbeiro"}</h2>
           <p>Você está em sua agenda.</p>
         </div>
         <button aria-label="Abrir menu" onClick={onOpenMenu} type="button">
