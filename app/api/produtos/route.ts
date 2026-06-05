@@ -26,6 +26,19 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Produto invalido." }, { status: 400 });
   }
 
+  // Bloquear se houver vendas vinculadas
+  const { count: vendaCount } = await supabase
+    .from("venda_itens")
+    .select("id", { count: "exact", head: true })
+    .eq("produto_id", id);
+
+  if (vendaCount && vendaCount > 0) {
+    return NextResponse.json(
+      { error: `Este produto possui ${vendaCount} venda(s) registrada(s) e nao pode ser excluido. Ajuste o estoque para zero se quiser desativa-lo.` },
+      { status: 409 }
+    );
+  }
+
   const { error } = await supabase
     .from("produtos")
     .delete()

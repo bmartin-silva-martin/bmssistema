@@ -26,6 +26,20 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Servico invalido." }, { status: 400 });
   }
 
+  // Bloquear se houver agendamentos vinculados
+  const { count: agCount } = await supabase
+    .from("agendamentos")
+    .select("id", { count: "exact", head: true })
+    .eq("servico_id", id)
+    .eq("empresa_id", empresaId);
+
+  if (agCount && agCount > 0) {
+    return NextResponse.json(
+      { error: `Este servico possui ${agCount} agendamento(s) registrado(s) e nao pode ser excluido. Desative-o ou renomeie-o.` },
+      { status: 409 }
+    );
+  }
+
   const { error } = await supabase
     .from("servicos")
     .delete()
