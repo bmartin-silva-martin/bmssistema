@@ -674,6 +674,38 @@ export default function AdminDashboard() {
     setMensagem("Produto atualizado com sucesso.");
   }
 
+  async function excluirServico(servicoId: number) {
+    const { error } = await supabase
+      .from("servicos")
+      .delete()
+      .eq("id", servicoId)
+      .eq("empresa_id", empresaIdAtual);
+
+    if (error) {
+      setMensagem(`Erro ao excluir servico: ${formatarErroSupabase(error.message)}`);
+      return;
+    }
+
+    setServicos((atuais) => atuais.filter((s) => s.id !== servicoId));
+    setMensagem("Servico excluido com sucesso.");
+  }
+
+  async function excluirProduto(produtoId: number) {
+    const { error } = await supabase
+      .from("produtos")
+      .delete()
+      .eq("id", produtoId)
+      .eq("empresa_id", empresaIdAtual);
+
+    if (error) {
+      setMensagem(`Erro ao excluir produto: ${formatarErroSupabase(error.message)}`);
+      return;
+    }
+
+    setProdutos((atuais) => atuais.filter((p) => p.id !== produtoId));
+    setMensagem("Produto excluido com sucesso.");
+  }
+
   async function atualizarCliente(cliente: ClienteResumo) {
     const nome = cliente.nome.trim();
     const telefone = normalizarTelefoneBrasil(cliente.telefone || "");
@@ -1368,7 +1400,7 @@ export default function AdminDashboard() {
                 <h2>Servicos</h2>
                 <button className="add-item-btn" onClick={() => setAddServicoOpen(true)} type="button">+ Novo</button>
               </div>
-              <EditableServicoList servicos={servicos} setServicos={setServicos} onSave={atualizarServico} />
+              <EditableServicoList servicos={servicos} setServicos={setServicos} onSave={atualizarServico} onDelete={excluirServico} />
             </article>
           </AdminSectionShell>
         )}
@@ -1421,7 +1453,7 @@ export default function AdminDashboard() {
                 <h2>Produtos</h2>
                 <button className="add-item-btn" disabled={Boolean(produtoAviso)} onClick={() => setAddProdutoOpen(true)} type="button">+ Novo</button>
               </div>
-              <EditableProdutoList produtos={produtos} setProdutos={setProdutos} onSave={atualizarProduto} />
+              <EditableProdutoList produtos={produtos} setProdutos={setProdutos} onSave={atualizarProduto} onDelete={excluirProduto} />
             </article>
           </AdminSectionShell>
         )}
@@ -2544,10 +2576,12 @@ function ordenarRanking(totais: Map<string, number>) {
 }
 
 function EditableServicoList({
+  onDelete,
   onSave,
   servicos,
   setServicos,
 }: {
+  onDelete?: (id: number) => Promise<void>;
   onSave: (servico: Servico) => Promise<void>;
   servicos: Servico[];
   setServicos: Dispatch<SetStateAction<Servico[]>>;
@@ -2636,6 +2670,11 @@ function EditableServicoList({
                   <button className="admin-pill-button primary" onClick={async () => { await onSave(servico); setEditandoId(null); }} type="button">
                     Salvar servico
                   </button>
+                  {onDelete && (
+                    <button className="admin-pill-button cancel-appt-btn" onClick={async () => { await onDelete(servico.id); setEditandoId(null); }} type="button">
+                      Excluir servico
+                    </button>
+                  )}
                 </div>
               )}
             </article>
@@ -2653,10 +2692,12 @@ function EditableServicoList({
 }
 
 function EditableProdutoList({
+  onDelete,
   onSave,
   produtos,
   setProdutos,
 }: {
+  onDelete?: (id: number) => Promise<void>;
   onSave: (produto: Produto) => Promise<void>;
   produtos: Produto[];
   setProdutos: Dispatch<SetStateAction<Produto[]>>;
@@ -2809,6 +2850,11 @@ function EditableProdutoList({
                   <button className="admin-pill-button primary" onClick={async () => { await onSave(produto); setEditandoId(null); }} type="button">
                     Salvar produto
                   </button>
+                  {onDelete && (
+                    <button className="admin-pill-button cancel-appt-btn" onClick={async () => { await onDelete(produto.id); setEditandoId(null); }} type="button">
+                      Excluir produto
+                    </button>
+                  )}
                 </div>
               )}
             </article>
