@@ -7,6 +7,13 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const EMPRESA_ID_LEGADO = 1;
 
+type EmpresaFeatures = {
+  cor_primaria?: string | null;
+  cor_secundaria?: string | null;
+  logo_url?: string | null;
+  [key: string]: unknown;
+};
+
 type Empresa = {
   id: number;
   nome: string;
@@ -20,6 +27,7 @@ type Empresa = {
   nome_responsavel?: string | null;
   owner_user_id?: string | null;
   slug?: string | null;
+  features?: EmpresaFeatures | null;
 };
 
 type Servico = {
@@ -113,7 +121,7 @@ const mesesCurtos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "se
 const DIAS_ATENDIMENTO_PADRAO = [1, 2, 3, 4, 5, 6];
 const DONO_STORAGE_KEY = "bms_nome_dono";
 const EMPRESA_SELECT =
-  "id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id,licenca_install_id,licenca_expires_at,licenca_grace_days";
+  "id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id,licenca_install_id,licenca_expires_at,licenca_grace_days,features";
 const HORARIOS_ATENDIMENTO_PADRAO = [
   "09:00",
   "09:30",
@@ -447,6 +455,20 @@ export default function AdminDashboard() {
       setMensagem("Alguns dados nao puderam ser carregados. Confira as politicas RLS no Supabase.");
     }
   }
+
+  useEffect(() => {
+    if (!empresa?.features) return;
+    const root = document.documentElement;
+    const f = empresa.features;
+    if (f.cor_primaria) {
+      root.style.setProperty("--brand-start", f.cor_primaria);
+      root.style.setProperty("--brand-btn-end", f.cor_primaria);
+    }
+    if (f.cor_secundaria) {
+      root.style.setProperty("--brand-end", f.cor_secundaria);
+      root.style.setProperty("--brand-btn-start", f.cor_secundaria);
+    }
+  }, [empresa]);
 
   useEffect(() => {
     async function verificarSessao() {
@@ -1098,7 +1120,12 @@ export default function AdminDashboard() {
 
       <aside className="admin-sidebar">
         <div className="admin-brand">
-          <span>BMS</span>
+          {empresa?.features?.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img alt="Logo" className="empresa-logo" src={empresa.features.logo_url} />
+          ) : (
+            <span>BMS</span>
+          )}
           <div>
             <strong>{empresa?.nome || "Barbearia"}</strong>
             <small>Painel administrativo</small>
@@ -1239,6 +1266,7 @@ export default function AdminDashboard() {
             <AgendaHero
               agendamentos={agendamentosAtivos}
               dias={diasAgendaPainel}
+              empresa={empresa}
               nomeDono={nomeDono}
               onOpenMenu={() => setMobileDrawerOpen(true)}
               vendas={vendas}
@@ -1943,12 +1971,14 @@ function MobileDrawer({
 function AgendaHero({
   agendamentos,
   dias,
+  empresa,
   nomeDono,
   onOpenMenu,
   vendas,
 }: {
   agendamentos: Agendamento[];
   dias: DiaPainel[];
+  empresa?: Empresa | null;
   nomeDono: string;
   onOpenMenu: () => void;
   vendas: Venda[];
@@ -1963,6 +1993,10 @@ function AgendaHero({
     <section className="agenda-hero">
       <div className="agenda-title-row">
         <div>
+          {empresa?.features?.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img alt="Logo" className="empresa-logo-hero" src={empresa.features.logo_url} />
+          )}
           <h2>Olá, {nomeDono || "barbeiro"}</h2>
           <p>Você está em sua agenda.</p>
         </div>

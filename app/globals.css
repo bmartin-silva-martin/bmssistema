@@ -12,6 +12,28 @@
   --danger: #b91c1c;
   --danger-hover: #991b1b;
   --shadow: 0 18px 50px rgb(15 23 42 / 0.08);
+
+  /* Brand colors — overridden per empresa via JS */
+  --brand-start: #f19a6c;
+  --brand-end: #9c4a2d;
+  --brand-btn-start: #b7653e;
+  --brand-btn-end: #f0a06f;
+}
+
+.empresa-logo {
+  border-radius: 10px;
+  height: 2.4rem;
+  object-fit: contain;
+  width: 2.4rem;
+}
+
+.empresa-logo-hero {
+  border-radius: 12px;
+  height: 3rem;
+  margin-bottom: 0.5rem;
+  object-fit: contain;
+  width: auto;
+  max-width: 8rem;
 }
 
 @theme inline {
@@ -2122,7 +2144,7 @@ th {
 }
 
 .agenda-day-strip span.active {
-  background: linear-gradient(135deg, #f19a6c, #9c4a2d);
+  background: linear-gradient(135deg, var(--brand-start), var(--brand-end));
   color: #ffffff;
 }
 
@@ -2150,7 +2172,7 @@ th {
 }
 
 .agenda-summary-grid article.hot {
-  background: linear-gradient(135deg, #f19a6c, #9c4a2d);
+  background: linear-gradient(135deg, var(--brand-start), var(--brand-end));
   color: #ffffff;
 }
 
@@ -2376,7 +2398,7 @@ th {
   .admin-form .admin-pill-button {
     min-height: 4.5rem;
     border-radius: 20px;
-    background: linear-gradient(135deg, #b7653e, #f0a06f);
+    background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
@@ -2642,7 +2664,7 @@ th {
 .admin-form .admin-pill-button {
   min-height: 4.5rem;
   border-radius: 20px;
-  background: linear-gradient(135deg, #b7653e, #f0a06f);
+  background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -3778,7 +3800,7 @@ th {
 }
 
 .add-item-btn {
-  background: linear-gradient(135deg, #b7653e, #f0a06f);
+  background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
   border: 0;
   border-radius: 999px;
   color: #fff;
