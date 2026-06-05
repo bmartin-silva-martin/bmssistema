@@ -724,14 +724,19 @@ export default function AdminDashboard() {
   }
 
   async function excluirCliente(clienteId: number) {
-    const { error } = await supabase
+    const { error, count } = await supabase
       .from("clientes")
-      .delete()
+      .delete({ count: "exact" })
       .eq("id", clienteId)
       .eq("empresa_id", empresaIdAtual);
 
     if (error) {
       setMensagem("Nao foi possivel excluir. O cliente pode ter agendamentos vinculados.");
+      return;
+    }
+
+    if (count === 0) {
+      setMensagem("Sem permissao para excluir. Execute o SQL de policy de DELETE no Supabase.");
       return;
     }
 
