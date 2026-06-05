@@ -239,6 +239,9 @@ export default function AdminDashboard() {
   const [novoHorario, setNovoHorario] = useState("");
   const [addServicoOpen, setAddServicoOpen] = useState(false);
   const [addProdutoOpen, setAddProdutoOpen] = useState(false);
+  const [periodoInteligencia, setPeriodoInteligencia] = useState<"7" | "30" | "custom">("30");
+  const [inteligenciaDataInicio, setInteligenciaDataInicio] = useState("");
+  const [inteligenciaDataFim, setInteligenciaDataFim] = useState("");
 
   const empresaIdAtual = empresa?.id || EMPRESA_ID_LEGADO;
   const empresaSlugAtual = empresa?.slug?.trim();
@@ -1543,7 +1546,60 @@ export default function AdminDashboard() {
             description="Analise inteligente dos seus dados: receita, produtos, sugestoes de compra e promocoes."
             title="Inteligencia"
           >
-            <InteligenciaPanel agendamentos={agendamentos} clientes={clientes} produtos={produtos} vendas={vendas} />
+            <div className="finance-filter" aria-label="Periodo de analise">
+              <button
+                className={periodoInteligencia === "7" ? "active" : ""}
+                onClick={() => setPeriodoInteligencia("7")}
+                type="button"
+              >
+                7 dias
+              </button>
+              <button
+                className={periodoInteligencia === "30" ? "active" : ""}
+                onClick={() => setPeriodoInteligencia("30")}
+                type="button"
+              >
+                30 dias
+              </button>
+              <button
+                className={periodoInteligencia === "custom" ? "active" : ""}
+                onClick={() => setPeriodoInteligencia("custom")}
+                type="button"
+              >
+                Personalizado
+              </button>
+            </div>
+
+            {periodoInteligencia === "custom" && (
+              <div className="inteligencia-datas-row">
+                <label>
+                  De
+                  <input
+                    onChange={(e) => setInteligenciaDataInicio(e.target.value)}
+                    type="date"
+                    value={inteligenciaDataInicio}
+                  />
+                </label>
+                <label>
+                  Ate
+                  <input
+                    onChange={(e) => setInteligenciaDataFim(e.target.value)}
+                    type="date"
+                    value={inteligenciaDataFim}
+                  />
+                </label>
+              </div>
+            )}
+
+            <InteligenciaPanel
+              agendamentos={agendamentos}
+              clientes={clientes}
+              dataFim={inteligenciaDataFim}
+              dataInicio={inteligenciaDataInicio}
+              periodo={periodoInteligencia}
+              produtos={produtos}
+              vendas={vendas}
+            />
           </AdminSectionShell>
         )}
 
@@ -3070,20 +3126,43 @@ function RankingClientePanel({
 function InteligenciaPanel({
   agendamentos,
   clientes,
+  dataFim,
+  dataInicio,
+  periodo,
   produtos,
   vendas,
 }: {
   agendamentos: Agendamento[];
   clientes: ClienteResumo[];
+  dataFim?: string;
+  dataInicio?: string;
+  periodo?: "7" | "30" | "custom";
   produtos: Produto[];
   vendas: Venda[];
 }) {
   const hoje = new Date();
-  const inicio30 = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const inicio7 = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const dias = periodo === "7" ? 7 : 30;
 
-  const vendas30 = vendas.filter((v) => new Date(v.created_at) >= inicio30);
+  let inicioPeriodo: Date;
+  let fimPeriodo: Date = hoje;
+
+  if (periodo === "custom" && dataInicio) {
+    inicioPeriodo = new Date(dataInicio + "T00:00:00");
+    if (dataFim) fimPeriodo = new Date(dataFim + "T23:59:59");
+  } else {
+    inicioPeriodo = new Date(hoje.getTime() - dias * 24 * 60 * 60 * 1000);
+  }
+
+  const labelPeriodo = periodo === "custom" && dataInicio
+    ? `${dataInicio} a ${dataFim || "hoje"}`
+    : `${dias} dias`;
+
+  const vendas30 = vendas.filter((v) => {
+    const d = new Date(v.created_at);
+    return d >= inicioPeriodo && d <= fimPeriodo;
+  });
   const receita30 = vendas30.reduce((acc, v) => acc + (v.total || 0), 0);
+  const inicio7 = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
   const vendas7 = vendas.filter((v) => new Date(v.created_at) >= inicio7);
   const receita7 = vendas7.reduce((acc, v) => acc + (v.total || 0), 0);
   const ticketMedio = vendas30.length > 0 ? receita30 / vendas30.length : 0;
@@ -3114,11 +3193,14 @@ function InteligenciaPanel({
   }
   const clientesInativos = clientes.filter((c) => {
     const ultima = ultimaVisitaMap.get(c.id);
-    return !ultima || ultima < inicio30;
+    return !ultima || ultima < inicioPeriodo;
   });
 
   const servicoGiro = new Map<string, number>();
-  for (const ag of agendamentos.filter((a) => new Date(a.data_agendamento) >= inicio30)) {
+  for (const ag of agendamentos.filter((a) => {
+    const d = new Date(a.data_agendamento);
+    return d >= inicioPeriodo && d <= fimPeriodo;
+  })) {
     const s = firstRelation(ag.servicos);
     if (s?.nome) servicoGiro.set(s.nome, (servicoGiro.get(s.nome) || 0) + 1);
   }
@@ -3129,15 +3211,15 @@ function InteligenciaPanel({
       <div className="inteligencia-grid">
 
         <article className="inteligencia-card">
-          <h3>Receita dos ultimos 30 dias</h3>
+          <h3>Receita — {labelPeriodo}</h3>
           <strong className="inteligencia-numero">{formatarMoeda(receita30)}</strong>
-          <span>Ultimos 7 dias: {formatarMoeda(receita7)}</span>
+          {periodo !== "7" && <span>Ultimos 7 dias: {formatarMoeda(receita7)}</span>}
           <span>Ticket medio: {formatarMoeda(ticketMedio)}</span>
           <span>{vendas30.length} atendimento{vendas30.length !== 1 ? "s" : ""} no periodo</span>
         </article>
 
         <article className="inteligencia-card">
-          <h3>Servicos mais populares (30 dias)</h3>
+          <h3>Servicos mais populares — {labelPeriodo}</h3>
           {topServicos.length === 0 ? (
             <span className="inteligencia-vazio">Sem dados suficientes</span>
           ) : (

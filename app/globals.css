@@ -1673,6 +1673,33 @@ th {
   padding: clamp(1rem, 3vw, 1.35rem);
 }
 
+/* Inteligencia custom date range */
+.inteligencia-datas-row {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inteligencia-datas-row label {
+  display: grid;
+  gap: 0.35rem;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.inteligencia-datas-row input[type="date"] {
+  background: #1e2130;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  color: #f1f5f9;
+  font-size: 0.95rem;
+  min-height: 3rem;
+  padding: 0 0.85rem;
+  width: 100%;
+}
+
 /* Finance product modal */
 .finance-modal-overlay {
   align-items: flex-end;
