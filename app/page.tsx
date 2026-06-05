@@ -1498,8 +1498,8 @@ export default function AdminDashboard() {
             </section>
 
             <section className="finance-card-grid">
-              <FinanceProductCard emptyLabel="Todos os produtos tiveram giro." produtos={resumoFinanceiro.produtosSemGiro} title="Produtos sem giro" />
-              <FinanceProductCard emptyLabel="Nenhum produto cadastrado." produtos={produtos} title="Controle de estoque" />
+              <FinanceProductCard emptyLabel="Todos os produtos tiveram giro." produtos={resumoFinanceiro.produtosSemGiro} title="Produtos sem giro" useModal />
+              <FinanceProductCard emptyLabel="Nenhum produto cadastrado." produtos={produtos} title="Controle de estoque" useModal />
             </section>
           </AdminSectionShell>
         )}
@@ -2158,40 +2158,72 @@ function FinanceRankingCard({ items, title }: { items: RankingItem[]; title: str
   );
 }
 
-function FinanceProductCard({ emptyLabel, produtos, title }: { emptyLabel: string; produtos: Produto[]; title: string }) {
+function FinanceProductCard({ emptyLabel, produtos, title, useModal }: { emptyLabel: string; produtos: Produto[]; title: string; useModal?: boolean }) {
   const [mostrarTodos, setMostrarTodos] = useState(false);
-  const visiveis = mostrarTodos ? produtos : produtos.slice(0, 3);
+  const [modalAberto, setModalAberto] = useState(false);
+  const visiveis = produtos.slice(0, 3);
 
   return (
-    <article className="finance-list-card">
-      <div className="finance-card-header">
-        <h2>{title}</h2>
-        <span>{produtos.length} itens</span>
-      </div>
+    <>
+      <article className="finance-list-card">
+        <div className="finance-card-header">
+          <h2>{title}</h2>
+          <span>{produtos.length} itens</span>
+        </div>
 
-      {produtos.length === 0 ? (
-        <div className="empty-state">{emptyLabel}</div>
-      ) : (
-        <div className="finance-product-list">
-          {visiveis.map((produto) => (
-            <div className="finance-product-row" key={produto.id}>
-              <ProductPhoto produto={produto} />
-              <span>
-                <strong>{produto.nome}</strong>
-                <small>{formatarMoeda(produto.preco || 0)}</small>
-              </span>
-              <em>{produto.estoque || 0} un.</em>
+        {produtos.length === 0 ? (
+          <div className="empty-state">{emptyLabel}</div>
+        ) : (
+          <div className="finance-product-list">
+            {(useModal ? visiveis : (mostrarTodos ? produtos : visiveis)).map((produto) => (
+              <div className="finance-product-row" key={produto.id}>
+                <ProductPhoto produto={produto} />
+                <span>
+                  <strong>{produto.nome}</strong>
+                  <small>{formatarMoeda(produto.preco || 0)}</small>
+                </span>
+                <em>{produto.estoque || 0} un.</em>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {produtos.length > 3 && (
+          useModal ? (
+            <button className="manager-more-button" onClick={() => setModalAberto(true)} type="button">
+              Ver todos ({produtos.length})
+            </button>
+          ) : (
+            <button className="manager-more-button" onClick={() => setMostrarTodos((v) => !v)} type="button">
+              {mostrarTodos ? "Ver menos" : "Ver mais"}
+            </button>
+          )
+        )}
+      </article>
+
+      {modalAberto && (
+        <div className="finance-modal-overlay" onClick={() => setModalAberto(false)}>
+          <div className="finance-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="finance-modal-header">
+              <strong>{title}</strong>
+              <button aria-label="Fechar" onClick={() => setModalAberto(false)} type="button">×</button>
             </div>
-          ))}
+            <div className="finance-modal-list">
+              {produtos.map((produto) => (
+                <div className="finance-product-row" key={produto.id}>
+                  <ProductPhoto produto={produto} />
+                  <span>
+                    <strong>{produto.nome}</strong>
+                    <small>{formatarMoeda(produto.preco || 0)}</small>
+                  </span>
+                  <em>{produto.estoque || 0} un.</em>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
-
-      {produtos.length > 3 && (
-        <button className="manager-more-button" onClick={() => setMostrarTodos((valor) => !valor)} type="button">
-          {mostrarTodos ? "Ver menos" : "Ver mais"}
-        </button>
-      )}
-    </article>
+    </>
   );
 }
 
