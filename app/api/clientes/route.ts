@@ -101,3 +101,35 @@ export async function PATCH(request: Request) {
 
   return NextResponse.json({ cliente: data, updated_at: new Date().toISOString() });
 }
+
+export async function DELETE(request: Request) {
+  const supabase = getSupabaseServerClient();
+
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase Service Role nao configurada na Vercel." }, { status: 500 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = Number(searchParams.get("id"));
+  const empresaId = getEmpresaId(searchParams.get("empresaId"));
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Cliente invalido." }, { status: 400 });
+  }
+
+  const { error, count } = await supabase
+    .from("clientes")
+    .delete({ count: "exact" })
+    .eq("id", id)
+    .eq("empresa_id", empresaId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (count === 0) {
+    return NextResponse.json({ error: "Cliente nao encontrado." }, { status: 404 });
+  }
+
+  return NextResponse.json({ deleted: true });
+}
