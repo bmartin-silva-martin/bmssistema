@@ -2170,7 +2170,7 @@ function AppointmentList({
           <article className={`admin-appointment-card ${variant === "history" ? "is-history" : ""}`} key={agendamento.id}>
             <div>
               <strong>{cliente?.nome || "Cliente"}</strong>
-              <span>{cliente?.telefone || "Telefone nao informado"}</span>
+              <span>{formatarTelefone(cliente?.telefone || null)}</span>
             </div>
             <dl>
               <div>
@@ -2442,6 +2442,15 @@ function formatarAniversario(data?: string | null) {
 
   const [, mes, dia] = data.split("-");
   return `${dia}/${mes}`;
+}
+
+function formatarTelefone(telefone: string | null) {
+  if (!telefone) return "Telefone nao informado";
+  const digits = telefone.replace(/\D/g, "");
+  const sem55 = digits.startsWith("55") ? digits.slice(2) : digits;
+  if (sem55.length === 11) return `(${sem55.slice(0, 2)}) ${sem55.slice(2, 7)}-${sem55.slice(7)}`;
+  if (sem55.length === 10) return `(${sem55.slice(0, 2)}) ${sem55.slice(2, 6)}-${sem55.slice(6)}`;
+  return sem55;
 }
 
 function formatarMoeda(valor: number) {
