@@ -675,14 +675,11 @@ export default function AdminDashboard() {
   }
 
   async function excluirServico(servicoId: number) {
-    const { error } = await supabase
-      .from("servicos")
-      .delete()
-      .eq("id", servicoId)
-      .eq("empresa_id", empresaIdAtual);
+    const response = await fetch(`/api/servicos?id=${servicoId}&empresaId=${empresaIdAtual}`, { method: "DELETE" });
+    const data = await response.json().catch(() => null);
 
-    if (error) {
-      setMensagem(`Erro ao excluir servico: ${formatarErroSupabase(error.message)}`);
+    if (!response.ok) {
+      setMensagem(data?.error || "Nao foi possivel excluir o servico.");
       return;
     }
 
@@ -691,14 +688,11 @@ export default function AdminDashboard() {
   }
 
   async function excluirProduto(produtoId: number) {
-    const { error } = await supabase
-      .from("produtos")
-      .delete()
-      .eq("id", produtoId)
-      .eq("empresa_id", empresaIdAtual);
+    const response = await fetch(`/api/produtos?id=${produtoId}&empresaId=${empresaIdAtual}`, { method: "DELETE" });
+    const data = await response.json().catch(() => null);
 
-    if (error) {
-      setMensagem(`Erro ao excluir produto: ${formatarErroSupabase(error.message)}`);
+    if (!response.ok) {
+      setMensagem(data?.error || "Nao foi possivel excluir o produto.");
       return;
     }
 
