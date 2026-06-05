@@ -389,23 +389,41 @@ export default function AgendamentoPublicoPage() {
     setSalvando(true);
     setMensagem("Confirmando seu agendamento...");
 
-    const { data: cliente, error: erroCliente } = await supabase
+    // Reusar cliente existente se mesmo telefone na mesma empresa
+    const { data: clienteExistente } = await supabase
       .from("clientes")
-      .insert({
-        data_nascimento: dataNascimento || null,
-        empresa_id: empresaId,
-        aceita_lembrete: aceitaLembrete,
-        nome: nomeLimpo,
-        telefone: telefoneLimpo,
-      })
       .select("id")
-      .single();
+      .eq("empresa_id", empresaId)
+      .eq("telefone", telefoneLimpo)
+      .maybeSingle();
 
-    if (erroCliente) {
-      setSalvando(false);
-      setMensagem(`Erro ao criar cadastro: ${erroCliente.message}`);
-      return;
+    let clienteId: number;
+
+    if (clienteExistente) {
+      clienteId = clienteExistente.id;
+    } else {
+      const { data: novoCliente, error: erroCliente } = await supabase
+        .from("clientes")
+        .insert({
+          aceita_lembrete: aceitaLembrete,
+          data_nascimento: dataNascimento || null,
+          empresa_id: empresaId,
+          nome: nomeLimpo,
+          telefone: telefoneLimpo,
+        })
+        .select("id")
+        .single();
+
+      if (erroCliente) {
+        setSalvando(false);
+        setMensagem(`Erro ao criar cadastro: ${erroCliente.message}`);
+        return;
+      }
+
+      clienteId = novoCliente.id;
     }
+
+    const cliente = { id: clienteId };
 
     const { data: agendamento, error } = await supabase
       .from("agendamentos")

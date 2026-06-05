@@ -2820,7 +2820,7 @@ function EditableClienteList({
 }) {
   const [busca, setBusca] = useState("");
   const [editandoId, setEditandoId] = useState<number | null>(null);
-  const [limite, setLimite] = useState(8);
+  const [limite, setLimite] = useState(3);
   const termoBusca = normalizarBusca(busca);
   const clientesFiltrados = clientes.filter((cliente) => {
     return [cliente.nome, cliente.telefone || "", formatarAniversario(cliente.data_nascimento)]
@@ -2843,7 +2843,7 @@ function EditableClienteList({
         className="manager-search"
         onChange={(event) => {
           setBusca(event.target.value);
-          setLimite(8);
+          setLimite(3);
         }}
         placeholder="Buscar por nome, WhatsApp ou aniversario"
         value={busca}
@@ -2911,7 +2911,7 @@ function EditableClienteList({
 
       {clientesFiltrados.length === 0 && <div className="empty-state">Nenhum cliente encontrado.</div>}
       {clientesFiltrados.length > limite && (
-        <button className="manager-more-button" onClick={() => setLimite((valor) => valor + 8)} type="button">
+        <button className="manager-more-button" onClick={() => setLimite((valor) => valor + 3)} type="button">
           Ver mais clientes
         </button>
       )}
