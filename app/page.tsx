@@ -723,6 +723,22 @@ export default function AdminDashboard() {
     setMensagem("Cliente atualizado com sucesso.");
   }
 
+  async function excluirCliente(clienteId: number) {
+    const { error } = await supabase
+      .from("clientes")
+      .delete()
+      .eq("id", clienteId)
+      .eq("empresa_id", empresaIdAtual);
+
+    if (error) {
+      setMensagem("Nao foi possivel excluir. O cliente pode ter agendamentos vinculados.");
+      return;
+    }
+
+    setClientes((atuais) => atuais.filter((c) => c.id !== clienteId));
+    setMensagem("Cliente excluido com sucesso.");
+  }
+
   async function copiarLink() {
     await navigator.clipboard.writeText(linkPublico);
     setMensagem("Link publico copiado para enviar aos clientes.");
@@ -1569,7 +1585,7 @@ export default function AdminDashboard() {
             {abaClientes === "cadastro" && (
               <article className="admin-panel">
                 <h2>Cadastro de clientes</h2>
-                <EditableClienteList clientes={clientes} setClientes={setClientes} onSave={atualizarCliente} />
+                <EditableClienteList clientes={clientes} onDelete={excluirCliente} setClientes={setClientes} onSave={atualizarCliente} />
               </article>
             )}
 
@@ -2811,10 +2827,12 @@ function EditableProdutoList({
 
 function EditableClienteList({
   clientes,
+  onDelete,
   onSave,
   setClientes,
 }: {
   clientes: ClienteResumo[];
+  onDelete?: (id: number) => Promise<void>;
   onSave: (cliente: ClienteResumo) => Promise<void>;
   setClientes: Dispatch<SetStateAction<ClienteResumo[]>>;
 }) {
@@ -2899,9 +2917,18 @@ function EditableClienteList({
                       value={cliente.data_nascimento || ""}
                     />
                   </label>
-                  <button className="admin-pill-button primary" onClick={() => onSave(cliente)} type="button">
+                  <button className="admin-pill-button primary" onClick={async () => { await onSave(cliente); setEditandoId(null); }} type="button">
                     Salvar cliente
                   </button>
+                  {onDelete && (
+                    <button
+                      className="admin-pill-button cancel-appt-btn"
+                      onClick={async () => { await onDelete(cliente.id); setEditandoId(null); }}
+                      type="button"
+                    >
+                      Excluir cliente
+                    </button>
+                  )}
                 </div>
               )}
             </article>

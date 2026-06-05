@@ -616,7 +616,7 @@ export default function AgendamentoPublicoPage() {
         )}
 
         {!modoCancelamento && (
-        <AssistantBubble>Qual o seu nome? Escreva seu nome e sobrenome, por favor.</AssistantBubble>
+        <AssistantBubble>Qual o seu nome? Escreva seu nome e sobrenome ou apelido, por favor.</AssistantBubble>
         )}
 
         {!modoCancelamento && !nomeConfirmado ? (
