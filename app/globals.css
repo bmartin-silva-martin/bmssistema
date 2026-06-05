@@ -2787,7 +2787,9 @@ th {
 
 .compact-edit-panel label:first-child,
 .compact-edit-panel label:last-of-type,
-.compact-edit-panel .admin-pill-button {
+.compact-edit-panel .admin-pill-button,
+.compact-edit-panel .produto-lucro-preview,
+.compact-edit-panel .foto-upload-label {
   grid-column: 1 / -1;
 }
 
@@ -2798,6 +2800,49 @@ th {
   background: #242832;
   color: #ffffff;
   padding: 0.8rem 1rem;
+}
+
+/* File upload input */
+.foto-upload-label {
+  display: grid;
+  gap: 0.35rem;
+  color: #c8cdd5;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.foto-upload-input {
+  align-items: center;
+  background: #242832;
+  border: 1px dashed rgb(255 255 255 / 0.18);
+  border-radius: 18px;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  font-size: 0.9rem;
+  gap: 0.6rem;
+  justify-content: center;
+  min-height: 3.4rem;
+  padding: 0.6rem 1rem;
+  width: 100%;
+}
+
+.foto-upload-input::-webkit-file-upload-button {
+  background: rgb(255 255 255 / 0.07);
+  border: 0;
+  border-radius: 8px;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.75rem;
+}
+
+.foto-preview-thumb {
+  border-radius: 14px;
+  height: 5rem;
+  object-fit: cover;
+  width: 5rem;
 }
 
 .manager-more-button {
@@ -2924,7 +2969,7 @@ th {
   }
 
   .compact-edit-panel {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .client-summary-grid {

@@ -1418,14 +1418,23 @@ export default function AdminDashboard() {
                   value={produtoForm.estoque}
                 />
               </label>
-              <label>
-                Foto do produto opcional
+              <label className="foto-upload-label">
+                Foto do produto
                 <input
-                  onChange={(event) => setProdutoForm((form) => ({ ...form, foto_url: event.target.value }))}
-                  placeholder="Cole uma URL de imagem"
-                  type="url"
-                  value={produtoForm.foto_url}
+                  accept="image/*"
+                  className="foto-upload-input"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      const dataUrl = await redimensionarFoto(file);
+                      setProdutoForm((form) => ({ ...form, foto_url: dataUrl }));
+                    }
+                  }}
+                  type="file"
                 />
+                {produtoForm.foto_url && (
+                  <img alt="Preview" className="foto-preview-thumb" src={produtoForm.foto_url} />
+                )}
               </label>
               <button
                 className="admin-pill-button primary wide"
@@ -2605,17 +2614,23 @@ function EditableProdutoList({
                       value={produto.comissao_percentual || 0}
                     />
                   </label>
-                  <label>
-                    Foto
+                  <label className="foto-upload-label">
+                    Foto do produto
                     <input
-                      onChange={(event) =>
-                        setProdutos(
-                          produtos.map((item) => (item.id === produto.id ? { ...item, foto_url: event.target.value } : item)),
-                        )
-                      }
-                      placeholder="URL da imagem"
-                      value={produto.foto_url || ""}
+                      accept="image/*"
+                      className="foto-upload-input"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          const dataUrl = await redimensionarFoto(file);
+                          setProdutos(produtos.map((item) => (item.id === produto.id ? { ...item, foto_url: dataUrl } : item)));
+                        }
+                      }}
+                      type="file"
                     />
+                    {produto.foto_url && (
+                      <img alt="Preview" className="foto-preview-thumb" src={produto.foto_url} />
+                    )}
                   </label>
                   <button className="admin-pill-button primary" onClick={async () => { await onSave(produto); setEditandoId(null); }} type="button">
                     Salvar produto
@@ -2744,6 +2759,27 @@ function EditableClienteList({
       )}
     </div>
   );
+}
+
+function redimensionarFoto(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 600;
+        let w = img.width, h = img.height;
+        if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+        else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.src = e.target!.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function normalizarBusca(valor: string) {
