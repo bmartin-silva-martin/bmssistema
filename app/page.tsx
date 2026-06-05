@@ -3260,6 +3260,67 @@ function RankingClientePanel({
 
 // ---------- Inteligencia / IA ----------
 
+function InteligenciaListCard({ children, className, title }: { children: React.ReactNode; className: string; title: string }) {
+  return (
+    <article className={className}>
+      <h3>{title}</h3>
+      {children}
+    </article>
+  );
+}
+
+type InteligenciaItem = {
+  key: string;
+  primary: string;
+  secondary?: string;
+  action?: React.ReactNode;
+};
+
+function InteligenciaVerMais({ items, title }: { items: InteligenciaItem[]; title: string }) {
+  const [modalAberto, setModalAberto] = useState(false);
+  const visiveis = items.slice(0, 3);
+
+  return (
+    <>
+      <ul>
+        {visiveis.map((item) => (
+          <li key={item.key}>
+            <strong>{item.primary}</strong>
+            {item.secondary && <span>{item.secondary}</span>}
+            {item.action}
+          </li>
+        ))}
+      </ul>
+      {items.length > 3 && (
+        <button className="manager-more-button" onClick={() => setModalAberto(true)} type="button">
+          Ver todos ({items.length})
+        </button>
+      )}
+      {modalAberto && (
+        <div className="finance-modal-overlay" onClick={() => setModalAberto(false)}>
+          <div className="finance-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="finance-modal-header">
+              <strong>{title}</strong>
+              <button aria-label="Fechar" onClick={() => setModalAberto(false)} type="button">×</button>
+            </div>
+            <div className="finance-modal-list">
+              <ul className="inteligencia-modal-list">
+                {items.map((item) => (
+                  <li key={item.key}>
+                    <strong>{item.primary}</strong>
+                    {item.secondary && <span>{item.secondary}</span>}
+                    {item.action}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function InteligenciaPanel({
   agendamentos,
   clientes,
@@ -3355,95 +3416,80 @@ function InteligenciaPanel({
           <span>{vendas30.length} atendimento{vendas30.length !== 1 ? "s" : ""} no periodo</span>
         </article>
 
-        <article className="inteligencia-card">
-          <h3>Servicos mais populares — {labelPeriodo}</h3>
+        <InteligenciaListCard className="inteligencia-card" title={`Servicos mais populares — ${labelPeriodo}`}>
           {topServicos.length === 0 ? (
             <span className="inteligencia-vazio">Sem dados suficientes</span>
           ) : (
-            <ul>
-              {topServicos.map(([nome, qtd]) => (
-                <li key={nome}><strong>{nome}</strong> — {qtd}x</li>
-              ))}
-            </ul>
+            <InteligenciaVerMais
+              items={topServicos.map(([nome, qtd]) => ({ key: nome, primary: nome, secondary: `${qtd}x` }))}
+              title="Servicos mais populares"
+            />
           )}
-        </article>
+        </InteligenciaListCard>
 
-        <article className="inteligencia-card destaque-alerta">
-          <h3>Produtos com baixo giro</h3>
+        <InteligenciaListCard className="inteligencia-card destaque-alerta" title="Produtos com baixo giro">
           <p className="inteligencia-subtitulo">Menos de 2 unidades vendidas em 30 dias — considere fazer uma promocao.</p>
           {produtosBaixoGiro.length === 0 ? (
             <span className="inteligencia-vazio">Todos os produtos estao girando bem!</span>
           ) : (
-            <ul>
-              {produtosBaixoGiro.slice(0, 6).map((p) => (
-                <li key={p.id}>
-                  <strong>{p.nome}</strong>
-                  <span>{giroMap.get(p.id) || 0} vend. — estoque: {p.estoque || 0}</span>
-                </li>
-              ))}
-            </ul>
+            <InteligenciaVerMais
+              items={produtosBaixoGiro.map((p) => ({ key: String(p.id), primary: p.nome, secondary: `${giroMap.get(p.id) || 0} vend. — estoque: ${p.estoque || 0}` }))}
+              title="Produtos com baixo giro"
+            />
           )}
-        </article>
+        </InteligenciaListCard>
 
-        <article className="inteligencia-card destaque-positivo">
-          <h3>Sugestao de recompra</h3>
+        <InteligenciaListCard className="inteligencia-card destaque-positivo" title="Sugestao de recompra">
           <p className="inteligencia-subtitulo">Produtos que mais saem — mantenha estoque em dia.</p>
           {produtosMaisVendidos.length === 0 ? (
             <span className="inteligencia-vazio">Sem dados de venda ainda.</span>
           ) : (
-            <ul>
-              {produtosMaisVendidos.map((p) => (
-                <li key={p.id}>
-                  <strong>{p.nome}</strong>
-                  <span>{giroMap.get(p.id)} vendidos — estoque: {p.estoque || 0}</span>
-                </li>
-              ))}
-            </ul>
+            <InteligenciaVerMais
+              items={produtosMaisVendidos.map((p) => ({ key: String(p.id), primary: p.nome, secondary: `${giroMap.get(p.id)} vendidos — estoque: ${p.estoque || 0}` }))}
+              title="Sugestao de recompra"
+            />
           )}
-        </article>
+        </InteligenciaListCard>
 
-        <article className="inteligencia-card destaque-alerta">
-          <h3>Clientes para reativar</h3>
-          <p className="inteligencia-subtitulo">{clientesInativos.length} clientes sem visita ha mais de 30 dias.</p>
+        <InteligenciaListCard className="inteligencia-card destaque-alerta" title="Clientes para reativar">
+          <p className="inteligencia-subtitulo">{clientesInativos.length} clientes sem visita ha mais de {labelPeriodo}.</p>
           {clientesInativos.length === 0 ? (
             <span className="inteligencia-vazio">Nenhum cliente inativo!</span>
           ) : (
-            <ul>
-              {clientesInativos.slice(0, 5).map((c) => (
-                <li key={c.id}>
-                  <strong>{c.nome}</strong>
-                  {c.telefone && (
-                    <a
-                      href={"https://wa.me/55" + c.telefone.replace(/\D/g, "") + "?text=" + encodeURIComponent("Oi " + c.nome + "! Que tal dar uma passada na barbearia?")}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Whats
-                    </a>
-                  )}
-                </li>
-              ))}
-              {clientesInativos.length > 5 && <li>...e mais {clientesInativos.length - 5} clientes</li>}
-            </ul>
+            <InteligenciaVerMais
+              items={clientesInativos.map((c) => ({
+                key: String(c.id),
+                primary: c.nome,
+                secondary: c.telefone ? "" : "Sem WhatsApp",
+                action: c.telefone ? (
+                  <a
+                    className="inteligencia-whats-btn"
+                    href={"https://wa.me/55" + c.telefone.replace(/\D/g, "") + "?text=" + encodeURIComponent("Oi " + c.nome + "! Que tal dar uma passada na barbearia?")}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Whats
+                  </a>
+                ) : undefined,
+              }))}
+              title="Clientes para reativar"
+            />
           )}
-        </article>
+        </InteligenciaListCard>
 
         {produtosBaixoGiro.length > 0 && (
-          <article className="inteligencia-card destaque-sugestao">
-            <h3>Sugestao de promocao</h3>
-            <ul>
-              {produtosBaixoGiro.slice(0, 3).map((p) => (
-                <li key={p.id}>
-                  <strong>Promocao de {p.nome}</strong>
-                  <span>
-                    {p.preco_custo && p.preco
-                      ? "Custo " + formatarMoeda(p.preco_custo) + " — venda " + formatarMoeda(p.preco) + ". Pode dar desconto de ate " + Math.floor(((p.preco - p.preco_custo) / p.preco) * 100) + "%."
-                      : "Preco atual: " + formatarMoeda(p.preco || 0) + ". Considere um desconto para girar o estoque."}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </article>
+          <InteligenciaListCard className="inteligencia-card destaque-sugestao" title="Sugestao de promocao">
+            <InteligenciaVerMais
+              items={produtosBaixoGiro.map((p) => ({
+                key: String(p.id),
+                primary: `Promocao de ${p.nome}`,
+                secondary: p.preco_custo && p.preco
+                  ? `Custo ${formatarMoeda(p.preco_custo)} — venda ${formatarMoeda(p.preco)}. Desconto de ate ${Math.floor(((p.preco - p.preco_custo) / p.preco) * 100)}%.`
+                  : `Preco atual: ${formatarMoeda(p.preco || 0)}. Considere um desconto.`,
+              }))}
+              title="Sugestao de promocao"
+            />
+          </InteligenciaListCard>
         )}
 
       </div>
