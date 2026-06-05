@@ -442,20 +442,23 @@ export default function AgendamentoPublicoPage() {
   }
 
   async function buscarAgendamentosCliente() {
-    const tel = normalizarTelefoneBrasil(telefoneCancelamento);
-    if (!telefoneBrasilValido(tel)) {
+    const digits = telefoneCancelamento.replace(/\D/g, "");
+    if (digits.length < 10) {
       setMensagem("Informe um WhatsApp valido com DDD.");
       return;
     }
+    const telCom55 = normalizarTelefoneBrasil(telefoneCancelamento);
+    const telSem55 = telCom55.startsWith("55") ? telCom55.slice(2) : telCom55;
     setMensagem("");
     setBuscandoAgendamentos(true);
 
-    const { data: clienteData } = await supabase
+    const { data: clientesData } = await supabase
       .from("clientes")
       .select("id")
       .eq("empresa_id", empresaId)
-      .eq("telefone", tel)
-      .maybeSingle();
+      .or(`telefone.eq.${telCom55},telefone.eq.${telSem55}`);
+
+    const clienteData = clientesData?.[0] ?? null;
 
     if (!clienteData) {
       setBuscandoAgendamentos(false);
@@ -463,12 +466,13 @@ export default function AgendamentoPublicoPage() {
       return;
     }
 
-    const hoje = dataLocalISO(); // filtra por data local, evita problema de fuso UTC
+    const hoje = dataLocalISO();
+    const clienteIds = (clientesData || []).map((c) => c.id);
     const { data: ags } = await supabase
       .from("agendamentos")
       .select("id,data_agendamento,status,servicos(nome)")
       .eq("empresa_id", empresaId)
-      .eq("cliente_id", clienteData.id)
+      .in("cliente_id", clienteIds)
       .neq("status", "cancelado")
       .neq("status", "finalizado")
       .gte("data_agendamento", hoje)
