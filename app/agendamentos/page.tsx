@@ -45,6 +45,14 @@ type EmpresaAgendaConfig = {
   slug?: string | null;
   dias_atendimento?: number[] | null;
   horarios_atendimento?: string[] | null;
+  servicos?: Servico[] | null;
+};
+
+type AgendamentoHistorico = {
+  id: number;
+  data_agendamento: string;
+  servico: string;
+  status: string;
 };
 
 function dataLocalISO(data = new Date()) {
@@ -143,11 +151,15 @@ export default function AgendamentoPublicoPage() {
   const [telefoneCancelamento, setTelefoneCancelamento] = useState("");
   const [buscandoAgendamentos, setBuscandoAgendamentos] = useState(false);
   const [agendamentosCliente, setAgendamentosCliente] = useState<{ id: number; data_agendamento: string; servico: string; status: string }[]>([]);
+  const [historicoCliente, setHistoricoCliente] = useState<AgendamentoHistorico[]>([]);
+  const [mostrarHistorico, setMostrarHistorico] = useState(false);
+  const [buscandoHistorico, setBuscandoHistorico] = useState(false);
   const [nomeConfirmado, setNomeConfirmado] = useState(false);
   const [notificacaoRespondida, setNotificacaoRespondida] = useState(false);
   const [aceitaLembrete, setAceitaLembrete] = useState(false);
   const [servicoConfirmado, setServicoConfirmado] = useState(false);
   const [horarioConfirmado, setHorarioConfirmado] = useState(false);
+  const [profissionalId, setProfissionalId] = useState<number | null>(null);
   const fimDoFluxoRef = useRef<HTMLDivElement | null>(null);
 
   const primeiroNome = nome.trim().split(" ")[0] || "tudo bem";
@@ -311,11 +323,11 @@ export default function AgendamentoPublicoPage() {
     const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
     if (!aceitaLembrete || !vapidPublicKey || Notification.permission !== "granted") {
-      return;
+      return false;
     }
 
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      return;
+      return false;
     }
 
     const registration = await navigator.serviceWorker.register("/sw.js");

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { authorizeRequest } from "@/lib/serverAuth";
 
 const EMPRESA_ID_LEGADO = 1;

@@ -95,7 +95,7 @@ export async function GET(request: Request) {
   const empresaSlug = new URL(request.url).searchParams.get("empresa")?.trim();
   let query = supabase
     .from("empresas")
-    .select("id,nome,slug,dias_atendimento,horarios_atendimento,licenca_expires_at")
+    .select("id,nome,slug,dias_atendimento,horarios_atendimento,licenca_expires_at,features")
     .eq("ativo", true);
 
   query = empresaSlug ? query.eq("slug", empresaSlug) : query.eq("id", EMPRESA_ID_LEGADO);
