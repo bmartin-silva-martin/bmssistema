@@ -12,31 +12,21 @@ export async function DELETE(request: Request) {
   const { empresaId, supabase } = authorization;
 
   if (!Number.isInteger(id) || id <= 0) {
-    return NextResponse.json({ error: "Servico invalido." }, { status: 400 });
+    return NextResponse.json({ error: "Profissional invalido." }, { status: 400 });
   }
 
-  // Bloquear se houver agendamentos vinculados
-  const { count: agCount } = await supabase
-    .from("agendamentos")
-    .select("id", { count: "exact", head: true })
-    .eq("servico_id", id)
-    .eq("empresa_id", empresaId);
-
-  if (agCount && agCount > 0) {
-    return NextResponse.json(
-      { error: `Este servico possui ${agCount} agendamento(s) registrado(s) e nao pode ser excluido. Desative-o ou renomeie-o.` },
-      { status: 409 }
-    );
-  }
-
-  const { error } = await supabase
-    .from("servicos")
-    .delete()
+  const { error, count } = await supabase
+    .from("profissionais")
+    .delete({ count: "exact" })
     .eq("id", id)
     .eq("empresa_id", empresaId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (count === 0) {
+    return NextResponse.json({ error: "Profissional nao encontrado." }, { status: 404 });
   }
 
   return NextResponse.json({ deleted: true });

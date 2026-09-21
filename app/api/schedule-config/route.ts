@@ -1,25 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { authorizeRequest, type AuthorizedRequest } from "@/lib/serverAuth";
 
-const EMPRESA_ID_LEGADO = 1;
 const DIAS_VALIDOS = new Set([0, 1, 2, 3, 4, 5, 6]);
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-function getSupabaseServerClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) return null;
-
-  return createClient(supabaseUrl, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
 
 function normalizarHorario(horario: unknown) {
   if (typeof horario !== "string") return null;
@@ -54,18 +39,7 @@ function normalizarHorarios(horarios: unknown) {
   ).sort();
 }
 
-function getEmpresaId(value: unknown) {
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : EMPRESA_ID_LEGADO;
-}
-
-async function buscarConfiguracao(empresaId: number) {
-  const supabase = getSupabaseServerClient();
-
-  if (!supabase) {
-    return { data: null, error: "Supabase Service Role nao configurada na Vercel." };
-  }
-
+async function buscarConfiguracao(supabase: AuthorizedRequest["supabase"], empresaId: number) {
   const { data, error } = await supabase
     .from("empresas")
     .select("dias_atendimento,horarios_atendimento")
@@ -78,8 +52,11 @@ async function buscarConfiguracao(empresaId: number) {
 }
 
 export async function GET(request: Request) {
-  const empresaId = getEmpresaId(new URL(request.url).searchParams.get("empresaId"));
-  const { data, error } = await buscarConfiguracao(empresaId);
+  const authorization = await authorizeRequest(request, new URL(request.url).searchParams.get("empresaId"));
+  if ("response" in authorization) return authorization.response;
+
+  const { empresaId, supabase } = authorization;
+  const { data, error } = await buscarConfiguracao(supabase, empresaId);
 
   if (error) {
     return NextResponse.json({ error }, { status: 500 });
@@ -100,14 +77,11 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const supabase = getSupabaseServerClient();
+ const body = await request.json().catch(() => null);
+ const authorization = await authorizeRequest(request, body?.empresaId);
+ if ("response" in authorization) return authorization.response;
 
-  if (!supabase) {
-    return NextResponse.json({ error: "Supabase Service Role nao configurada na Vercel." }, { status: 500 });
-  }
-
-  const body = await request.json().catch(() => null);
-  const empresaId = getEmpresaId(body?.empresaId);
+ const { empresaId, supabase } = authorization;
   const diasAtendimento = normalizarDias(body?.dias_atendimento);
   const horariosAtendimento = normalizarHorarios(body?.horarios_atendimento);
 

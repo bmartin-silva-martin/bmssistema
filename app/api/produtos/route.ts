@@ -1,26 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { authorizeRequest } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
-function getSupabaseServerClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) return null;
-  return createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
-
 export async function DELETE(request: Request) {
-  const supabase = getSupabaseServerClient();
-  if (!supabase) {
-    return NextResponse.json({ error: "Supabase Service Role nao configurada." }, { status: 500 });
-  }
-
   const { searchParams } = new URL(request.url);
   const id = Number(searchParams.get("id"));
-  const empresaId = Number(searchParams.get("empresaId")) || 1;
+  const authorization = await authorizeRequest(request, searchParams.get("empresaId"));
+  if ("response" in authorization) return authorization.response;
+
+  const { empresaId, supabase } = authorization;
 
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Produto invalido." }, { status: 400 });
