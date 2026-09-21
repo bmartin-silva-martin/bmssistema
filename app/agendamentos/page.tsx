@@ -215,22 +215,8 @@ export default function AgendamentoPublicoPage() {
 
     if (empresaResponse.ok) {
       const config = (await empresaResponse.json()) as EmpresaAgendaConfig;
-      const idEmpresa = config.id || EMPRESA_ID_LEGADO;
-
       aplicarConfigEmpresa(config);
-
-      const servicosResponse = await supabase
-        .from("servicos")
-        .select("id,nome,preco,duracao")
-        .eq("empresa_id", idEmpresa)
-        .order("preco", { ascending: false });
-
-      if (servicosResponse.error) {
-        setMensagem(`Erro ao carregar servicos: ${servicosResponse.error.message}`);
-        return;
-      }
-
-      setServicos(servicosResponse.data || []);
+      setServicos(config.servicos || []);
     } else {
       const erro = await empresaResponse.json().catch(() => null);
       setMensagem(erro?.error || "Nao consegui carregar os horarios da barbearia. Atualize a pagina e tente novamente.");
@@ -240,24 +226,20 @@ export default function AgendamentoPublicoPage() {
   const carregarHorariosOcupados = useCallback(async () => {
     if (!isSupabaseConfigured || !data) return;
 
-    const inicio = `${data} 00:00:00`;
-    const fim = `${data} 23:59:59`;
+    const params = new URLSearchParams({ empresa: String(empresaId), data });
+    if (profissionalId) params.set("profissionalId", String(profissionalId));
+    if (servicoId) params.set("servicoId", String(servicoId));
 
-    const { data: lista, error } = await supabase
-      .from("agendamentos")
-      .select("data_agendamento")
-      .eq("empresa_id", empresaId)
-      .neq("status", "cancelado")
-      .gte("data_agendamento", inicio)
-      .lte("data_agendamento", fim);
+    const response = await fetch(`/api/public-availability?${params.toString()}`, { cache: "no-store" });
+    const resultado = await response.json().catch(() => null);
 
-    if (error) {
-      setMensagem(`Erro ao carregar horarios: ${error.message}`);
+    if (!response.ok) {
+      setMensagem(resultado?.error || "Erro ao carregar horarios.");
       return;
     }
 
-    setOcupados(((lista || []) as HorarioOcupado[]).map((item) => item.data_agendamento.slice(11, 16)));
-  }, [data, empresaId]);
+    setOcupados(Array.isArray(resultado?.ocupados) ? resultado.ocupados : []);
+  }, [data, empresaId, profissionalId, servicoId]);
 
   useEffect(() => {
     async function carregarTela() {
@@ -389,74 +371,51 @@ export default function AgendamentoPublicoPage() {
     setSalvando(true);
     setMensagem("Confirmando seu agendamento...");
 
-    // Reusar cliente existente se mesmo telefone na mesma empresa
-    const { data: clienteExistente } = await supabase
-      .from("clientes")
-      .select("id")
-      .eq("empresa_id", empresaId)
-      .eq("telefone", telefoneLimpo)
-      .maybeSingle();
+    const response = await fetch("/api/public-booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        aceitaLembrete,
+        data,
+        dataNascimento: dataNascimento || null,
+        empresa: empresaId,
+        hora: horario,
+        nome: nomeLimpo,
+        profissionalId,
+        servicoId,
+        telefone: telefoneLimpo,
+      }),
+    });
+    const resultado = await response.json().catch(() => null);
 
-    let clienteId: number;
-
-    if (clienteExistente) {
-      clienteId = clienteExistente.id;
-    } else {
-      const { data: novoCliente, error: erroCliente } = await supabase
-        .from("clientes")
-        .insert({
-          aceita_lembrete: aceitaLembrete,
-          data_nascimento: dataNascimento || null,
-          empresa_id: empresaId,
-          nome: nomeLimpo,
-          telefone: telefoneLimpo,
-        })
-        .select("id")
-        .single();
-
-      if (erroCliente) {
-        setSalvando(false);
-        setMensagem(`Erro ao criar cadastro: ${erroCliente.message}`);
-        return;
-      }
-
-      clienteId = novoCliente.id;
-    }
-
-    const cliente = { id: clienteId };
-
-    const { data: agendamento, error } = await supabase
-      .from("agendamentos")
-      .insert({
-        aceita_lembrete: aceitaLembrete,
-        cliente_id: cliente.id,
-        data_agendamento: `${data} ${horario}:00`,
-        empresa_id: empresaId,
-        servico_id: servicoId,
-        status: "confirmado",
-      })
-      .select("id")
-      .single();
-
-    if (error) {
+    if (!response.ok || !resultado?.agendamentoId || !resultado?.clienteId) {
       setSalvando(false);
-      setMensagem(`Erro ao confirmar agendamento: ${error.message}`);
-      return;
-    }
-
-    try {
-      await salvarInscricaoPush(cliente.id, agendamento.id);
-    } catch {
-      setMensagem("Agendamento confirmado! Nao conseguimos ativar o push, mas a barbearia recebeu sua reserva.");
-      setSalvando(false);
-      rolarParaProximaEtapa();
+      setMensagem(resultado?.error || "Erro ao confirmar agendamento. Tente novamente.");
       return;
     }
 
     setSalvando(false);
-    setAgendamentoIdConfirmado(agendamento.id);
+    setAgendamentoIdConfirmado(resultado.agendamentoId);
     setAgendamentoConcluido(true);
+    setMensagem(
+      aceitaLembrete
+        ? "Agendamento confirmado! Estamos testando a notificacao neste aparelho."
+        : "Agendamento confirmado! A barbearia recebeu sua reserva.",
+    );
     rolarParaProximaEtapa();
+
+    if (aceitaLembrete) {
+      salvarInscricaoPush(resultado.clienteId, resultado.agendamentoId)
+        .then((notificacoesEnviadas) => {
+          if (notificacoesEnviadas) {
+            setMensagem("Agendamento confirmado! Enviamos uma notificacao de teste para este aparelho.");
+          }
+        })
+        .catch((pushError) => {
+          const detalhe = pushError instanceof Error ? pushError.message : "Nao conseguimos ativar o push.";
+          setMensagem(`Agendamento confirmado! ${detalhe} A barbearia recebeu sua reserva.`);
+        });
+    }
   }
 
   async function buscarAgendamentosCliente() {
@@ -466,62 +425,68 @@ export default function AgendamentoPublicoPage() {
       return;
     }
     const telCom55 = normalizarTelefoneBrasil(telefoneCancelamento);
-    const telSem55 = telCom55.startsWith("55") ? telCom55.slice(2) : telCom55;
     setMensagem("");
     setBuscandoAgendamentos(true);
 
-    const { data: clientesData } = await supabase
-      .from("clientes")
-      .select("id")
-      .eq("empresa_id", empresaId)
-      .or(`telefone.eq.${telCom55},telefone.eq.${telSem55}`);
-
-    const clienteData = clientesData?.[0] ?? null;
-
-    if (!clienteData) {
-      setBuscandoAgendamentos(false);
-      setMensagem("Nenhum agendamento encontrado para este WhatsApp.");
-      return;
-    }
-
-    const hoje = dataLocalISO();
-    const clienteIds = (clientesData || []).map((c) => c.id);
-    const { data: ags } = await supabase
-      .from("agendamentos")
-      .select("id,data_agendamento,status,servicos(nome)")
-      .eq("empresa_id", empresaId)
-      .in("cliente_id", clienteIds)
-      .neq("status", "cancelado")
-      .neq("status", "finalizado")
-      .gte("data_agendamento", hoje)
-      .order("data_agendamento", { ascending: true });
+    const params = new URLSearchParams({
+      empresa: String(empresaId),
+      scope: "future",
+      telefone: telCom55,
+    });
+    const response = await fetch(`/api/public-appointments?${params.toString()}`, { cache: "no-store" });
+    const resultado = await response.json().catch(() => null);
+    const ags = response.ok && Array.isArray(resultado?.appointments) ? resultado.appointments : null;
 
     setBuscandoAgendamentos(false);
 
-    if (!ags || ags.length === 0) {
+    if (!response.ok || !ags || ags.length === 0) {
       setMensagem("Nenhum agendamento futuro encontrado.");
       return;
     }
 
-    setAgendamentosCliente(
-      ags.map((ag: { id: number; data_agendamento: string; status: string; servicos: { nome: string } | { nome: string }[] | null }) => ({
-        id: ag.id,
-        data_agendamento: ag.data_agendamento,
-        servico: (Array.isArray(ag.servicos) ? ag.servicos[0] : ag.servicos)?.nome || "Servico",
-        status: ag.status,
-      }))
-    );
+    setAgendamentosCliente(ags);
+  }
+
+  async function buscarHistoricoCliente() {
+    const digits = telefoneCancelamento.replace(/\D/g, "");
+    if (digits.length < 10) return;
+
+    const telCom55 = normalizarTelefoneBrasil(telefoneCancelamento);
+    setBuscandoHistorico(true);
+
+    const params = new URLSearchParams({
+      empresa: String(empresaId),
+      scope: "history",
+      telefone: telCom55,
+    });
+    const response = await fetch(`/api/public-appointments?${params.toString()}`, { cache: "no-store" });
+    const resultado = await response.json().catch(() => null);
+    const ags = response.ok && Array.isArray(resultado?.appointments) ? resultado.appointments : [];
+
+    setBuscandoHistorico(false);
+    setHistoricoCliente(ags);
+  }
+
+  function alternarHistorico() {
+    const abrir = !mostrarHistorico;
+    setMostrarHistorico(abrir);
+
+    if (abrir && historicoCliente.length === 0) {
+      buscarHistoricoCliente();
+    }
   }
 
   async function cancelarAgendamentoCliente(id: number) {
     setCancelando(true);
-    const { error } = await supabase
-      .from("agendamentos")
-      .update({ status: "cancelado" })
-      .eq("id", id);
+    const response = await fetch("/api/public-appointments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresa: empresaId, telefone: telefoneCancelamento, agendamentoId: id }),
+    });
+    const resultado = await response.json().catch(() => null);
     setCancelando(false);
-    if (error) {
-      setMensagem("Nao foi possivel cancelar. Tente novamente.");
+    if (!response.ok) {
+      setMensagem(resultado?.error || "Nao foi possivel cancelar. Tente novamente.");
       return;
     }
     setAgendamentosCliente((lista) => lista.filter((ag) => ag.id !== id));
@@ -531,16 +496,17 @@ export default function AgendamentoPublicoPage() {
   async function cancelarAgendamento() {
     if (!agendamentoIdConfirmado) return;
     setCancelando(true);
-
-    const { error } = await supabase
-      .from("agendamentos")
-      .update({ status: "cancelado" })
-      .eq("id", agendamentoIdConfirmado);
+    const response = await fetch("/api/public-appointments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresa: empresaId, telefone, agendamentoId: agendamentoIdConfirmado }),
+    });
+    const resultado = await response.json().catch(() => null);
 
     setCancelando(false);
 
-    if (error) {
-      setMensagem("Nao foi possivel cancelar. Tente novamente ou entre em contato com a barbearia.");
+    if (!response.ok) {
+      setMensagem(resultado?.error || "Nao foi possivel cancelar. Tente novamente ou entre em contato com a barbearia.");
       return;
     }
 

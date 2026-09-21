@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { authorizeRequest } from "@/lib/serverAuth";
 
-const EMPRESA_ID_LEGADO = 1;
 
 type ClienteUpdateRequest = {
   data_nascimento?: string | null;
@@ -13,20 +12,6 @@ type ClienteUpdateRequest = {
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-function getSupabaseServerClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) return null;
-
-  return createClient(supabaseUrl, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
 
 function normalizarTelefoneBrasil(value = "") {
   let digits = value.replace(/\D/g, "");
@@ -49,20 +34,12 @@ function normalizarDataNascimento(value?: string | null) {
   return value;
 }
 
-function getEmpresaId(value: unknown) {
-  const id = Number(value);
-  return Number.isInteger(id) && id > 0 ? id : EMPRESA_ID_LEGADO;
-}
-
 export async function PATCH(request: Request) {
-  const supabase = getSupabaseServerClient();
-
-  if (!supabase) {
-    return NextResponse.json({ error: "Supabase Service Role nao configurada na Vercel." }, { status: 500 });
-  }
-
   const body = (await request.json().catch(() => null)) as ClienteUpdateRequest | null;
-  const empresaId = getEmpresaId(body?.empresaId);
+  const authorization = await authorizeRequest(request, body?.empresaId);
+  if ("response" in authorization) return authorization.response;
+
+  const { empresaId, supabase } = authorization;
   const id = Number(body?.id);
   const nome = body?.nome?.trim();
   const telefone = normalizarTelefoneBrasil(body?.telefone || "");
@@ -103,15 +80,12 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const supabase = getSupabaseServerClient();
-
-  if (!supabase) {
-    return NextResponse.json({ error: "Supabase Service Role nao configurada na Vercel." }, { status: 500 });
-  }
-
   const { searchParams } = new URL(request.url);
   const id = Number(searchParams.get("id"));
-  const empresaId = getEmpresaId(searchParams.get("empresaId"));
+  const authorization = await authorizeRequest(request, searchParams.get("empresaId"));
+  if ("response" in authorization) return authorization.response;
+
+  const { empresaId, supabase } = authorization;
 
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Cliente invalido." }, { status: 400 });

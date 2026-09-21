@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Session } from "@supabase/supabase-js";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -675,7 +676,7 @@ export default function AdminDashboard() {
   }
 
   async function excluirServico(servicoId: number) {
-    const response = await fetch(`/api/servicos?id=${servicoId}&empresaId=${empresaIdAtual}`, { method: "DELETE" });
+    const response = await authenticatedFetch(`/api/servicos?id=${servicoId}&empresaId=${empresaIdAtual}`, { method: "DELETE" });
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
@@ -688,7 +689,7 @@ export default function AdminDashboard() {
   }
 
   async function excluirProduto(produtoId: number) {
-    const response = await fetch(`/api/produtos?id=${produtoId}&empresaId=${empresaIdAtual}`, { method: "DELETE" });
+    const response = await authenticatedFetch(`/api/produtos?id=${produtoId}&empresaId=${empresaIdAtual}`, { method: "DELETE" });
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
@@ -750,7 +751,7 @@ export default function AdminDashboard() {
   }
 
   async function excluirCliente(clienteId: number) {
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `/api/clientes?id=${clienteId}&empresaId=${empresaIdAtual}`,
       { method: "DELETE" }
     );
@@ -907,7 +908,7 @@ export default function AdminDashboard() {
     }
 
     setSalvandoConfiguracao(true);
-    const response = await fetch("/api/schedule-config", {
+    const response = await authenticatedFetch("/api/schedule-config", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -946,7 +947,7 @@ export default function AdminDashboard() {
 
   async function salvarNomeDono() {
     const nome = nomeDono.trim();
-    const response = await fetch("/api/company-profile", {
+    const response = await authenticatedFetch("/api/company-profile", {
       body: JSON.stringify({ empresaId: empresaIdAtual, nome_responsavel: nome || null }),
       headers: { "Content-Type": "application/json" },
       method: "PATCH",
