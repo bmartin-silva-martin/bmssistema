@@ -416,7 +416,7 @@ export default function AdminDashboard() {
         )
         .eq("empresa_id", empresaId)
         .order("created_at", { ascending: false }),
-      fetch(`/api/company-profile?empresaId=${empresaId}`, { cache: "no-store" })
+      authenticatedFetch(`/api/company-profile?empresaId=${empresaId}`, { cache: "no-store" })
         .then((response) => response.json())
         .catch(() => null),
     ]);
@@ -715,7 +715,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    const response = await fetch("/api/clientes", {
+    const response = await authenticatedFetch("/api/clientes", {
       body: JSON.stringify({
         data_nascimento: cliente.data_nascimento || null,
         empresaId: empresaIdAtual,

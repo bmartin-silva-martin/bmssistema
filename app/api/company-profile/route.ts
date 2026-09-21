@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { authorizeRequest } from "@/lib/serverAuth";
 
 const EMPRESA_ID_LEGADO = 1;
 const MISSING_COLUMN_HINT =
@@ -37,8 +37,10 @@ function getEmpresaId(value: unknown) {
 }
 
 export async function GET(request: Request) {
-  const supabase = getSupabaseServerClient();
-  const empresaId = getEmpresaId(new URL(request.url).searchParams.get("empresaId"));
+  const authorization = await authorizeRequest(request, new URL(request.url).searchParams.get("empresaId"));
+  if ("response" in authorization) return authorization.response;
+
+  const { empresaId, supabase } = authorization;
 
   if (!supabase) {
     return NextResponse.json({ error: "Supabase Service Role nao configurada na Vercel." }, { status: 500 });
@@ -62,14 +64,15 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const supabase = getSupabaseServerClient();
+  const body = (await request.json().catch(() => null)) as CompanyProfileRequest | null;
+  const authorization = await authorizeRequest(request, body?.empresaId);
+  if ("response" in authorization) return authorization.response;
+
+  const { empresaId, supabase } = authorization;
 
   if (!supabase) {
     return NextResponse.json({ error: "Supabase Service Role nao configurada na Vercel." }, { status: 500 });
   }
-
-  const body = (await request.json().catch(() => null)) as CompanyProfileRequest | null;
-  const empresaId = getEmpresaId(body?.empresaId);
   const nomeResponsavel = body?.nome_responsavel?.trim() || null;
 
   const { data, error } = await supabase
