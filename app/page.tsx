@@ -56,8 +56,22 @@ type ClienteResumo = {
 };
 
 type ServicoResumo = {
+  duracao?: number | null;
   nome: string;
   preco: number | null;
+};
+
+type Profissional = {
+  ativo?: boolean | null;
+  id: number;
+  nome: string;
+  foto_url?: string | null;
+};
+
+type ProfissionalResumo = {
+  id: number;
+  nome: string;
+  foto_url?: string | null;
 };
 
 type Agendamento = {
@@ -66,10 +80,12 @@ type Agendamento = {
   data_agendamento: string;
   lembrete_enviado_em?: string | null;
   lembrete_status?: string | null;
+  profissional_id?: number | null;
   servico_id: number | null;
   status: string;
   clientes: ClienteResumo | ClienteResumo[] | null;
   servicos: ServicoResumo | ServicoResumo[] | null;
+  profissionais?: ProfissionalResumo | ProfissionalResumo[] | null;
 };
 
 type VendaItem = {
@@ -170,6 +186,97 @@ function dataLocalISO(data = new Date()) {
   return `${ano}-${mes}-${dia}`;
 }
 
+const AGENDA_PX_POR_MINUTO = 1.6;
+const AGENDA_CARD_MIN_ALTURA = 58;
+const AGENDA_DURACAO_PADRAO_MIN = 30;
+
+function horaParaMinutos(hora: string) {
+  const [h, m] = hora.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function minutosDoAgendamento(dataIso: string) {
+  const data = new Date(dataIso);
+  return data.getHours() * 60 + data.getMinutes();
+}
+
+function minutosAgora() {
+  const agora = new Date();
+  return agora.getHours() * 60 + agora.getMinutes();
+}
+
+function formatarHoraMinutos(minutos: number) {
+  const h = String(Math.floor(minutos / 60)).padStart(2, "0");
+  const m = String(minutos % 60).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+function calcularJanelaHorario(horarios?: string[] | null) {
+  const lista = horarios && horarios.length ? horarios : HORARIOS_ATENDIMENTO_PADRAO;
+  const minutosLista = lista.map(horaParaMinutos);
+  const inicio = Math.floor(Math.min(...minutosLista) / 60) * 60;
+  const fim = Math.ceil(Math.max(...minutosLista, inicio + 60) / 60) * 60 + 60;
+  return { inicio, fim };
+}
+
+type ItemTimelinePosicionado = {
+  agendamento: Agendamento;
+  inicioMin: number;
+  duracaoMin: number;
+  coluna: number;
+  totalColunas: number;
+};
+
+function posicionarItensTimeline(agendamentos: Agendamento[]): ItemTimelinePosicionado[] {
+  const itens = agendamentos
+    .map((agendamento) => {
+      const servico = firstRelation(agendamento.servicos);
+      const inicioMin = minutosDoAgendamento(agendamento.data_agendamento);
+      const duracaoMin = servico?.duracao && servico.duracao > 0 ? servico.duracao : AGENDA_DURACAO_PADRAO_MIN;
+      return { agendamento, inicioMin, duracaoMin, fimMin: inicioMin + duracaoMin };
+    })
+    .sort((a, b) => a.inicioMin - b.inicioMin);
+
+  const posicionados: ItemTimelinePosicionado[] = [];
+  let cluster: typeof itens = [];
+  let clusterFim = -1;
+
+  const fecharCluster = () => {
+    if (cluster.length === 0) return;
+    const colunas: number[] = [];
+    const atribuicoes = cluster.map((item) => {
+      let coluna = colunas.findIndex((fimColuna) => fimColuna <= item.inicioMin);
+      if (coluna === -1) {
+        coluna = colunas.length;
+        colunas.push(item.fimMin);
+      } else {
+        colunas[coluna] = item.fimMin;
+      }
+      return { ...item, coluna };
+    });
+    const totalColunas = colunas.length;
+    atribuicoes.forEach((item) => {
+      posicionados.push({
+        agendamento: item.agendamento,
+        inicioMin: item.inicioMin,
+        duracaoMin: item.duracaoMin,
+        coluna: item.coluna,
+        totalColunas,
+      });
+    });
+    cluster = [];
+    clusterFim = -1;
+  };
+
+  itens.forEach((item) => {
+    if (cluster.length > 0 && item.inicioMin >= clusterFim) fecharCluster();
+    cluster.push(item);
+    clusterFim = Math.max(clusterFim, item.fimMin);
+  });
+  fecharCluster();
+  return posicionados;
+}
+
 function normalizarTelefoneBrasil(value = "") {
   let digits = value.replace(/\D/g, "");
 
@@ -220,6 +327,7 @@ export default function AdminDashboard() {
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [profissionais, setProfissionais] = useState<Profissional[]>([]);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [clientes, setClientes] = useState<ClienteResumo[]>([]);
@@ -251,6 +359,9 @@ export default function AdminDashboard() {
   const [periodoInteligencia, setPeriodoInteligencia] = useState<"7" | "30" | "custom">("30");
   const [inteligenciaDataInicio, setInteligenciaDataInicio] = useState("");
   const [inteligenciaDataFim, setInteligenciaDataFim] = useState("");
+  const [filtroProfissionalId, setFiltroProfissionalId] = useState<number | "todos">("todos");
+  const [diaAgendaSelecionado, setDiaAgendaSelecionado] = useState(dataLocalISO());
+  const [agendaWeekOffset, setAgendaWeekOffset] = useState(0);
 
   const empresaIdAtual = empresa?.id || EMPRESA_ID_LEGADO;
   const empresaSlugAtual = empresa?.slug?.trim();
@@ -258,7 +369,13 @@ export default function AdminDashboard() {
     typeof window === "undefined"
       ? `/agendamentos${empresaSlugAtual ? `?empresa=${empresaSlugAtual}` : ""}`
       : `${window.location.origin}/agendamentos${empresaSlugAtual ? `?empresa=${empresaSlugAtual}` : ""}`;
-  const diasAgendaPainel = useMemo(() => montarDiasDoPainel(), []);
+  const diasAgendaPainel = useMemo(() => montarDiasDoPainel(agendaWeekOffset), [agendaWeekOffset]);
+
+  const navegarSemanaAgenda = (direcao: -1 | 1) => {
+    const novoOffset = agendaWeekOffset + direcao;
+    setAgendaWeekOffset(novoOffset);
+    setDiaAgendaSelecionado(montarDiasDoPainel(novoOffset)[0].iso);
+  };
 
   const ranking = useMemo(() => {
     const totais = new Map<string, number>();
@@ -281,6 +398,24 @@ export default function AdminDashboard() {
       return status !== "cancelado" && status !== "finalizado";
     });
   }, [agendamentos]);
+
+  const diasComAgendamentoAgenda = useMemo(
+    () => new Set(agendamentosAtivos.map((agendamento) => agendamento.data_agendamento.slice(0, 10))),
+    [agendamentosAtivos],
+  );
+
+  const agendamentosDoDiaSelecionado = useMemo(
+    () =>
+      agendamentosAtivos
+        .filter((agendamento) => agendamento.data_agendamento.slice(0, 10) === diaAgendaSelecionado)
+        .sort((a, b) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime()),
+    [agendamentosAtivos, diaAgendaSelecionado],
+  );
+
+  const agendamentosDoDiaFiltrados = useMemo(() => {
+    if (filtroProfissionalId === "todos") return agendamentosDoDiaSelecionado;
+    return agendamentosDoDiaSelecionado.filter((agendamento) => agendamento.profissional_id === filtroProfissionalId);
+  }, [agendamentosDoDiaSelecionado, filtroProfissionalId]);
 
   const historicoAgendamentos = useMemo(() => {
     return agendamentos
@@ -389,12 +524,13 @@ export default function AdminDashboard() {
       clientesResponse,
       vendasResponse,
       perfilResponse,
+      profissionaisResponse,
     ] = await Promise.all([
       supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", empresaId).order("nome"),
       supabase
         .from("agendamentos")
         .select(
-          "id,cliente_id,servico_id,data_agendamento,status,lembrete_enviado_em,lembrete_status,clientes(id,nome,telefone,data_nascimento),servicos(nome,preco)",
+          "id,cliente_id,servico_id,profissional_id,data_agendamento,status,lembrete_enviado_em,lembrete_status,clientes(id,nome,telefone,data_nascimento),servicos(nome,preco,duracao),profissionais(id,nome,foto_url)",
         )
         .eq("empresa_id", empresaId)
         .neq("status", "cancelado")
@@ -419,6 +555,7 @@ export default function AdminDashboard() {
       authenticatedFetch(`/api/company-profile?empresaId=${empresaId}`, { cache: "no-store" })
         .then((response) => response.json())
         .catch(() => null),
+      supabase.from("profissionais").select("id,nome,foto_url,ativo").eq("empresa_id", empresaId).order("nome"),
     ]);
 
     setEmpresa(empresaAtual);
@@ -429,6 +566,7 @@ export default function AdminDashboard() {
 
     if (servicosResponse.data) setServicos(servicosResponse.data as Servico[]);
     if (agendamentosResponse.data) setAgendamentos(agendamentosResponse.data as unknown as Agendamento[]);
+    if (profissionaisResponse.data) setProfissionais(profissionaisResponse.data as Profissional[]);
     if (clientesResponse.data) setClientes(clientesResponse.data as ClienteResumo[]);
 
     const nomeResponsavel = perfilResponse?.empresa?.nome_responsavel || "";
@@ -1328,10 +1466,43 @@ export default function AdminDashboard() {
             <AgendaHero
               agendamentos={agendamentosAtivos}
               dias={diasAgendaPainel}
+              diaSelecionado={diaAgendaSelecionado}
+              diasComAgendamento={diasComAgendamentoAgenda}
               empresa={empresa}
               nomeDono={nomeDono}
+              onNavigateWeek={navegarSemanaAgenda}
               onOpenMenu={() => setMobileDrawerOpen(true)}
+              onSelectDia={setDiaAgendaSelecionado}
               vendas={vendas}
+            />
+            {profissionais.filter((profissional) => profissional.ativo !== false).length > 0 && (
+              <div className="profissional-filtro-strip" aria-label="Filtrar por profissional">
+                <button
+                  className={filtroProfissionalId === "todos" ? "active" : ""}
+                  onClick={() => setFiltroProfissionalId("todos")}
+                  type="button"
+                >
+                  Todos
+                </button>
+                {profissionais
+                  .filter((profissional) => profissional.ativo !== false)
+                  .map((profissional) => (
+                    <button
+                      className={filtroProfissionalId === profissional.id ? "active" : ""}
+                      key={profissional.id}
+                      onClick={() => setFiltroProfissionalId(profissional.id)}
+                      type="button"
+                    >
+                      {profissional.nome}
+                    </button>
+                  ))}
+              </div>
+            )}
+            <AgendaTimeline
+              agendamentos={agendamentosDoDiaFiltrados}
+              diaSelecionado={diaAgendaSelecionado}
+              emptyLabel="Nenhum agendamento ativo para este dia."
+              horariosAtendimento={empresa?.horarios_atendimento}
             />
             <TodayReminderPanel
               agendamentos={lembretesDeHoje}
@@ -2034,16 +2205,24 @@ function MobileDrawer({
 function AgendaHero({
   agendamentos,
   dias,
+  diaSelecionado,
+  diasComAgendamento,
   empresa,
   nomeDono,
+  onNavigateWeek,
   onOpenMenu,
+  onSelectDia,
   vendas,
 }: {
   agendamentos: Agendamento[];
   dias: DiaPainel[];
+  diaSelecionado: string;
+  diasComAgendamento?: Set<string>;
   empresa?: Empresa | null;
   nomeDono: string;
+  onNavigateWeek: (direcao: -1 | 1) => void;
   onOpenMenu: () => void;
+  onSelectDia: (iso: string) => void;
   vendas: Venda[];
 }) {
   const hojeIso = dataLocalISO();
@@ -2068,16 +2247,33 @@ function AgendaHero({
         </button>
       </div>
 
-      <strong className="agenda-week-label">
-        {dias[0]?.labelCompleto} à {dias[dias.length - 1]?.labelCompleto}
-      </strong>
+      <div className="agenda-week-nav">
+        <strong className="agenda-week-label">
+          {dias[0]?.labelCompleto} à {dias[dias.length - 1]?.labelCompleto}
+        </strong>
+        <div className="agenda-week-arrows">
+          <button aria-label="Semana anterior" className="agenda-week-arrow" onClick={() => onNavigateWeek(-1)} type="button">
+            ‹
+          </button>
+          <button aria-label="Proxima semana" className="agenda-week-arrow" onClick={() => onNavigateWeek(1)} type="button">
+            ›
+          </button>
+        </div>
+      </div>
 
       <div className="agenda-day-strip">
-        {dias.map((dia, index) => (
-          <span className={index === 0 ? "active" : ""} key={dia.iso}>
+        {dias.map((dia) => (
+          <button
+            aria-pressed={dia.iso === diaSelecionado}
+            className={dia.iso === diaSelecionado ? "active" : ""}
+            key={dia.iso}
+            onClick={() => onSelectDia(dia.iso)}
+            type="button"
+          >
             <small>{dia.semana}</small>
             <strong>{dia.dia}</strong>
-          </span>
+            {diasComAgendamento?.has(dia.iso) && <span className="agenda-day-dot" aria-hidden="true" />}
+          </button>
         ))}
       </div>
 
@@ -2094,6 +2290,72 @@ function AgendaHero({
         </article>
       </div>
     </section>
+  );
+}
+
+function AgendaTimeline({
+  agendamentos,
+  diaSelecionado,
+  emptyLabel,
+  horariosAtendimento,
+}: {
+  agendamentos: Agendamento[];
+  diaSelecionado: string;
+  emptyLabel: string;
+  horariosAtendimento?: string[] | null;
+}) {
+  if (agendamentos.length === 0) return <div className="empty-state">{emptyLabel}</div>;
+
+  const { inicio, fim } = calcularJanelaHorario(horariosAtendimento);
+  const alturaGrid = (fim - inicio) * AGENDA_PX_POR_MINUTO;
+  const horas = Array.from({ length: Math.floor((fim - inicio) / 60) + 1 }, (_, index) => inicio + index * 60);
+  const itensPosicionados = posicionarItensTimeline(agendamentos);
+  const mostrarLinhaAgora = diaSelecionado === dataLocalISO() && minutosAgora() >= inicio && minutosAgora() <= fim;
+  const minutosAtual = minutosAgora();
+
+  return (
+    <div className="agenda-grid" style={{ height: alturaGrid }}>
+      <div className="agenda-grid-hours" aria-hidden="true">
+        {horas.map((minuto) => (
+          <span className="agenda-grid-hour-label" key={minuto} style={{ top: (minuto - inicio) * AGENDA_PX_POR_MINUTO }}>
+            {formatarHoraMinutos(minuto)}
+          </span>
+        ))}
+      </div>
+      <div className="agenda-grid-body">
+        {horas.map((minuto) => (
+          <span className="agenda-grid-line" key={minuto} style={{ top: (minuto - inicio) * AGENDA_PX_POR_MINUTO }} />
+        ))}
+        {mostrarLinhaAgora && (
+          <div className="agenda-grid-now-line" style={{ top: (minutosAtual - inicio) * AGENDA_PX_POR_MINUTO }}>
+            <span className="agenda-grid-now-dot" />
+          </div>
+        )}
+        {itensPosicionados.map(({ agendamento, inicioMin, duracaoMin, coluna, totalColunas }) => {
+          const cliente = firstRelation(agendamento.clientes);
+          const servico = firstRelation(agendamento.servicos);
+          const profissional = firstRelation(agendamento.profissionais);
+          const top = Math.max(0, (inicioMin - inicio) * AGENDA_PX_POR_MINUTO);
+          const altura = Math.max(AGENDA_CARD_MIN_ALTURA, duracaoMin * AGENDA_PX_POR_MINUTO);
+          const largura = 100 / totalColunas;
+
+          return (
+            <article
+              className={`agenda-grid-card status-${agendamento.status.toLowerCase()}`}
+              key={agendamento.id}
+              style={{ height: altura, left: `${coluna * largura}%`, top, width: `calc(${largura}% - 6px)` }}
+            >
+              <div className="agenda-grid-card-time-row">
+                {formatarHoraMinutos(inicioMin)} - {formatarHoraMinutos(inicioMin + duracaoMin)}
+              </div>
+              <strong>{cliente?.nome || "Cliente"}</strong>
+              <span className="agenda-grid-card-service">{servico?.nome || "Servico"}</span>
+              {profissional && <span className="agenda-grid-card-professional">{profissional.nome}</span>}
+            </article>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
