@@ -1615,6 +1615,12 @@ export default function AdminDashboard() {
           onNavigate={abrirSecao}
         />
 
+        <MobileBottomNav
+          activeSection={activeSection}
+          onNavigate={abrirSecao}
+          onOpenMore={() => setMobileDrawerOpen(true)}
+        />
+
         {activeSection === "visao" && (
           <AdminSectionShell
             description="Acompanhe os numeros principais e o que precisa de atencao hoje."
@@ -1652,7 +1658,7 @@ export default function AdminDashboard() {
         )}
 
         {activeSection === "agenda" && (
-          <section className="admin-section">
+          <section className="admin-section agenda-section agenda-app-shell agenda-app-content">
             <AgendaHero
               agendamentos={agendamentosAtivos}
               dias={diasAgendaPainel}
@@ -1665,6 +1671,7 @@ export default function AdminDashboard() {
               onSelectDia={setDiaAgendaSelecionado}
               vendas={vendas}
             />
+            <article className="agenda-timeline-panel agenda-app-main agenda-app-section">
             {profissionais.filter((profissional) => profissional.ativo !== false).length > 0 && (
               <div className="profissional-filtro-strip" aria-label="Filtrar por profissional">
                 <button
@@ -1683,6 +1690,12 @@ export default function AdminDashboard() {
                       onClick={() => setFiltroProfissionalId(profissional.id)}
                       type="button"
                     >
+                      {profissional.foto_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt="" src={profissional.foto_url} />
+                      ) : (
+                        <span className="photo-placeholder" aria-hidden="true">☺</span>
+                      )}
                       {profissional.nome}
                     </button>
                   ))}
@@ -1699,6 +1712,7 @@ export default function AdminDashboard() {
               onNotify={enviarLembrete}
               profissionais={profissionais}
             />
+            </article>
             <TodayReminderPanel
               agendamentos={lembretesDeHoje}
               onNotify={enviarLembrete}
@@ -1749,6 +1763,17 @@ export default function AdminDashboard() {
               )}
             </article>
           </section>
+        )}
+
+        {activeSection === "agenda" && (
+          <div className="agenda-fixed-actions">
+            <button aria-label="Travar tela" className="agenda-lock-button" type="button">
+              🔒
+            </button>
+            <button className="agenda-new-button" onClick={() => setNovoAgendamentoAberto(true)} type="button">
+              Novo Agendamento <span aria-hidden="true">→</span>
+            </button>
+          </div>
         )}
 
         {activeSection === "servicos" && (
@@ -2479,6 +2504,35 @@ function MobileDrawer({
   );
 }
 
+function MobileBottomNav({
+  activeSection,
+  onNavigate,
+  onOpenMore,
+}: {
+  activeSection: AdminSection;
+  onNavigate: (secao: AdminSection) => void;
+  onOpenMore: () => void;
+}) {
+  const maisAtivo = !["agenda", "clientes", "financeiro"].includes(activeSection);
+
+  return (
+    <nav aria-label="Navegação principal" className="mobile-bottom-nav">
+      <button aria-current={activeSection === "agenda" ? "page" : undefined} className={activeSection === "agenda" ? "active" : ""} onClick={() => onNavigate("agenda")} type="button">
+        <span aria-hidden="true">◷</span><small>Agenda</small>
+      </button>
+      <button aria-current={activeSection === "clientes" ? "page" : undefined} className={activeSection === "clientes" ? "active" : ""} onClick={() => onNavigate("clientes")} type="button">
+        <span aria-hidden="true">♡</span><small>Clientes</small>
+      </button>
+      <button aria-current={activeSection === "financeiro" ? "page" : undefined} className={activeSection === "financeiro" ? "active" : ""} onClick={() => onNavigate("financeiro")} type="button">
+        <span aria-hidden="true">$</span><small>Financeiro</small>
+      </button>
+      <button aria-current={maisAtivo ? "page" : undefined} className={maisAtivo ? "active" : ""} onClick={onOpenMore} type="button">
+        <span aria-hidden="true">⋯</span><small>Mais</small>
+      </button>
+    </nav>
+  );
+}
+
 function AgendaHero({
   agendamentos,
   dias,
@@ -2509,7 +2563,7 @@ function AgendaHero({
   const totalSemana = vendas.reduce((total, venda) => total + (venda.total || 0), 0);
 
   return (
-    <section className="agenda-hero">
+    <section className="agenda-hero agenda-app-header">
       <div className="agenda-title-row">
         <div>
           {empresa?.features?.logo_url && (
@@ -2526,6 +2580,7 @@ function AgendaHero({
 
       <div className="agenda-week-nav">
         <strong className="agenda-week-label">
+          <span className="agenda-week-icon" aria-hidden="true">📅</span>
           {dias[0]?.labelCompleto} à {dias[dias.length - 1]?.labelCompleto}
         </strong>
         <div className="agenda-week-arrows">
@@ -2541,8 +2596,9 @@ function AgendaHero({
       <div className="agenda-day-strip">
         {dias.map((dia) => (
           <button
+            aria-current={dia.iso === hojeIso ? "date" : undefined}
             aria-pressed={dia.iso === diaSelecionado}
-            className={dia.iso === diaSelecionado ? "active" : ""}
+            className={`agenda-day-card${dia.iso === diaSelecionado ? " active" : ""}${dia.iso === hojeIso ? " today" : ""}`}
             key={dia.iso}
             onClick={() => onSelectDia(dia.iso)}
             type="button"
@@ -2556,14 +2612,24 @@ function AgendaHero({
 
       <div className="agenda-summary-grid">
         <article className="hot">
-          <span>Hoje</span>
-          <strong>{formatarMoeda(totalHoje)}</strong>
-          <em>{agendamentosHoje.length}</em>
+          <div className="agenda-summary-top">
+            <span className="agenda-summary-icon" aria-hidden="true">💰</span>
+            <div><span>Hoje</span><strong>{formatarMoeda(totalHoje)}</strong></div>
+          </div>
+          <div className="agenda-summary-count-row">
+            <strong className="agenda-summary-count">{agendamentosHoje.length}</strong>
+            <span className="agenda-summary-decor" aria-hidden="true">🪑</span>
+          </div>
         </article>
         <article>
-          <span>Esta semana</span>
-          <strong>{formatarMoeda(totalSemana)}</strong>
-          <em>{agendamentos.length}</em>
+          <div className="agenda-summary-top">
+            <span className="agenda-summary-icon" aria-hidden="true">💈</span>
+            <div><span>Esta semana</span><strong>{formatarMoeda(totalSemana)}</strong></div>
+          </div>
+          <div className="agenda-summary-count-row">
+            <strong className="agenda-summary-count">{agendamentos.length}</strong>
+            <span className="agenda-summary-decor" aria-hidden="true">🪑</span>
+          </div>
         </article>
       </div>
     </section>
