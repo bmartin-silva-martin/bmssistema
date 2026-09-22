@@ -362,6 +362,16 @@ export default function AdminDashboard() {
   const [filtroProfissionalId, setFiltroProfissionalId] = useState<number | "todos">("todos");
   const [diaAgendaSelecionado, setDiaAgendaSelecionado] = useState(dataLocalISO());
   const [agendaWeekOffset, setAgendaWeekOffset] = useState(0);
+  const [novoAgendamentoAberto, setNovoAgendamentoAberto] = useState(false);
+  const [novoAgendamentoForm, setNovoAgendamentoForm] = useState({
+    clienteNome: "",
+    clienteTelefone: "",
+    data: dataLocalISO(),
+    horario: "",
+    profissionalId: "",
+    servicoId: "",
+  });
+  const [salvandoNovoAgendamento, setSalvandoNovoAgendamento] = useState(false);
 
   const empresaIdAtual = empresa?.id || EMPRESA_ID_LEGADO;
   const empresaSlugAtual = empresa?.slug?.trim();
@@ -1009,6 +1019,113 @@ export default function AdminDashboard() {
 
     await carregarDados();
     setMensagem("Agendamento cancelado.");
+  }
+
+  async function criarAgendamentoManual(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const profissionaisAtivos = profissionais.filter((p) => p.ativo !== false);
+    const exigeProfissional = profissionaisAtivos.length > 1;
+    const nome = novoAgendamentoForm.clienteNome.trim();
+    const telefone = normalizarTelefoneBrasil(novoAgendamentoForm.clienteTelefone);
+    const servicoId = Number(novoAgendamentoForm.servicoId);
+    const profissionalId = novoAgendamentoForm.profissionalId ? Number(novoAgendamentoForm.profissionalId) : null;
+
+    if (!nome || !telefone || !servicoId || !novoAgendamentoForm.data || !novoAgendamentoForm.horario) {
+      setMensagem("Preencha cliente, WhatsApp, servico, dia e horario para agendar.");
+      return;
+    }
+
+    if (exigeProfissional && !profissionalId) {
+      setMensagem("Selecione o profissional para este agendamento.");
+      return;
+    }
+
+    if (telefone.length < 12 || telefone.length > 13) {
+      setMensagem("Informe um WhatsApp valido com DDD. Exemplo: 18981518787.");
+      return;
+    }
+
+    const servico = servicos.find((s) => s.id === servicoId);
+    const duracaoMin = servico?.duracao && servico.duracao > 0 ? servico.duracao : AGENDA_DURACAO_PADRAO_MIN;
+    const inicioNovo = new Date(`${novoAgendamentoForm.data}T${novoAgendamentoForm.horario}:00`).getTime();
+    const fimNovo = inicioNovo + duracaoMin * 60000;
+
+    const conflito = agendamentosAtivos.find((item) => {
+      if (exigeProfissional && item.profissional_id !== profissionalId) return false;
+
+      const outroServico = firstRelation(item.servicos);
+      const outraDuracao = outroServico?.duracao && outroServico.duracao > 0 ? outroServico.duracao : AGENDA_DURACAO_PADRAO_MIN;
+      const outroInicio = new Date(item.data_agendamento).getTime();
+      const outroFim = outroInicio + outraDuracao * 60000;
+
+      return inicioNovo < outroFim && fimNovo > outroInicio;
+    });
+
+    if (conflito) {
+      const clienteConflito = firstRelation(conflito.clientes);
+      setMensagem(`Horario indisponivel: ja existe um agendamento de ${clienteConflito?.nome || "outro cliente"} nesse periodo.`);
+      return;
+    }
+
+    setSalvandoNovoAgendamento(true);
+    setMensagem("Criando agendamento...");
+
+    const { data: clienteExistente } = await supabase
+      .from("clientes")
+      .select("id")
+      .eq("empresa_id", empresaIdAtual)
+      .eq("telefone", telefone)
+      .maybeSingle();
+
+    let clienteId: number;
+
+    if (clienteExistente) {
+      clienteId = clienteExistente.id;
+    } else {
+      const { data: novoCliente, error: erroCliente } = await supabase
+        .from("clientes")
+        .insert({ empresa_id: empresaIdAtual, nome, telefone })
+        .select("id")
+        .single();
+
+      if (erroCliente) {
+        setSalvandoNovoAgendamento(false);
+        setMensagem(`Erro ao cadastrar cliente: ${formatarErroSupabase(erroCliente.message)}`);
+        return;
+      }
+
+      clienteId = novoCliente.id;
+    }
+
+    const { error: agendamentoError } = await supabase.from("agendamentos").insert({
+      cliente_id: clienteId,
+      data_agendamento: `${novoAgendamentoForm.data} ${novoAgendamentoForm.horario}:00`,
+      empresa_id: empresaIdAtual,
+      profissional_id: profissionalId,
+      servico_id: servicoId,
+      status: "confirmado",
+    });
+
+    setSalvandoNovoAgendamento(false);
+
+    if (agendamentoError) {
+      setMensagem(`Erro ao criar agendamento: ${formatarErroSupabase(agendamentoError.message)}`);
+      return;
+    }
+
+    setDiaAgendaSelecionado(novoAgendamentoForm.data);
+    setNovoAgendamentoAberto(false);
+    setNovoAgendamentoForm({
+      clienteNome: "",
+      clienteTelefone: "",
+      data: dataLocalISO(),
+      horario: "",
+      profissionalId: "",
+      servicoId: "",
+    });
+    await carregarDados();
+    setMensagem(`Agendamento de ${nome} criado com sucesso.`);
   }
 
   function abrirSecao(secao: AdminSection) {
@@ -1961,6 +2078,88 @@ export default function AdminDashboard() {
           onClick={() => abrirSecao("configuracoes")}
         />
       </nav>
+
+      {novoAgendamentoAberto && (
+        <AddFormSheet onClose={() => setNovoAgendamentoAberto(false)} title="Novo agendamento">
+          <form className="admin-form" onSubmit={criarAgendamentoManual}>
+            <label>
+              Nome do cliente
+              <input
+                onChange={(event) =>
+                  setNovoAgendamentoForm((form) => ({ ...form, clienteNome: event.target.value }))
+                }
+                placeholder="Nome completo"
+                value={novoAgendamentoForm.clienteNome}
+              />
+            </label>
+            <label>
+              WhatsApp
+              <input
+                onChange={(event) =>
+                  setNovoAgendamentoForm((form) => ({ ...form, clienteTelefone: event.target.value }))
+                }
+                placeholder="18999998888"
+                value={novoAgendamentoForm.clienteTelefone}
+              />
+            </label>
+            <label>
+              Servico
+              <select
+                onChange={(event) =>
+                  setNovoAgendamentoForm((form) => ({ ...form, servicoId: event.target.value }))
+                }
+                value={novoAgendamentoForm.servicoId}
+              >
+                <option value="">Selecione</option>
+                {servicos.map((servico) => (
+                  <option key={servico.id} value={servico.id}>
+                    {servico.nome} - {formatarMoeda(servico.preco)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {profissionais.filter((p) => p.ativo !== false).length > 1 && (
+              <label>
+                Profissional
+                <select
+                  onChange={(event) =>
+                    setNovoAgendamentoForm((form) => ({ ...form, profissionalId: event.target.value }))
+                  }
+                  value={novoAgendamentoForm.profissionalId}
+                >
+                  <option value="">Selecione</option>
+                  {profissionais
+                    .filter((p) => p.ativo !== false)
+                    .map((profissional) => (
+                      <option key={profissional.id} value={profissional.id}>
+                        {profissional.nome}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+            <label>
+              Dia
+              <input
+                onChange={(event) => setNovoAgendamentoForm((form) => ({ ...form, data: event.target.value }))}
+                type="date"
+                value={novoAgendamentoForm.data}
+              />
+            </label>
+            <label>
+              Horario
+              <input
+                onChange={(event) => setNovoAgendamentoForm((form) => ({ ...form, horario: event.target.value }))}
+                type="time"
+                value={novoAgendamentoForm.horario}
+              />
+            </label>
+            <button className="admin-pill-button primary wide" disabled={salvandoNovoAgendamento} type="submit">
+              {salvandoNovoAgendamento ? "Agendando..." : "Confirmar agendamento"}
+            </button>
+          </form>
+        </AddFormSheet>
+      )}
 
       {atendimentoAberto && (
         <SaleModal
