@@ -1737,7 +1737,7 @@ export default function AdminDashboard() {
               >
                 <span>Historico de atendimentos</span>
                 <strong>{historicoAgendamentos.length}</strong>
-                <em>{historicoAberto ? "Ocultar" : "Ver historico"}</em>
+                <em>{historicoAberto ? "Ocultar" : "Ver atendimentos anteriores"}</em>
               </button>
 
               {historicoAberto && (
@@ -2618,7 +2618,7 @@ function AgendaHero({
           </div>
           <div className="agenda-summary-count-row">
             <strong className="agenda-summary-count">{agendamentosHoje.length}</strong>
-            <span className="agenda-summary-decor" aria-hidden="true">🪑</span>
+            <span className="agenda-summary-count-label">{agendamentosHoje.length === 1 ? "agendamento" : "agendamentos"}</span>
           </div>
         </article>
         <article>
@@ -2628,7 +2628,7 @@ function AgendaHero({
           </div>
           <div className="agenda-summary-count-row">
             <strong className="agenda-summary-count">{agendamentos.length}</strong>
-            <span className="agenda-summary-decor" aria-hidden="true">🪑</span>
+            <span className="agenda-summary-count-label">{agendamentos.length === 1 ? "agendamento" : "agendamentos"}</span>
           </div>
         </article>
       </div>
@@ -2878,10 +2878,11 @@ function AppointmentList({
       {agendamentos.map((agendamento) => {
         const cliente = firstRelation(agendamento.clientes);
         const servico = firstRelation(agendamento.servicos);
+        const profissional = firstRelation(agendamento.profissionais);
 
         return (
           <article className={`admin-appointment-card ${variant === "history" ? "is-history" : ""}`} key={agendamento.id}>
-            <div>
+            <div className="appointment-card-person">
               <strong>{cliente?.nome || "Cliente"}</strong>
               <span>{formatarTelefone(cliente?.telefone || null)}</span>
             </div>
@@ -2892,11 +2893,17 @@ function AppointmentList({
               </div>
               <div>
                 <dt>Horario</dt>
-                <dd>{new Date(agendamento.data_agendamento).toLocaleString("pt-BR")}</dd>
+                <dd className="appointment-card-time">{new Date(agendamento.data_agendamento).toLocaleString("pt-BR")}</dd>
               </div>
+              {profissional && (
+                <div>
+                  <dt>Profissional</dt>
+                  <dd>{profissional.nome}</dd>
+                </div>
+              )}
               <div>
                 <dt>Status</dt>
-                <dd>{agendamento.status}</dd>
+                <dd className={`appointment-status-chip status-${agendamento.status.toLowerCase()}`}>{agendamento.status}</dd>
               </div>
             </dl>
             {variant === "active" && (

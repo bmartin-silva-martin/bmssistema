@@ -4218,3 +4218,71 @@ th {
 @media (min-width: 761px) { .mobile-bottom-nav { display: none; } .agenda-app-main { padding: 1.15rem 1.35rem 1.35rem; } .agenda-summary-grid { grid-template-columns: repeat(2, minmax(12rem, 1fr)); } }
 @media (min-width: 1280px) { .agenda-app-shell { max-width: 1240px; } }
 @media (min-width: 1600px) { .agenda-app-shell { max-width: 1280px; } }
+
+/* Refinamento mobile apos teste em aparelho */
+.agenda-hero.agenda-app-header { gap: .7rem; padding: .9rem; }
+.agenda-title-row { min-height: 2.9rem; }
+.agenda-title-row h2 { font-size: clamp(1.35rem, 5vw, 2rem); }
+.agenda-title-row p { font-size: .8rem; margin-top: .2rem; }
+.agenda-week-nav { margin-top: .55rem; }
+.agenda-week-label { color: #f4f6fa; font-size: .8rem; }
+.agenda-day-strip { gap: .45rem; margin-top: .45rem; padding-bottom: .25rem; }
+.agenda-day-strip button { flex-basis: 4.35rem; min-height: 4.25rem; min-width: 4.35rem; padding: .45rem .25rem; }
+.agenda-day-strip small { font-size: .62rem; line-height: 1; white-space: nowrap; }
+.agenda-day-strip strong { font-size: 1.25rem; }
+.agenda-summary-grid { gap: .5rem; margin-top: .55rem; }
+.agenda-summary-grid article { border-radius: 16px; min-height: 6.4rem; padding: .7rem; }
+.agenda-summary-grid article,
+.agenda-summary-grid article.hot,
+.agenda-summary-grid article:not(.hot) { color: #f5f7fb; }
+.agenda-summary-icon { font-size: .85rem; height: 1.65rem; width: 1.65rem; }
+.agenda-summary-top > div > span { color: #c7ced9; font-size: .64rem; }
+.agenda-summary-top strong { color: #fff; font-size: .95rem; }
+.agenda-summary-count-row { align-items: baseline; gap: .3rem; margin-top: .7rem; }
+.agenda-summary-count { color: #fff; font-size: 1.7rem; }
+.agenda-summary-count-label { color: #c7ced9; font-size: .68rem; }
+.agenda-summary-decor { display: none; }
+.agenda-app-main > .empty-state { min-height: 4.5rem; padding: .75rem; }
+.reminder-panel { gap: .55rem; padding: .8rem; }
+.reminder-header { align-items: center; gap: .65rem; }
+.reminder-header h2 { font-size: 1rem; margin: .15rem 0; }
+.reminder-header p { font-size: .72rem; margin: 0; }
+.reminder-header .admin-pill-button { min-height: 2.35rem; padding: .45rem .65rem; white-space: nowrap; }
+.reminder-summary { gap: .35rem; }
+.reminder-summary span { font-size: .65rem; padding: .25rem .45rem; }
+.reminder-row { gap: .5rem; padding: .55rem 0; }
+.reminder-row strong { font-size: .82rem; }
+.reminder-row span { font-size: .7rem; }
+.reminder-row em { font-size: .65rem; }
+.reminder-row .row-icon-button { min-height: 2rem; padding: .25rem .5rem; }
+.admin-appointment-card { gap: .55rem; padding: .75rem; }
+.appointment-card-person strong { font-size: 1rem; }
+.appointment-card-person span { color: #aeb7c5; font-size: .72rem; }
+.admin-appointment-card dl { gap: .4rem .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.admin-appointment-card dl dt { color: #8893a2; font-size: .6rem; margin-bottom: .1rem; }
+.admin-appointment-card dl dd { color: #e9edf3; font-size: .76rem; margin: 0; }
+.admin-appointment-card .appointment-card-time { color: #fff; font-size: .9rem; font-weight: 800; }
+.appointment-status-chip { background: rgb(255 255 255 / .1); border-radius: 999px; display: inline-flex; padding: .18rem .45rem; width: fit-content; }
+.appointment-status-chip.status-confirmado { background: rgb(74 222 128 / .16); color: #86efac; }
+.admin-appointment-card dl div { position: relative; }
+.admin-appointment-card dl div:nth-child(2) { order: -2; }
+.admin-appointment-card dl dt { height: 1px; overflow: hidden; position: absolute; width: 1px; clip: rect(0 0 0 0); white-space: nowrap; }
+.appointment-actions { gap: .4rem; margin-top: .15rem; }
+.appointment-actions .admin-pill-button { flex: 1 1 0; }
+.appointment-actions .admin-pill-button { min-height: 2.35rem; padding: .4rem .55rem; }
+.collapsible-panel-trigger { min-height: 3.1rem; padding: .65rem .75rem; }
+.collapsible-panel-trigger em { font-size: .7rem; }
+.agenda-fixed-actions { bottom: calc(4.55rem + env(safe-area-inset-bottom)); gap: .45rem; }
+.agenda-new-button { min-height: 2.7rem; padding: .55rem .8rem; }
+.agenda-lock-button { height: 2.55rem; width: 2.55rem; }
+@media (max-width: 380px) {
+  .agenda-summary-grid { grid-template-columns: 1fr; }
+  .agenda-summary-grid article { min-height: 5.5rem; }
+  .reminder-header { align-items: flex-start; flex-direction: column; }
+  .reminder-header .admin-pill-button { width: 100%; }
+}
+@media (min-width: 761px) {
+  .agenda-hero.agenda-app-header { padding: 1rem 1.2rem; }
+  .agenda-summary-grid article { min-height: 7.2rem; }
+  .reminder-panel, .admin-appointment-card { padding: 1rem; }
+}
