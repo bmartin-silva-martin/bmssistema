@@ -941,7 +941,50 @@ export default function AdminDashboard() {
     return true;
   }
 
-  async function enviarLembrete(agendamento: Agendamento) {
+  async function enviarPushLembretes(agendamentoIds: number[]) {
+    try {
+      const response = await fetch("/api/push/reminders", {
+        body: JSON.stringify({ agendamentoIds, empresaId: empresaIdAtual }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) return data?.error || "Nao consegui enviar a notificacao push.";
+      if (!data?.configured) return data?.error || "Push nao configurado no servidor.";
+      if ((data.sent || 0) === 0) {
+        return "Nenhuma notificacao push foi entregue. O cliente precisa ativar as notificacoes no aparelho dele.";
+      }
+      return `${data.sent} notificacao push enviada.`;
+    } catch {
+      return "Nao consegui enviar a notificacao push.";
+    }
+  }
+
+  async function enviarWhatsAppAutomatico(agendamentoIds: number[]) {
+    try {
+      const response = await fetch("/api/whatsapp/reminders", {
+        body: JSON.stringify({ agendamentoIds, empresaId: empresaIdAtual }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.configured) {
+        return { configured: false, resumo: "", sentAppointmentIds: [] as number[] };
+      }
+
+      const resumo = data.sent
+        ? `${data.sent} lembrete(s) enviado(s) automaticamente pelo WhatsApp.`
+        : data.error || "Nenhum lembrete foi enviado automaticamente pelo WhatsApp.";
+
+      return { configured: true, resumo, sentAppointmentIds: (data.sentAppointmentIds || []) as number[] };
+    } catch {
+      return { configured: false, resumo: "", sentAppointmentIds: [] as number[] };
+    }
+  }
+
+  async function enviarLembrete(agendamento: Agendamento, resumoPush?: string) {
     const cliente = firstRelation(agendamento.clientes);
     const servico = firstRelation(agendamento.servicos);
     const telefoneLimpo = normalizarTelefoneBrasil(cliente?.telefone || "");
@@ -951,17 +994,23 @@ export default function AdminDashboard() {
       return;
     }
 
-    const texto = encodeURIComponent(
+    const pushMensagem = resumoPush || (await enviarPushLembretes([agendamento.id]));
+    const whatsappAuto = await enviarWhatsAppAutomatico([agendamento.id]);
+    const enviadoAutomaticamente = whatsappAuto.sentAppointmentIds.includes(agendamento.id);
+
+    if (!enviadoAutomaticamente) {
+      const texto = encodeURIComponent(
       `Ola, ${cliente?.nome || "tudo bem"}! Passando para lembrar seu agendamento de ${servico?.nome || "servico"} em ${new Date(
         agendamento.data_agendamento,
       ).toLocaleString("pt-BR")}.`,
-    );
-
-    window.open(`https://wa.me/${telefoneLimpo}?text=${texto}`, "_blank", "noopener,noreferrer");
+      );
+      window.open(`https://wa.me/${telefoneLimpo}?text=${texto}`, "_blank", "noopener,noreferrer");
+    }
     const lembreteMarcado = await marcarLembreteEnviado(agendamento);
 
     if (lembreteMarcado) {
-      setMensagem(`Lembrete de ${cliente?.nome || "cliente"} marcado como enviado.`);
+      const detalhe = whatsappAuto.configured ? whatsappAuto.resumo : "";
+      setMensagem(`Lembrete de ${cliente?.nome || "cliente"} marcado como enviado. ${detalhe} ${pushMensagem}`.trim());
     }
   }
 
@@ -1019,6 +1068,30 @@ export default function AdminDashboard() {
 
     await carregarDados();
     setMensagem("Agendamento cancelado.");
+  }
+
+  async function atribuirProfissionalAgendamento(agendamento: Agendamento, profissionalId: number | null) {
+    const profissionalValido = profissionalId === null || profissionais.some((item) => item.id === profissionalId && item.ativo !== false);
+
+    if (!profissionalValido) {
+      setMensagem("Profissional invalido para este agendamento.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ profissional_id: profissionalId })
+      .eq("id", agendamento.id)
+      .eq("empresa_id", empresaIdAtual);
+
+    if (error) {
+      setMensagem(`Erro ao atribuir profissional: ${formatarErroSupabase(error.message)}`);
+      return;
+    }
+
+    setAgendamentos((atuais) =>
+      atuais.map((item) => (item.id === agendamento.id ? { ...item, profissional_id: profissionalId } : item)),
+    );
   }
 
   async function criarAgendamentoManual(event: FormEvent<HTMLFormElement>) {
@@ -1620,6 +1693,11 @@ export default function AdminDashboard() {
               diaSelecionado={diaAgendaSelecionado}
               emptyLabel="Nenhum agendamento ativo para este dia."
               horariosAtendimento={empresa?.horarios_atendimento}
+              onAssignProfissional={atribuirProfissionalAgendamento}
+              onCancel={cancelarAgendamentoDono}
+              onFinish={abrirFinalizacao}
+              onNotify={enviarLembrete}
+              profissionais={profissionais}
             />
             <TodayReminderPanel
               agendamentos={lembretesDeHoje}
@@ -2497,12 +2575,24 @@ function AgendaTimeline({
   diaSelecionado,
   emptyLabel,
   horariosAtendimento,
+  onAssignProfissional,
+  onCancel,
+  onFinish,
+  onNotify,
+  profissionais,
 }: {
   agendamentos: Agendamento[];
   diaSelecionado: string;
   emptyLabel: string;
   horariosAtendimento?: string[] | null;
+  onAssignProfissional?: (agendamento: Agendamento, profissionalId: number | null) => void | Promise<void>;
+  onCancel?: (agendamento: Agendamento) => void | Promise<void>;
+  onFinish?: (agendamento: Agendamento) => void;
+  onNotify?: (agendamento: Agendamento) => void | Promise<void>;
+  profissionais?: Profissional[];
 }) {
+  const [menuAbertoId, setMenuAbertoId] = useState<number | null>(null);
+
   if (agendamentos.length === 0) return <div className="empty-state">{emptyLabel}</div>;
 
   const { inicio, fim } = calcularJanelaHorario(horariosAtendimento);
@@ -2534,22 +2624,75 @@ function AgendaTimeline({
           const cliente = firstRelation(agendamento.clientes);
           const servico = firstRelation(agendamento.servicos);
           const profissional = firstRelation(agendamento.profissionais);
+          const statusLower = agendamento.status.toLowerCase();
+          const finalizado = statusLower === "finalizado";
           const top = Math.max(0, (inicioMin - inicio) * AGENDA_PX_POR_MINUTO);
           const altura = Math.max(AGENDA_CARD_MIN_ALTURA, duracaoMin * AGENDA_PX_POR_MINUTO);
           const largura = 100 / totalColunas;
+          const menuAberto = menuAbertoId === agendamento.id;
 
           return (
             <article
-              className={`agenda-grid-card status-${agendamento.status.toLowerCase()}`}
+              className={`agenda-grid-card status-${statusLower} ${finalizado ? "is-finalizado" : ""} ${menuAberto ? "is-open" : ""}`}
               key={agendamento.id}
               style={{ height: altura, left: `${coluna * largura}%`, top, width: `calc(${largura}% - 6px)` }}
+              title={agendamento.status}
             >
               <div className="agenda-grid-card-time-row">
                 {formatarHoraMinutos(inicioMin)} - {formatarHoraMinutos(inicioMin + duracaoMin)}
+                <span className={`agenda-grid-card-status status-${statusLower}`}>{agendamento.status}</span>
               </div>
-              <strong>{cliente?.nome || "Cliente"}</strong>
-              <span className="agenda-grid-card-service">{servico?.nome || "Servico"}</span>
-              {profissional && <span className="agenda-grid-card-professional">{profissional.nome}</span>}
+              <div className="agenda-grid-card-header">
+                <strong>{cliente?.nome || "Cliente"}</strong>
+              </div>
+              <div className="agenda-grid-card-service-row">
+                <span className="agenda-grid-card-service">{servico?.nome || "Servico"}</span>
+                {servico?.preco != null && <span className="agenda-grid-card-price">{formatarMoeda(servico.preco)}</span>}
+              </div>
+              <span className="agenda-grid-card-professional">{profissional?.nome || "Sem profissional"}</span>
+              <div className="agenda-grid-card-actions">
+                {onNotify && !finalizado && (
+                  <button aria-label="Enviar lembrete" className="agenda-grid-icon-button" onClick={() => onNotify(agendamento)} type="button">
+                    Lembrete
+                  </button>
+                )}
+                <button
+                  aria-label="Mais opcoes"
+                  className="agenda-grid-icon-button"
+                  onClick={() => setMenuAbertoId(menuAberto ? null : agendamento.id)}
+                  type="button"
+                >
+                  Mais
+                </button>
+              </div>
+              {menuAberto && (
+                <div className="agenda-grid-card-menu">
+                  {onAssignProfissional && profissionais && profissionais.length > 0 && (
+                    <label className="appointment-profissional-select">
+                      Profissional
+                      <select
+                        onChange={(event) => onAssignProfissional(agendamento, event.target.value ? Number(event.target.value) : null)}
+                        value={agendamento.profissional_id || ""}
+                      >
+                        <option value="">Sem profissional</option>
+                        {profissionais.filter((p) => p.ativo !== false).map((p) => (
+                          <option key={p.id} value={p.id}>{p.nome}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {onFinish && !finalizado && (
+                    <button className="admin-pill-button primary" onClick={() => { setMenuAbertoId(null); onFinish(agendamento); }} type="button">
+                      Finalizar
+                    </button>
+                  )}
+                  {onCancel && !finalizado && (
+                    <button className="admin-pill-button cancel-appt-btn" onClick={() => { setMenuAbertoId(null); onCancel(agendamento); }} type="button">
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              )}
             </article>
           );
         })}
