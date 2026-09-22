@@ -1713,22 +1713,6 @@ export default function AdminDashboard() {
               profissionais={profissionais}
             />
             </article>
-            <TodayReminderPanel
-              agendamentos={lembretesDeHoje}
-              onNotify={enviarLembrete}
-              onSendAll={enviarLembretesDoDia}
-            />
-            <article className="admin-panel">
-              <h2>Agenda do dia</h2>
-              <AppointmentList
-                agendamentos={lembretesDeHoje}
-                emptyLabel="Nenhum agendamento ativo para hoje."
-                onCancel={cancelarAgendamentoDono}
-                onFinish={abrirFinalizacao}
-                onNotify={enviarLembrete}
-              />
-            </article>
-
             <article className="admin-panel">
               <button
                 className="collapsible-panel-trigger"
@@ -2269,8 +2253,13 @@ export default function AdminDashboard() {
           agendamento={atendimentoAberto}
           finalizando={finalizandoVenda}
           itensVenda={itensVenda}
+          onCancel={async () => {
+            await cancelarAgendamentoDono(atendimentoAberto);
+            setAtendimentoAberto(null);
+          }}
           onClose={() => setAtendimentoAberto(null)}
           onConfirm={finalizarAtendimento}
+          onNotify={() => enviarLembrete(atendimentoAberto)}
           produtos={produtos}
           setItensVenda={setItensVenda}
           total={totalAtendimentoAberto}
@@ -2701,7 +2690,18 @@ function AgendaTimeline({
             <article
               className={`agenda-grid-card status-${statusLower} ${finalizado ? "is-finalizado" : ""} ${menuAberto ? "is-open" : ""}`}
               key={agendamento.id}
+              onClick={() => {
+                if (!finalizado) onFinish?.(agendamento);
+              }}
+              onKeyDown={(event) => {
+                if ((event.key === "Enter" || event.key === " ") && !finalizado) {
+                  event.preventDefault();
+                  onFinish?.(agendamento);
+                }
+              }}
+              role={onFinish && !finalizado ? "button" : undefined}
               style={{ height: altura, left: `${coluna * largura}%`, top, width: `calc(${largura}% - 6px)` }}
+              tabIndex={onFinish && !finalizado ? 0 : undefined}
               title={agendamento.status}
             >
               <div className="agenda-grid-card-time-row">
@@ -2718,21 +2718,21 @@ function AgendaTimeline({
               <span className="agenda-grid-card-professional">{profissional?.nome || "Sem profissional"}</span>
               <div className="agenda-grid-card-actions">
                 {onNotify && !finalizado && (
-                  <button aria-label="Enviar lembrete" className="agenda-grid-icon-button" onClick={() => onNotify(agendamento)} type="button">
+                  <button aria-label="Enviar lembrete" className="agenda-grid-icon-button" onClick={(event) => { event.stopPropagation(); onNotify(agendamento); }} type="button">
                     Lembrete
                   </button>
                 )}
                 <button
                   aria-label="Mais opcoes"
                   className="agenda-grid-icon-button"
-                  onClick={() => setMenuAbertoId(menuAberto ? null : agendamento.id)}
+                  onClick={(event) => { event.stopPropagation(); setMenuAbertoId(menuAberto ? null : agendamento.id); }}
                   type="button"
                 >
                   Mais
                 </button>
               </div>
               {menuAberto && (
-                <div className="agenda-grid-card-menu">
+                <div className="agenda-grid-card-menu" onClick={(event) => event.stopPropagation()}>
                   {onAssignProfissional && profissionais && profissionais.length > 0 && (
                     <label className="appointment-profissional-select">
                       Profissional
@@ -2748,12 +2748,12 @@ function AgendaTimeline({
                     </label>
                   )}
                   {onFinish && !finalizado && (
-                    <button className="admin-pill-button primary" onClick={() => { setMenuAbertoId(null); onFinish(agendamento); }} type="button">
+                    <button className="admin-pill-button primary" onClick={(event) => { event.stopPropagation(); setMenuAbertoId(null); onFinish(agendamento); }} type="button">
                       Finalizar
                     </button>
                   )}
                   {onCancel && !finalizado && (
-                    <button className="admin-pill-button cancel-appt-btn" onClick={() => { setMenuAbertoId(null); onCancel(agendamento); }} type="button">
+                    <button className="admin-pill-button cancel-appt-btn" onClick={(event) => { event.stopPropagation(); setMenuAbertoId(null); onCancel(agendamento); }} type="button">
                       Cancelar
                     </button>
                   )}
@@ -3068,8 +3068,10 @@ function SaleModal({
   agendamento,
   finalizando,
   itensVenda,
+  onCancel,
   onClose,
   onConfirm,
+  onNotify,
   produtos,
   setItensVenda,
   total,
@@ -3077,8 +3079,10 @@ function SaleModal({
   agendamento: Agendamento;
   finalizando: boolean;
   itensVenda: Record<number, string>;
+  onCancel: () => void | Promise<void>;
   onClose: () => void;
   onConfirm: () => void;
+  onNotify: () => void | Promise<void>;
   produtos: Produto[];
   setItensVenda: Dispatch<SetStateAction<Record<number, string>>>;
   total: number;
@@ -3096,6 +3100,10 @@ function SaleModal({
             <p>
               {servico?.nome || "Servico"} - {formatarMoeda(servico?.preco || 0)}
             </p>
+            <p className="sale-modal-meta">
+              {new Date(agendamento.data_agendamento).toLocaleString("pt-BR")} · {formatarTelefone(cliente?.telefone || null)}
+            </p>
+            <span className={`appointment-status-chip status-${agendamento.status.toLowerCase()}`}>{agendamento.status}</span>
           </div>
           <button onClick={onClose} type="button">
             Fechar
@@ -3137,6 +3145,14 @@ function SaleModal({
           <strong>{formatarMoeda(total)}</strong>
         </div>
 
+        <div className="sale-modal-actions">
+          <button className="admin-pill-button secondary" onClick={onNotify} type="button">
+            Enviar lembrete
+          </button>
+          <button className="admin-pill-button cancel-appt-btn" onClick={onCancel} type="button">
+            Cancelar agendamento
+          </button>
+        </div>
         <button className="admin-pill-button primary wide" disabled={finalizando} onClick={onConfirm} type="button">
           {finalizando ? "Finalizando..." : "Finalizar e lancar financeiro"}
         </button>

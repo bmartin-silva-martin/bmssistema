@@ -4286,3 +4286,27 @@ th {
   .agenda-summary-grid article { min-height: 7.2rem; }
   .reminder-panel, .admin-appointment-card { padding: 1rem; }
 }
+
+/* Timeline como entrada principal para o atendimento */
+.agenda-grid-card[role="button"] { cursor: pointer; }
+.agenda-grid-card[role="button"]:hover { border-color: rgb(255 255 255 / .25); transform: translateY(-1px); }
+.agenda-grid-card[role="button"]:focus-visible { outline: 3px solid rgb(255 255 255 / .9); outline-offset: 3px; }
+.agenda-grid-card-header strong { font-size: clamp(.9rem, 2vw, 1.05rem); letter-spacing: -.01em; }
+.agenda-grid-card-service { color: #d5dbe5; font-size: .75rem; }
+.agenda-grid-card-professional { font-size: .68rem; }
+.agenda-grid-card-actions { opacity: .82; }
+.agenda-grid-icon-button { min-height: 1.8rem; }
+.agenda-section > .admin-panel { margin-top: .35rem; }
+.sale-modal { border-radius: 22px; }
+.sale-modal-meta { color: #aeb7c5; font-size: .78rem; margin: .45rem 0 0; }
+.sale-modal-actions { display: grid; gap: .5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sale-modal-actions .admin-pill-button { min-height: 2.7rem; }
+@media (max-width: 760px) {
+  .agenda-grid-card[role="button"] { padding: .65rem .7rem; }
+  .agenda-grid-card[role="button"] .agenda-grid-card-actions { display: flex; }
+  .agenda-grid-card-menu { margin-top: .35rem; }
+  .sale-modal-backdrop { align-items: end; padding: 0; }
+  .sale-modal { border-radius: 22px 22px 0 0; max-height: 94vh; padding: 1rem; width: 100%; }
+  .sale-modal-header h2 { font-size: 1.55rem; }
+  .sale-modal-actions { grid-template-columns: 1fr 1fr; }
+}
