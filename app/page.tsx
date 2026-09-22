@@ -162,12 +162,12 @@ function firstRelation<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] || null : value;
 }
 
-function montarDiasDoPainel() {
+function montarDiasDoPainel(offsetSemanas = 0) {
   const hoje = new Date();
 
   return Array.from({ length: 7 }, (_, index) => {
     const data = new Date(hoje);
-    data.setDate(hoje.getDate() + index);
+    data.setDate(hoje.getDate() + index + offsetSemanas * 7);
 
     return {
       dia: String(data.getDate()).padStart(2, "0"),
