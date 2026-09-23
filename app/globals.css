@@ -4714,6 +4714,30 @@ th {
   grid-column: auto;
 }
 
+.form-row-4 {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.form-row-4 label {
+  font-size: 0.62rem;
+}
+
+.form-row-4 input {
+  padding: 0.4rem 0.5rem;
+  width: 100%;
+}
+
+.compact-edit-panel .form-row-4 {
+  grid-column: 1 / -1;
+}
+
+.compact-edit-panel .form-row-4 label:first-child,
+.compact-edit-panel .form-row-4 label:last-of-type {
+  grid-column: auto;
+}
+
 .form-row-foto-nome {
   align-items: end;
   display: grid;

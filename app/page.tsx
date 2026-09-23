@@ -1932,9 +1932,9 @@ export default function AdminDashboard() {
                   />
                 </label>
               </div>
-              <div className="form-row-2">
+              <div className="form-row-4">
                 <label>
-                  Preco de venda
+                  Venda
                   <input
                     inputMode="decimal"
                     onChange={(event) => setProdutoForm((form) => ({ ...form, preco: event.target.value }))}
@@ -1944,13 +1944,32 @@ export default function AdminDashboard() {
                   />
                 </label>
                 <label>
-                  Preco de custo
+                  Custo
                   <input
                     inputMode="decimal"
                     onChange={(event) => setProdutoForm((form) => ({ ...form, custo: event.target.value }))}
                     placeholder="R$ 0,00"
                     type="number"
                     value={produtoForm.custo}
+                  />
+                </label>
+                <label>
+                  Estoque
+                  <input
+                    inputMode="numeric"
+                    onChange={(event) => setProdutoForm((form) => ({ ...form, estoque: event.target.value }))}
+                    type="number"
+                    value={produtoForm.estoque}
+                  />
+                </label>
+                <label>
+                  Comissao
+                  <input
+                    inputMode="decimal"
+                    onChange={(event) => setProdutoForm((form) => ({ ...form, comissao: event.target.value }))}
+                    placeholder="Ex: 20%"
+                    type="number"
+                    value={produtoForm.comissao}
                   />
                 </label>
               </div>
@@ -1963,27 +1982,6 @@ export default function AdminDashboard() {
                   de lucro
                 </p>
               )}
-              <div className="form-row-2">
-                <label>
-                  Estoque
-                  <input
-                    inputMode="numeric"
-                    onChange={(event) => setProdutoForm((form) => ({ ...form, estoque: event.target.value }))}
-                    type="number"
-                    value={produtoForm.estoque}
-                  />
-                </label>
-                <label>
-                  Comissao (%)
-                  <input
-                    inputMode="decimal"
-                    onChange={(event) => setProdutoForm((form) => ({ ...form, comissao: event.target.value }))}
-                    placeholder="Ex: 20%"
-                    type="number"
-                    value={produtoForm.comissao}
-                  />
-                </label>
-              </div>
               <button
                 className="admin-pill-button primary wide"
                 disabled={salvandoProduto}
@@ -3961,9 +3959,9 @@ function EditableProdutoList({
                       />
                     </label>
                   </div>
-                  <div className="form-row-2">
+                  <div className="form-row-4">
                     <label>
-                      Preco de venda
+                      Venda
                       <input
                         onChange={(event) =>
                           setProdutos(
@@ -3977,7 +3975,7 @@ function EditableProdutoList({
                       />
                     </label>
                     <label>
-                      Preco de custo
+                      Custo
                       <input
                         onChange={(event) =>
                           setProdutos(
@@ -3990,13 +3988,6 @@ function EditableProdutoList({
                         value={produto.preco_custo || 0}
                       />
                     </label>
-                  </div>
-                  {produto.preco && produto.preco_custo && produto.preco_custo > 0 && (
-                    <p className="produto-lucro-preview">
-                      Margem: <strong>{(((produto.preco - produto.preco_custo) / produto.preco_custo) * 100).toFixed(1)}%</strong> de lucro
-                    </p>
-                  )}
-                  <div className="form-row-2">
                     <label>
                       Estoque
                       <input
@@ -4026,6 +4017,11 @@ function EditableProdutoList({
                       />
                     </label>
                   </div>
+                  {produto.preco && produto.preco_custo && produto.preco_custo > 0 && (
+                    <p className="produto-lucro-preview">
+                      Margem: <strong>{(((produto.preco - produto.preco_custo) / produto.preco_custo) * 100).toFixed(1)}%</strong> de lucro
+                    </p>
+                  )}
                   <button className="admin-pill-button primary" onClick={async () => { await onSave(produto); setEditandoId(null); }} type="button">
                     Salvar produto
                   </button>
