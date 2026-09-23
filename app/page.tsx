@@ -3089,72 +3089,97 @@ function SaleModal({
 }) {
   const cliente = firstRelation(agendamento.clientes);
   const servico = firstRelation(agendamento.servicos);
+  const statusLower = agendamento.status.toLowerCase();
+  const inicioMin = minutosDoAgendamento(agendamento.data_agendamento);
+  const duracaoMin = servico?.duracao && servico.duracao > 0 ? servico.duracao : AGENDA_DURACAO_PADRAO_MIN;
+  const dataFormatada = new Date(agendamento.data_agendamento).toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "short",
+    weekday: "short",
+  });
 
   return (
-    <section className="sale-modal-backdrop" role="dialog" aria-modal="true" aria-label="Finalizar atendimento">
+    <section className="sale-modal-backdrop" role="dialog" aria-modal="true" aria-label="Detalhe do atendimento">
       <article className="sale-modal">
-        <div className="sale-modal-header">
-          <div>
-            <p className="admin-kicker">Fechar comanda</p>
-            <h2>{cliente?.nome || "Cliente"}</h2>
-            <p>
-              {servico?.nome || "Servico"} - {formatarMoeda(servico?.preco || 0)}
-            </p>
-            <p className="sale-modal-meta">
-              {new Date(agendamento.data_agendamento).toLocaleString("pt-BR")} · {formatarTelefone(cliente?.telefone || null)}
-            </p>
-            <span className={`appointment-status-chip status-${agendamento.status.toLowerCase()}`}>{agendamento.status}</span>
-          </div>
-          <button onClick={onClose} type="button">
-            Fechar
+        <div className="sale-modal-topbar">
+          <button aria-label="Fechar" className="sale-modal-close" onClick={onClose} type="button">
+            ✕
+          </button>
+          <button className="sale-modal-notify" onClick={onNotify} type="button">
+            🔔 Lembrete
           </button>
         </div>
 
-        <div className="sale-products">
+        <div className="sale-modal-datetime">
+          <strong>{dataFormatada}</strong>
+          <span>
+            {formatarHoraMinutos(inicioMin)} às {formatarHoraMinutos(inicioMin + duracaoMin)}
+          </span>
+        </div>
+
+        <div className="sale-modal-client">
+          <div>
+            <span className="sale-modal-label">Cliente</span>
+            <h2>{cliente?.nome || "Cliente"}</h2>
+            <span className="sale-modal-phone">{formatarTelefone(cliente?.telefone || null)}</span>
+          </div>
+          <span className={`sale-modal-status status-${statusLower}`}>{agendamento.status}</span>
+        </div>
+
+        <div className="sale-modal-section">
+          <span className="sale-modal-label">Serviço(s)</span>
+          <div className="sale-modal-chips">
+            <span className="sale-modal-chip">
+              {servico?.nome || "Servico"}
+              <em>{formatarMoeda(servico?.preco || 0)}</em>
+            </span>
+          </div>
+        </div>
+
+        <div className="sale-modal-section">
+          <span className="sale-modal-label">Produto(s)</span>
           {produtos.length === 0 ? (
-            <div className="empty-state">Nenhum produto cadastrado para adicionar na venda.</div>
+            <p className="sale-modal-empty">Nenhum produto cadastrado.</p>
           ) : (
-            produtos.map((produto) => (
-              <label className="sale-product-row" key={produto.id}>
-                <ProductPhoto produto={produto} />
-                <span>
-                  <strong>{produto.nome}</strong>
-                  <small>
-                    {formatarMoeda(produto.preco || 0)} · estoque {produto.estoque || 0}
-                  </small>
-                </span>
-                <input
-                  min="0"
-                  onChange={(event) =>
-                    setItensVenda((atual) => ({
-                      ...atual,
-                      [produto.id]: event.target.value,
-                    }))
-                  }
-                  placeholder="0"
-                  type="number"
-                  value={itensVenda[produto.id] || ""}
-                />
-              </label>
-            ))
+            <div className="sale-modal-products">
+              {produtos.map((produto) => (
+                <label className="sale-modal-product-row" key={produto.id}>
+                  <ProductPhoto produto={produto} />
+                  <span>
+                    <strong>{produto.nome}</strong>
+                    <small>
+                      {formatarMoeda(produto.preco || 0)} · estoque {produto.estoque || 0}
+                    </small>
+                  </span>
+                  <input
+                    className="sale-modal-qty-input"
+                    min="0"
+                    onChange={(event) =>
+                      setItensVenda((atual) => ({
+                        ...atual,
+                        [produto.id]: event.target.value,
+                      }))
+                    }
+                    placeholder="0"
+                    type="number"
+                    value={itensVenda[produto.id] || ""}
+                  />
+                </label>
+              ))}
+            </div>
           )}
         </div>
 
-        <div className="sale-total">
+        <div className="sale-modal-total">
           <span>Total do atendimento</span>
           <strong>{formatarMoeda(total)}</strong>
         </div>
 
-        <div className="sale-modal-actions">
-          <button className="admin-pill-button secondary" onClick={onNotify} type="button">
-            Enviar lembrete
-          </button>
-          <button className="admin-pill-button cancel-appt-btn" onClick={onCancel} type="button">
-            Cancelar agendamento
-          </button>
-        </div>
-        <button className="admin-pill-button primary wide" disabled={finalizando} onClick={onConfirm} type="button">
-          {finalizando ? "Finalizando..." : "Finalizar e lancar financeiro"}
+        <button className="sale-modal-confirm" disabled={finalizando} onClick={onConfirm} type="button">
+          {finalizando ? "Finalizando..." : "Finalizar e lançar financeiro"}
+        </button>
+        <button className="sale-modal-cancel" onClick={onCancel} type="button">
+          Cancelar agendamento
         </button>
       </article>
     </section>

@@ -2118,65 +2118,247 @@ th {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgb(0 0 0 / 0.72);
+  background: rgb(15 17 23 / 0.72);
   padding: 1rem;
 }
 
 .sale-modal {
   display: grid;
-  width: min(100%, 720px);
-  max-height: min(92vh, 760px);
+  width: min(100%, 480px);
+  max-height: min(92vh, 780px);
   overflow-y: auto;
-  gap: 1rem;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 8px;
-  background: #111217;
-  box-shadow: 0 32px 100px rgb(0 0 0 / 0.5);
-  padding: clamp(1rem, 3vw, 1.35rem);
+  gap: 0.9rem;
+  border-radius: 28px;
+  background: #ffffff;
+  color: #16181d;
+  box-shadow: 0 32px 100px rgb(0 0 0 / 0.45);
+  padding: clamp(1.1rem, 4vw, 1.5rem);
 }
 
-.sale-modal-header {
+.sale-modal-topbar {
+  align-items: center;
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
 }
 
-.sale-modal-header h2 {
-  margin: 0.2rem 0 0;
-  font-size: clamp(1.5rem, 4vw, 2.4rem);
-}
-
-.sale-modal-header button {
-  height: fit-content;
-  border: 1px solid rgb(255 255 255 / 0.12);
+.sale-modal-close {
+  align-items: center;
+  background: #f1f5f9;
+  border: 0;
   border-radius: 999px;
-  background: transparent;
-  color: #f8fafc;
+  color: #475569;
   cursor: pointer;
-  font-weight: 900;
-  padding: 0.65rem 1rem;
+  display: inline-flex;
+  font-size: 0.85rem;
+  height: 2.2rem;
+  justify-content: center;
+  width: 2.2rem;
 }
 
-.sale-product-row input {
-  max-width: 7rem;
+.sale-modal-notify {
+  background: #fff1e9;
+  border: 1px solid #ffd9c2;
+  border-radius: 999px;
+  color: #b7653e;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.4rem 0.75rem;
+}
+
+.sale-modal-datetime {
+  align-items: baseline;
+  border-bottom: 1px solid #eef1f5;
+  color: #667085;
+  display: flex;
+  font-size: 0.85rem;
+  gap: 0.5rem;
+  padding-bottom: 0.85rem;
+  text-transform: capitalize;
+}
+
+.sale-modal-datetime strong {
+  color: #16181d;
+  font-size: 0.95rem;
+}
+
+.sale-modal-client {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sale-modal-label {
+  color: #98a2b3;
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sale-modal-client h2 {
+  color: #b7653e;
+  font-size: clamp(1.3rem, 5vw, 1.6rem);
+  margin: 0.15rem 0 0.2rem;
+}
+
+.sale-modal-phone {
+  color: #667085;
+  font-size: 0.85rem;
+}
+
+.sale-modal-status {
+  background: #f1f5f9;
+  border-radius: 999px;
+  color: #475569;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.3rem 0.65rem;
+  text-transform: capitalize;
+}
+
+.sale-modal-status.status-confirmado {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.sale-modal-status.status-pendente {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.sale-modal-status.status-cancelado {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.sale-modal-status.status-finalizado {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.sale-modal-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sale-modal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sale-modal-chip {
+  align-items: center;
+  background: #fff1e9;
+  border: 1px solid #ffd9c2;
+  border-radius: 999px;
+  color: #9a3412;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+}
+
+.sale-modal-chip em {
+  color: #b7653e;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.sale-modal-empty {
+  color: #98a2b3;
+  font-size: 0.85rem;
+}
+
+.sale-modal-products {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.sale-modal-product-row {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #eef1f5;
+  border-radius: 16px;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: auto 1fr auto;
+  padding: 0.6rem 0.7rem;
+}
+
+.sale-modal-product-row strong {
+  color: #16181d;
+  display: block;
+  font-size: 0.9rem;
+}
+
+.sale-modal-product-row small {
+  color: #667085;
+}
+
+.sale-modal-qty-input {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #16181d;
+  max-width: 3.4rem;
+  padding: 0.4rem;
   text-align: center;
 }
 
-.sale-total {
-  display: flex;
+.sale-modal-total {
   align-items: center;
+  border-top: 1px dashed #d9dee6;
+  display: flex;
   justify-content: space-between;
-  border-top: 1px solid rgb(255 255 255 / 0.1);
-  padding-top: 1rem;
+  padding-top: 0.9rem;
 }
 
-.sale-total span {
-  color: #aab2bf;
+.sale-modal-total span {
+  color: #667085;
+  font-size: 0.85rem;
 }
 
-.sale-total strong {
-  color: #ffb09a;
-  font-size: 1.5rem;
+.sale-modal-total strong {
+  color: #9a3412;
+  font-size: 1.6rem;
+}
+
+.sale-modal-confirm {
+  background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 14px 30px rgb(183 101 62 / 0.32);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 800;
+  min-height: 3rem;
+  padding: 0.85rem;
+}
+
+.sale-modal-confirm:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sale-modal-cancel {
+  background: transparent;
+  border: 0;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.35rem;
+  text-align: center;
+}
+
+.sale-modal-cancel:hover {
+  color: #b91c1c;
 }
 
 .mobile-drawer-backdrop {
@@ -2687,9 +2869,7 @@ th {
     font-size: clamp(2.3rem, 14vw, 3.4rem);
   }
 
-  .admin-appointment-card dl div,
-  .sale-modal-header,
-  .sale-total {
+  .admin-appointment-card dl div {
     display: grid;
   }
 
@@ -4297,16 +4477,10 @@ th {
 .agenda-grid-card-actions { opacity: .82; }
 .agenda-grid-icon-button { min-height: 1.8rem; }
 .agenda-section > .admin-panel { margin-top: .35rem; }
-.sale-modal { border-radius: 22px; }
-.sale-modal-meta { color: #aeb7c5; font-size: .78rem; margin: .45rem 0 0; }
-.sale-modal-actions { display: grid; gap: .5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.sale-modal-actions .admin-pill-button { min-height: 2.7rem; }
 @media (max-width: 760px) {
   .agenda-grid-card[role="button"] { padding: .65rem .7rem; }
   .agenda-grid-card[role="button"] .agenda-grid-card-actions { display: flex; }
   .agenda-grid-card-menu { margin-top: .35rem; }
   .sale-modal-backdrop { align-items: end; padding: 0; }
-  .sale-modal { border-radius: 22px 22px 0 0; max-height: 94vh; padding: 1rem; width: 100%; }
-  .sale-modal-header h2 { font-size: 1.55rem; }
-  .sale-modal-actions { grid-template-columns: 1fr 1fr; }
+  .sale-modal { border-radius: 22px 22px 0 0; max-height: 94vh; padding: 1.1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom)); width: 100%; }
 }
