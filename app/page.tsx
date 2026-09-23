@@ -2633,21 +2633,41 @@ function AgendaHero({
   const vendasHoje = vendas.filter((venda) => venda.created_at.slice(0, 10) === hojeIso);
   const totalHoje = vendasHoje.reduce((total, venda) => total + (venda.total || 0), 0);
   const totalSemana = vendas.reduce((total, venda) => total + (venda.total || 0), 0);
+  const [valoresOcultos, setValoresOcultos] = useState(false);
+  const nomeExibido = nomeDono || empresa?.nome || "barbeiro";
+  const exibirValor = (valor: number) => (valoresOcultos ? "R$ ••••" : formatarMoeda(valor));
 
   return (
     <section className="agenda-hero agenda-app-header">
       <div className="agenda-title-row">
-        <div>
-          {empresa?.features?.logo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img alt="Logo" className="empresa-logo-hero" src={empresa.features.logo_url} />
-          )}
-          <h2>Olá, {nomeDono || empresa?.nome || "barbeiro"}</h2>
-          <p>Você está em sua agenda.</p>
+        <div className="agenda-owner-row">
+          <span className="agenda-owner-avatar" aria-hidden="true">
+            {empresa?.features?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt="" src={empresa.features.logo_url} />
+            ) : (
+              nomeExibido.slice(0, 2).toUpperCase()
+            )}
+          </span>
+          <div>
+            <h2>Olá, {nomeExibido}</h2>
+            <p>Você está em sua agenda.</p>
+          </div>
         </div>
-        <button aria-label="Abrir menu" onClick={onOpenMenu} type="button">
-          ☰
-        </button>
+        <div className="agenda-title-actions">
+          <button
+            aria-label={valoresOcultos ? "Mostrar valores" : "Ocultar valores"}
+            aria-pressed={valoresOcultos}
+            className="agenda-visibility-toggle"
+            onClick={() => setValoresOcultos((atual) => !atual)}
+            type="button"
+          >
+            {valoresOcultos ? "⊘" : "◉"}
+          </button>
+          <button aria-label="Abrir menu" onClick={onOpenMenu} type="button">
+            ☰
+          </button>
+        </div>
       </div>
 
       <div className="agenda-week-nav">
@@ -2686,21 +2706,21 @@ function AgendaHero({
         <article className="hot">
           <div className="agenda-summary-top">
             <span className="agenda-summary-icon" aria-hidden="true">💰</span>
-            <div><span>Hoje</span><strong>{formatarMoeda(totalHoje)}</strong></div>
+            <div><span>Hoje</span><strong>{exibirValor(totalHoje)}</strong></div>
           </div>
           <div className="agenda-summary-count-row">
             <strong className="agenda-summary-count">{agendamentosHoje.length}</strong>
-            <span className="agenda-summary-count-label">{agendamentosHoje.length === 1 ? "agendamento" : "agendamentos"}</span>
+            <span className="agenda-summary-decor" aria-hidden="true">💈</span>
           </div>
         </article>
         <article>
           <div className="agenda-summary-top">
             <span className="agenda-summary-icon" aria-hidden="true">💈</span>
-            <div><span>Esta semana</span><strong>{formatarMoeda(totalSemana)}</strong></div>
+            <div><span>Esta semana</span><strong>{exibirValor(totalSemana)}</strong></div>
           </div>
           <div className="agenda-summary-count-row">
             <strong className="agenda-summary-count">{agendamentos.length}</strong>
-            <span className="agenda-summary-count-label">{agendamentos.length === 1 ? "agendamento" : "agendamentos"}</span>
+            <span className="agenda-summary-decor" aria-hidden="true">💈</span>
           </div>
         </article>
       </div>

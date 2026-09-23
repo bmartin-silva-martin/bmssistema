@@ -4726,6 +4726,11 @@ th {
 .agenda-title-row h2 { font-size: clamp(1.5rem, 4vw, 2.3rem); letter-spacing: -.04em; line-height: 1.05; margin: 0; }
 .agenda-title-row p { color: #9aa1b0; font-size: .9rem; margin: .35rem 0 0; }
 .agenda-title-row button, .agenda-week-arrow { align-items: center; background: rgb(255 255 255 / .07); border: 1px solid rgb(255 255 255 / .1); border-radius: 12px; color: #fff; cursor: pointer; display: inline-flex; justify-content: center; min-height: 2.75rem; min-width: 2.75rem; }
+.agenda-owner-row { align-items: center; display: flex; gap: .75rem; min-width: 0; }
+.agenda-owner-avatar { align-items: center; background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end)); border-radius: 50%; color: #fff; display: flex; flex-shrink: 0; font-size: .85rem; font-weight: 900; height: 2.9rem; justify-content: center; overflow: hidden; width: 2.9rem; }
+.agenda-owner-avatar img { height: 100%; object-fit: cover; width: 100%; }
+.agenda-title-actions { align-items: center; display: flex; flex-shrink: 0; gap: .5rem; }
+.agenda-visibility-toggle { font-size: 1.1rem; }
 .agenda-week-nav { align-items: center; display: flex; gap: .75rem; justify-content: space-between; margin-top: 1.25rem; }
 .agenda-week-label { color: #e8ebf1; font-size: .88rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agenda-week-icon { margin-right: .35rem; }
@@ -4803,12 +4808,12 @@ th {
 .agenda-summary-grid article:not(.hot) .agenda-summary-top > div > span { color: #9a5b3a; }
 .agenda-summary-top strong { color: #fff; font-size: .95rem; }
 .agenda-summary-grid article:not(.hot) .agenda-summary-top strong { color: #1f2430; }
-.agenda-summary-count-row { align-items: baseline; gap: .3rem; margin-top: .7rem; }
+.agenda-summary-count-row { align-items: flex-end; display: flex; gap: .3rem; justify-content: space-between; margin-top: .7rem; }
 .agenda-summary-count { color: #fff; font-size: 1.7rem; }
 .agenda-summary-grid article:not(.hot) .agenda-summary-count { color: #1f2430; }
 .agenda-summary-count-label { color: rgb(255 255 255 / .75); font-size: .68rem; }
 .agenda-summary-grid article:not(.hot) .agenda-summary-count-label { color: #6b7280; }
-.agenda-summary-decor { display: none; }
+.agenda-summary-decor { font-size: 1.5rem; opacity: .5; }
 .agenda-app-main > .empty-state { min-height: 4.5rem; padding: .75rem; }
 .reminder-panel { gap: .55rem; padding: .8rem; }
 .reminder-header { align-items: center; gap: .65rem; }
