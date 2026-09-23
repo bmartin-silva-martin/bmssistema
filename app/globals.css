@@ -1981,6 +1981,54 @@ th {
   gap: 1rem;
 }
 
+.service-tiles-bars {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: none;
+}
+
+.service-tiles-bars::-webkit-scrollbar {
+  display: none;
+}
+
+.service-tile {
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 16px;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0.5rem;
+  min-width: 7.5rem;
+  padding: 0.85rem;
+}
+
+.service-tile-top {
+  align-items: baseline;
+  display: flex;
+  gap: 0.4rem;
+  justify-content: space-between;
+}
+
+.service-tiles-row .service-tile-top strong {
+  color: var(--brand-start);
+  font-size: 1.7rem;
+}
+
+.service-tile-top em {
+  color: #7f8998;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.service-tiles-row .service-tile > span {
+  color: #e7eaf0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .revenue-bar-chart-bars {
   align-items: flex-end;
   display: flex;

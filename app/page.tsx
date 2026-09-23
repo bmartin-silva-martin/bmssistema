@@ -466,8 +466,8 @@ export default function AdminDashboard() {
 
   const vendasFiltradas = useMemo(() => filtrarVendasPorPeriodo(vendas, periodoFinanceiro), [periodoFinanceiro, vendas]);
   const resumoFinanceiro = useMemo(
-    () => calcularResumoFinanceiro(vendasFiltradas, agendamentos, produtos),
-    [agendamentos, produtos, vendasFiltradas],
+    () => calcularResumoFinanceiro(vendasFiltradas, agendamentos, produtos, periodoFinanceiro, empresa?.horarios_atendimento),
+    [agendamentos, produtos, vendasFiltradas, periodoFinanceiro, empresa],
   );
   const faturamentoPorDia = useMemo(() => agruparVendasPorDiaDoMes(vendas), [vendas]);
 
@@ -1957,9 +1957,14 @@ export default function AdminDashboard() {
 
             <RevenueBarChart dias={faturamentoPorDia} />
 
+            <ServiceTilesRow items={resumoFinanceiro.servicosMaisVendidos} total={resumoFinanceiro.totalServicosRealizados} />
+
             <section className="finance-dashboard-grid" aria-label="Resumo financeiro">
               <MetricCard helper="receita no periodo" label="Faturamento" value={formatarMoeda(resumoFinanceiro.totalReceita)} />
               <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
+              {resumoFinanceiro.taxaOcupacao !== null && (
+                <MetricCard helper="agendamentos vs. horarios disponiveis" label="Taxa de ocupacao" value={`${resumoFinanceiro.taxaOcupacao}%`} />
+              )}
               <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
               <MetricCard helper="clientes atendidos no periodo" label="Clientes unicos" value={resumoFinanceiro.clientesUnicos} />
               <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
@@ -1968,7 +1973,6 @@ export default function AdminDashboard() {
 
             <section className="finance-card-grid">
               <FinanceRankingCard items={resumoFinanceiro.produtosMaisVendidos} title="Produtos com mais saida" />
-              <FinanceRankingCard items={resumoFinanceiro.servicosMaisVendidos} title="Servicos mais vendidos" />
             </section>
 
             <section className="finance-card-grid">
@@ -2979,6 +2983,36 @@ function RevenueBarChart({ dias }: { dias: { dia: number; valor: number }[] }) {
   );
 }
 
+function ServiceTilesRow({ items, total }: { items: RankingItem[]; total: number }) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <article className="finance-chart-card service-tiles-row">
+      <div>
+        <span>Servicos realizados</span>
+      </div>
+      <div className="service-tiles-bars">
+        {items.map((item) => (
+          <div className="service-tile" key={item.nome}>
+            <div className="service-tile-top">
+              <strong>{item.total}</strong>
+              {total > 0 && <em>{Math.round((item.total / total) * 100)}%</em>}
+            </div>
+            <span>{item.nome}</span>
+          </div>
+        ))}
+      </div>
+      {items.length > 3 && (
+        <p className="scroll-hint">
+          Arraste para o lado para ver mais <span aria-hidden="true">→</span>
+        </p>
+      )}
+    </article>
+  );
+}
+
 function PaymentChart({ items, total }: { items: PaymentItem[]; total: number }) {
   const maiorValor = Math.max(...items.map((item) => item.valor), 1);
 
@@ -3285,8 +3319,8 @@ function agruparVendasPorDiaDoMes(vendas: Venda[]) {
   return totaisPorDia.map((valor, index) => ({ dia: index + 1, valor }));
 }
 
-function filtrarVendasPorPeriodo(vendas: Venda[], periodo: PeriodoFinanceiro) {
-  if (periodo === "todos") return vendas;
+function calcularInicioPeriodo(periodo: PeriodoFinanceiro) {
+  if (periodo === "todos") return null;
 
   const hoje = new Date();
   const inicio = new Date(hoje);
@@ -3295,10 +3329,35 @@ function filtrarVendasPorPeriodo(vendas: Venda[], periodo: PeriodoFinanceiro) {
   if (periodo === "7") inicio.setDate(inicio.getDate() - 6);
   if (periodo === "30") inicio.setDate(inicio.getDate() - 29);
 
+  return inicio;
+}
+
+function contarDiasDoPeriodo(periodo: PeriodoFinanceiro) {
+  if (periodo === "hoje") return 1;
+  if (periodo === "7") return 7;
+  if (periodo === "30") return 30;
+  return null;
+}
+
+function filtrarVendasPorPeriodo(vendas: Venda[], periodo: PeriodoFinanceiro) {
+  const inicio = calcularInicioPeriodo(periodo);
+  if (!inicio) return vendas;
   return vendas.filter((venda) => new Date(venda.created_at) >= inicio);
 }
 
-function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], produtos: Produto[]) {
+function filtrarAgendamentosPorPeriodo(agendamentos: Agendamento[], periodo: PeriodoFinanceiro) {
+  const inicio = calcularInicioPeriodo(periodo);
+  if (!inicio) return agendamentos;
+  return agendamentos.filter((agendamento) => new Date(agendamento.data_agendamento) >= inicio);
+}
+
+function calcularResumoFinanceiro(
+  vendas: Venda[],
+  agendamentos: Agendamento[],
+  produtos: Produto[],
+  periodo: PeriodoFinanceiro,
+  horariosAtendimento?: string[] | null,
+) {
   const produtoTotais = new Map<string, number>();
   const servicoTotais = new Map<string, number>();
   const formaTotais = new Map<string, { total: number; valor: number }>();
@@ -3327,7 +3386,7 @@ function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], 
   });
 
   if (servicoTotais.size === 0) {
-    agendamentos
+    filtrarAgendamentosPorPeriodo(agendamentos, periodo)
       .filter((agendamento) => agendamento.status === "finalizado")
       .forEach((agendamento) => {
         const servico = firstRelation(agendamento.servicos);
@@ -3347,6 +3406,17 @@ function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], 
   });
 
   const totalReceita = vendas.reduce((total, venda) => total + (venda.total || 0), 0);
+  const totalServicosRealizados = Array.from(servicoTotais.values()).reduce((total, valor) => total + valor, 0);
+
+  const diasNoPeriodo = contarDiasDoPeriodo(periodo);
+  const slotsPorDia = horariosAtendimento?.length || HORARIOS_ATENDIMENTO_PADRAO.length;
+  const agendamentosAtivosNoPeriodo = filtrarAgendamentosPorPeriodo(agendamentos, periodo).filter(
+    (agendamento) => agendamento.status.toLowerCase() !== "cancelado",
+  );
+  const taxaOcupacao =
+    diasNoPeriodo && slotsPorDia > 0
+      ? Math.round((agendamentosAtivosNoPeriodo.length / (diasNoPeriodo * slotsPorDia)) * 100)
+      : null;
 
   return {
     clientesUnicos: clientesUnicosSet.size,
@@ -3357,6 +3427,8 @@ function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], 
     produtosMaisVendidos: ordenarRanking(produtoTotais),
     produtosSemGiro: produtos.filter((produto) => !produtosComGiro.has(produto.id)),
     servicosMaisVendidos: ordenarRanking(servicoTotais),
+    taxaOcupacao,
+    totalServicosRealizados,
     ticketMedio: vendas.length > 0 ? totalReceita / vendas.length : 0,
     totalReceita,
   };
