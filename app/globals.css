@@ -1680,14 +1680,90 @@ th {
 }
 
 .admin-link-card {
+  background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
+  border-color: transparent;
+  box-shadow: 0 18px 50px rgb(183 101 62 / 0.3);
+  color: #ffffff;
   display: grid;
-  grid-template-columns: 1fr auto;
   gap: 1rem;
-  padding: clamp(1rem, 3vw, 1.4rem);
+  padding: clamp(1.1rem, 3vw, 1.4rem);
 }
 
-.admin-link-card input {
-  grid-column: 1 / -1;
+.admin-link-card h2 {
+  color: #ffffff;
+}
+
+.admin-link-card p {
+  color: rgb(255 255 255 / 0.85);
+}
+
+.admin-link-kicker {
+  color: rgb(255 255 255 / 0.85);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+}
+
+.admin-link-field {
+  align-items: center;
+  background: rgb(255 255 255 / 0.14);
+  border-radius: 16px;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.9rem;
+}
+
+.admin-link-field input {
+  background: transparent;
+  border: 0;
+  color: #ffffff;
+  flex: 1;
+  font-size: 0.85rem;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-link-copy-btn {
+  background: #ffffff;
+  border: 0;
+  border-radius: 12px;
+  color: #b7653e;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 900;
+  padding: 0.6rem 0.9rem;
+  white-space: nowrap;
+}
+
+.admin-link-share-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.admin-link-share-btn {
+  align-items: center;
+  background: rgb(255 255 255 / 0.14);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 0.4rem;
+  justify-content: center;
+  min-height: 2.75rem;
+  text-decoration: none;
+}
+
+.admin-link-share-btn:hover {
+  background: rgb(255 255 255 / 0.22);
 }
 
 .admin-metrics-grid {

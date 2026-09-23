@@ -1636,14 +1636,35 @@ export default function AdminDashboard() {
             title="Visao geral"
           >
             <section className="admin-link-card">
-              <div>
-                <h2>Link publico para clientes</h2>
+              <div className="admin-link-card-intro">
+                <span className="admin-link-kicker">Compartilhar</span>
+                <h2>Meu link</h2>
                 <p>Envie este endereco no WhatsApp, Instagram ou Google Perfil da Empresa.</p>
               </div>
-              <button className="admin-pill-button primary" onClick={copiarLink} type="button">
-                Copiar link
-              </button>
-              <input readOnly value={linkPublico} />
+              <div className="admin-link-field">
+                <input readOnly value={linkPublico} />
+                <button className="admin-link-copy-btn" onClick={copiarLink} type="button">
+                  Copiar link
+                </button>
+              </div>
+              <div className="admin-link-share-row">
+                <a
+                  className="admin-link-share-btn"
+                  href={`https://wa.me/?text=${encodeURIComponent(linkPublico)}`}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <span aria-hidden="true">💬</span> WhatsApp
+                </a>
+                <a
+                  className="admin-link-share-btn"
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(linkPublico)}`}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <span aria-hidden="true">f</span> Facebook
+                </a>
+              </div>
             </section>
 
             <section className="admin-metrics-grid" aria-label="Resumo da barbearia">
