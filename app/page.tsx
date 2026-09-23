@@ -37,6 +37,7 @@ type Servico = {
   preco: number;
   duracao: number | null;
   precos_por_dia?: Record<string, number> | null;
+  foto_url?: string | null;
 };
 
 type Produto = {
@@ -345,7 +346,7 @@ export default function AdminDashboard() {
   const [mensagem, setMensagem] = useState("");
   const [produtoAviso, setProdutoAviso] = useState("");
   const [financeiroAviso, setFinanceiroAviso] = useState("");
-  const [servicoForm, setServicoForm] = useState({ duracao: "30", nome: "", preco: "" });
+  const [servicoForm, setServicoForm] = useState({ duracao: "30", foto_url: "", nome: "", preco: "" });
   const [produtoForm, setProdutoForm] = useState({ comissao: "", custo: "", estoque: "0", foto_url: "", nome: "", preco: "" });
   const [abaClientes, setAbaClientes] = useState<AbaClientes>("cadastro");
   const [periodoFinanceiro, setPeriodoFinanceiro] = useState<PeriodoFinanceiro>("hoje");
@@ -556,7 +557,7 @@ export default function AdminDashboard() {
       perfilResponse,
       profissionaisResponse,
     ] = await Promise.all([
-      supabase.from("servicos").select("id,nome,preco,duracao,precos_por_dia").eq("empresa_id", empresaId).order("nome"),
+      supabase.from("servicos").select("id,nome,preco,duracao,precos_por_dia,foto_url").eq("empresa_id", empresaId).order("nome"),
       supabase
         .from("agendamentos")
         .select(
@@ -753,6 +754,7 @@ export default function AdminDashboard() {
     const { error } = await supabase.from("servicos").insert({
       duracao: Number(servicoForm.duracao || 30),
       empresa_id: empresaIdAtual,
+      foto_url: servicoForm.foto_url.trim() || null,
       nome: servicoForm.nome.trim(),
       preco: Number(servicoForm.preco),
     });
@@ -763,7 +765,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    setServicoForm({ duracao: "30", nome: "", preco: "" });
+    setServicoForm({ duracao: "30", foto_url: "", nome: "", preco: "" });
     setAddServicoOpen(false);
     await carregarDados();
     setMensagem("Servico cadastrado com sucesso.");
@@ -805,6 +807,7 @@ export default function AdminDashboard() {
       .from("servicos")
       .update({
         duracao: servico.duracao || 30,
+        foto_url: servico.foto_url || null,
         nome: servico.nome,
         preco: servico.preco,
         precos_por_dia: servico.precos_por_dia && Object.keys(servico.precos_por_dia).length > 0 ? servico.precos_por_dia : null,
@@ -1820,14 +1823,37 @@ export default function AdminDashboard() {
         {addServicoOpen && (
           <AddFormSheet onClose={() => setAddServicoOpen(false)} title="Novo servico">
             <form className="form-stack add-sheet-form" onSubmit={cadastrarServico}>
-              <label>
-                Nome
-                <input
-                  onChange={(event) => setServicoForm((form) => ({ ...form, nome: event.target.value }))}
-                  placeholder="Ex: Corte masculino"
-                  value={servicoForm.nome}
-                />
-              </label>
+              <div className="form-row-foto-nome">
+                <label className="servico-foto-picker">
+                  Foto
+                  <input
+                    accept="image/*"
+                    className="servico-foto-input"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        const dataUrl = await redimensionarFoto(file);
+                        setServicoForm((form) => ({ ...form, foto_url: dataUrl }));
+                      }
+                    }}
+                    type="file"
+                  />
+                  {servicoForm.foto_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt="" src={servicoForm.foto_url} />
+                  ) : (
+                    <span aria-hidden="true">📷</span>
+                  )}
+                </label>
+                <label>
+                  Nome do servico
+                  <input
+                    onChange={(event) => setServicoForm((form) => ({ ...form, nome: event.target.value }))}
+                    placeholder="Ex: Corte masculino"
+                    value={servicoForm.nome}
+                  />
+                </label>
+              </div>
               <div className="form-row-2">
                 <label>
                   Duracao (min)
@@ -3682,6 +3708,14 @@ function EditableServicoList({
               <span className="drag-dots" aria-hidden="true">
                 ⋮
               </span>
+              {servico.foto_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="" className="compact-row-photo" src={servico.foto_url} />
+              ) : (
+                <span className="compact-row-photo photo-placeholder" aria-hidden="true">
+                  ✂
+                </span>
+              )}
               <div className="compact-row-main">
                 <strong>{servico.nome}</strong>
                 <span>
@@ -3694,17 +3728,42 @@ function EditableServicoList({
 
               {editando && (
                 <div className="compact-edit-panel">
-                  <label>
-                    Nome
-                    <input
-                      onChange={(event) =>
-                        setServicos(
-                          servicos.map((item) => (item.id === servico.id ? { ...item, nome: event.target.value } : item)),
-                        )
-                      }
-                      value={servico.nome}
-                    />
-                  </label>
+                  <div className="form-row-foto-nome">
+                    <label className="servico-foto-picker">
+                      Foto
+                      <input
+                        accept="image/*"
+                        className="servico-foto-input"
+                        onChange={async (event) => {
+                          const file = event.target.files?.[0];
+                          if (file) {
+                            const dataUrl = await redimensionarFoto(file);
+                            setServicos(
+                              servicos.map((item) => (item.id === servico.id ? { ...item, foto_url: dataUrl } : item)),
+                            );
+                          }
+                        }}
+                        type="file"
+                      />
+                      {servico.foto_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt="" src={servico.foto_url} />
+                      ) : (
+                        <span aria-hidden="true">📷</span>
+                      )}
+                    </label>
+                    <label>
+                      Nome
+                      <input
+                        onChange={(event) =>
+                          setServicos(
+                            servicos.map((item) => (item.id === servico.id ? { ...item, nome: event.target.value } : item)),
+                          )
+                        }
+                        value={servico.nome}
+                      />
+                    </label>
+                  </div>
                   <div className="form-row-2">
                     <label>
                       Duracao
