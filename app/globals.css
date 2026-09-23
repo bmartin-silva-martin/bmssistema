@@ -4694,13 +4694,11 @@ th {
 }
 
 .form-row-2 {
-  display: grid;
+  display: flex;
   gap: 0.5rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .form-row-2 input {
-  justify-self: start;
   max-width: 7rem;
   width: 100%;
 }
