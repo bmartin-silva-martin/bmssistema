@@ -1828,25 +1828,27 @@ export default function AdminDashboard() {
                   value={servicoForm.nome}
                 />
               </label>
-              <label>
-                Preco
-                <input
-                  inputMode="decimal"
-                  onChange={(event) => setServicoForm((form) => ({ ...form, preco: event.target.value }))}
-                  placeholder="R$ 0,00"
-                  type="number"
-                  value={servicoForm.preco}
-                />
-              </label>
-              <label>
-                Duracao em minutos
-                <input
-                  inputMode="numeric"
-                  onChange={(event) => setServicoForm((form) => ({ ...form, duracao: event.target.value }))}
-                  type="number"
-                  value={servicoForm.duracao}
-                />
-              </label>
+              <div className="form-row-2">
+                <label>
+                  Duracao (min)
+                  <input
+                    inputMode="numeric"
+                    onChange={(event) => setServicoForm((form) => ({ ...form, duracao: event.target.value }))}
+                    type="number"
+                    value={servicoForm.duracao}
+                  />
+                </label>
+                <label>
+                  Preco
+                  <input
+                    inputMode="decimal"
+                    onChange={(event) => setServicoForm((form) => ({ ...form, preco: event.target.value }))}
+                    placeholder="R$ 0,00"
+                    type="number"
+                    value={servicoForm.preco}
+                  />
+                </label>
+              </div>
               <button className="admin-pill-button primary wide" disabled={salvandoServico} type="submit">
                 {salvandoServico ? "Salvando..." : "Adicionar servico"}
               </button>
@@ -3703,34 +3705,36 @@ function EditableServicoList({
                       value={servico.nome}
                     />
                   </label>
-                  <label>
-                    Preco
-                    <input
-                      onChange={(event) =>
-                        setServicos(
-                          servicos.map((item) =>
-                            item.id === servico.id ? { ...item, preco: Number(event.target.value) } : item,
-                          ),
-                        )
-                      }
-                      type="number"
-                      value={servico.preco}
-                    />
-                  </label>
-                  <label>
-                    Duracao
-                    <input
-                      onChange={(event) =>
-                        setServicos(
-                          servicos.map((item) =>
-                            item.id === servico.id ? { ...item, duracao: Number(event.target.value) } : item,
-                          ),
-                        )
-                      }
-                      type="number"
-                      value={servico.duracao || 30}
-                    />
-                  </label>
+                  <div className="form-row-2">
+                    <label>
+                      Duracao
+                      <input
+                        onChange={(event) =>
+                          setServicos(
+                            servicos.map((item) =>
+                              item.id === servico.id ? { ...item, duracao: Number(event.target.value) } : item,
+                            ),
+                          )
+                        }
+                        type="number"
+                        value={servico.duracao || 30}
+                      />
+                    </label>
+                    <label>
+                      Preco
+                      <input
+                        onChange={(event) =>
+                          setServicos(
+                            servicos.map((item) =>
+                              item.id === servico.id ? { ...item, preco: Number(event.target.value) } : item,
+                            ),
+                          )
+                        }
+                        type="number"
+                        value={servico.preco}
+                      />
+                    </label>
+                  </div>
                   <details className="precos-por-dia">
                     <summary>Modo avancado de valores</summary>
                     <p className="precos-por-dia-hint">
