@@ -3225,14 +3225,22 @@ th {
 }
 
 .row-icon-button {
-  min-height: 4.1rem;
-  min-width: 5.2rem;
-  border: 0;
-  border-radius: 18px;
-  background: #10141c;
+  align-items: center;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 50%;
   color: #e7eaf0;
   cursor: pointer;
-  font-weight: 900;
+  display: inline-flex;
+  font-size: 1rem;
+  height: 2.75rem;
+  justify-content: center;
+  width: 2.75rem;
+}
+
+.row-icon-button:hover {
+  background: rgb(255 112 74 / 0.16);
+  border-color: rgb(255 139 92 / 0.4);
 }
 
 .compact-edit-panel {
@@ -3374,9 +3382,9 @@ th {
   border-radius: 24px;
   background: linear-gradient(180deg, #181c24, #141820);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.85rem;
-  padding: 0.9rem;
+  padding: 0.9rem 1.1rem;
 }
 
 .client-avatar {
@@ -3387,10 +3395,37 @@ th {
   background: linear-gradient(135deg, #f04b2b, #176c37);
   color: #ffffff;
   display: flex;
+  flex-shrink: 0;
   font-size: 0.95rem;
   font-weight: 900;
   justify-content: center;
   text-transform: uppercase;
+}
+
+.client-card-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.client-card-icon-button {
+  align-items: center;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 50%;
+  color: #e7eaf0;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 1rem;
+  height: 2.75rem;
+  justify-content: center;
+  text-decoration: none;
+  width: 2.75rem;
+}
+
+.client-card-icon-button:hover {
+  background: rgb(255 112 74 / 0.16);
+  border-color: rgb(255 139 92 / 0.4);
 }
 
 .client-card-main {
@@ -3433,11 +3468,6 @@ th {
     border-radius: 15px;
   }
 
-  .row-icon-button {
-    min-width: 4.6rem;
-    font-size: 0.85rem;
-  }
-
   .compact-edit-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3446,14 +3476,6 @@ th {
     grid-template-columns: 1fr;
   }
 
-  .client-card {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .client-card .row-icon-button {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
 }
 
 .reminder-panel {
@@ -4357,10 +4379,11 @@ th {
 .agenda-day-strip strong { font-size: clamp(1.3rem, 5vw, 1.7rem); line-height: 1; }
 .agenda-day-dot { background: #fff; border-radius: 50%; bottom: .42rem; height: .36rem; position: absolute; width: .36rem; }
 .agenda-summary-grid { display: grid; gap: .65rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 1rem; }
-.agenda-summary-grid article { background: rgb(255 255 255 / .065); border: 1px solid rgb(255 255 255 / .07); border-radius: 20px; min-height: 8rem; padding: .9rem; }
-.agenda-summary-grid article.hot { background: linear-gradient(135deg, rgb(255 112 74 / .22), rgb(255 255 255 / .06)); }
+.agenda-summary-grid article { background: linear-gradient(180deg, #ffffff, #f5efe9); border: 1px solid rgb(0 0 0 / .06); border-radius: 20px; box-shadow: 0 10px 24px rgb(0 0 0 / .16); min-height: 8rem; padding: .9rem; }
+.agenda-summary-grid article.hot { background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end)); border-color: transparent; box-shadow: 0 14px 30px rgb(183 101 62 / .35); }
 .agenda-summary-top { align-items: flex-start; display: flex; gap: .6rem; min-width: 0; }
-.agenda-summary-icon { align-items: center; background: rgb(255 255 255 / .1); border-radius: 11px; display: inline-flex; font-size: 1.1rem; height: 2.1rem; justify-content: center; width: 2.1rem; }
+.agenda-summary-icon { align-items: center; background: rgb(0 0 0 / .06); border-radius: 11px; display: inline-flex; font-size: 1.1rem; height: 2.1rem; justify-content: center; width: 2.1rem; }
+.agenda-summary-grid article.hot .agenda-summary-icon { background: rgb(255 255 255 / .22); }
 .agenda-summary-top span:not(.agenda-summary-icon) { color: #aab2bf; display: block; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
 .agenda-summary-top strong { display: block; font-size: clamp(.95rem, 3vw, 1.15rem); margin-top: .2rem; }
 .agenda-summary-count-row { align-items: flex-end; display: flex; justify-content: space-between; margin-top: 1rem; }
@@ -4412,15 +4435,18 @@ th {
 .agenda-day-strip strong { font-size: 1.25rem; }
 .agenda-summary-grid { gap: .5rem; margin-top: .55rem; }
 .agenda-summary-grid article { border-radius: 16px; min-height: 6.4rem; padding: .7rem; }
-.agenda-summary-grid article,
-.agenda-summary-grid article.hot,
-.agenda-summary-grid article:not(.hot) { color: #f5f7fb; }
+.agenda-summary-grid article.hot { color: #ffffff; }
+.agenda-summary-grid article:not(.hot) { color: #1f2430; }
 .agenda-summary-icon { font-size: .85rem; height: 1.65rem; width: 1.65rem; }
-.agenda-summary-top > div > span { color: #c7ced9; font-size: .64rem; }
+.agenda-summary-top > div > span { color: rgb(255 255 255 / .85); font-size: .64rem; }
+.agenda-summary-grid article:not(.hot) .agenda-summary-top > div > span { color: #9a5b3a; }
 .agenda-summary-top strong { color: #fff; font-size: .95rem; }
+.agenda-summary-grid article:not(.hot) .agenda-summary-top strong { color: #1f2430; }
 .agenda-summary-count-row { align-items: baseline; gap: .3rem; margin-top: .7rem; }
 .agenda-summary-count { color: #fff; font-size: 1.7rem; }
-.agenda-summary-count-label { color: #c7ced9; font-size: .68rem; }
+.agenda-summary-grid article:not(.hot) .agenda-summary-count { color: #1f2430; }
+.agenda-summary-count-label { color: rgb(255 255 255 / .75); font-size: .68rem; }
+.agenda-summary-grid article:not(.hot) .agenda-summary-count-label { color: #6b7280; }
 .agenda-summary-decor { display: none; }
 .agenda-app-main > .empty-state { min-height: 4.5rem; padding: .75rem; }
 .reminder-panel { gap: .55rem; padding: .8rem; }

@@ -2454,7 +2454,7 @@ function MobileDrawer({
         <button aria-label="Fechar menu" className="mobile-drawer-close" onClick={onClose} type="button">
           ×
         </button>
-        <h2>INBARBER</h2>
+        <h2>BMS Sistema</h2>
         <nav>
           <button onClick={() => onNavigate("agenda")} type="button">
             Inicio
@@ -3335,8 +3335,8 @@ function EditableServicoList({
                   {servico.duracao || 30} min. - {formatarMoeda(servico.preco || 0)}
                 </span>
               </div>
-              <button className="row-icon-button" onClick={() => setEditandoId(editando ? null : servico.id)} type="button">
-                Editar
+              <button aria-label="Editar servico" className="row-icon-button" onClick={() => setEditandoId(editando ? null : servico.id)} type="button">
+                ✎
               </button>
 
               {editando && (
@@ -3464,8 +3464,8 @@ function EditableProdutoList({
                   ) : null}
                 </span>
               </div>
-              <button className="row-icon-button" onClick={() => setEditandoId(editando ? null : produto.id)} type="button">
-                Editar
+              <button aria-label="Editar produto" className="row-icon-button" onClick={() => setEditandoId(editando ? null : produto.id)} type="button">
+                ✎
               </button>
 
               {editando && (
@@ -3638,17 +3638,32 @@ function EditableClienteList({
 
           return (
             <article className="client-card" key={cliente.id}>
-              <div className="client-avatar" aria-hidden="true">
-                {cliente.nome.slice(0, 2)}
-              </div>
               <div className="client-card-main">
                 <strong>{cliente.nome}</strong>
                 <span>{cliente.telefone || "WhatsApp nao informado"}</span>
                 <small>Aniversario: {formatarAniversario(cliente.data_nascimento)}</small>
               </div>
-              <button className="row-icon-button" onClick={() => setEditandoId(editando ? null : cliente.id)} type="button">
-                Editar
-              </button>
+              <div className="client-card-actions">
+                {cliente.telefone && (
+                  <a
+                    aria-label="Conversar no WhatsApp"
+                    className="client-card-icon-button"
+                    href={`https://wa.me/55${cliente.telefone.replace(/\D/g, "")}`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    💬
+                  </a>
+                )}
+                <button
+                  aria-label="Editar cliente"
+                  className="client-card-icon-button"
+                  onClick={() => setEditandoId(editando ? null : cliente.id)}
+                  type="button"
+                >
+                  ✎
+                </button>
+              </div>
 
               {editando && (
                 <div className="compact-edit-panel client-edit-panel">
