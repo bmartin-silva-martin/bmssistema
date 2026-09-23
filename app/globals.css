@@ -1781,7 +1781,7 @@ th {
   color: #aab2bf;
 }
 
-.finance-dashboard-grid .admin-metric-card.accent {
+.finance-metric-scroll .admin-metric-card.accent {
   background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
   border-color: transparent;
 }
@@ -1934,16 +1934,24 @@ th {
   color: #ffffff;
 }
 
-.finance-dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+.finance-metric-scroll {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: none;
 }
 
-.finance-dashboard-grid .admin-metric-card {
+.finance-metric-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.finance-metric-scroll .admin-metric-card {
   border-radius: 24px;
   background: linear-gradient(180deg, rgb(34 36 42 / 0.96), rgb(22 24 30 / 0.98));
   padding: clamp(1rem, 3vw, 1.35rem);
+  flex: 0 0 auto;
+  min-width: 9.5rem;
 }
 
 .finance-chart-card,
@@ -2941,10 +2949,6 @@ th {
   .admin-two-columns,
   .finance-card-grid {
     grid-template-columns: 1fr;
-  }
-
-  .finance-dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .payment-bar-row {

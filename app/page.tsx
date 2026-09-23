@@ -2035,28 +2035,36 @@ export default function AdminDashboard() {
 
             <ServiceTilesRow items={resumoFinanceiro.servicosMaisVendidos} total={resumoFinanceiro.totalServicosRealizados} />
 
-            <section className="finance-dashboard-grid" aria-label="Resumo financeiro">
-              <MetricCard
-                helper={`${vendasFiltradas.length} ${vendasFiltradas.length === 1 ? "atendimento" : "atendimentos"}`}
-                label="Faturamento"
-                value={formatarMoeda(resumoFinanceiro.totalReceita)}
-              />
-              <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
-              {resumoFinanceiro.taxaOcupacao !== null && (
-                <MetricCard helper="agendamentos vs. horarios disponiveis" label="Taxa de ocupacao" value={`${resumoFinanceiro.taxaOcupacao}%`} />
-              )}
-              <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
-              <MetricCard helper="clientes atendidos no periodo" label="Clientes unicos" value={resumoFinanceiro.clientesUnicos} />
-              {resumoFinanceiro.atendimentosPorCliente > 0 && (
-                <MetricCard helper="media de vendas por cliente" label="Atendimentos/cliente" value={resumoFinanceiro.atendimentosPorCliente.toFixed(2)} />
-              )}
-              {resumoFinanceiro.receitaPorHora > 0 && (
-                <MetricCard helper="receita por hora trabalhada" label="Receita por hora" value={formatarMoeda(resumoFinanceiro.receitaPorHora)} />
-              )}
-              {resumoFinanceiro.topServico && (
-                <MetricCard helper={`${resumoFinanceiro.topServico.percentual}% dos atendimentos`} label="Top servico" value={resumoFinanceiro.topServico.nome} />
-              )}
-              <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
+            <section aria-label="Resumo financeiro">
+              <div className="finance-metric-scroll">
+                <MetricCard
+                  helper={`${vendasFiltradas.length} ${vendasFiltradas.length === 1 ? "atendimento" : "atendimentos"}`}
+                  label="Faturamento"
+                  value={formatarMoeda(resumoFinanceiro.totalReceita)}
+                />
+                <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
+                {resumoFinanceiro.taxaOcupacao !== null && (
+                  <MetricCard helper="agendamentos vs. horarios disponiveis" label="Taxa de ocupacao" value={`${resumoFinanceiro.taxaOcupacao}%`} />
+                )}
+                <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
+                <MetricCard helper="clientes atendidos no periodo" label="Clientes unicos" value={resumoFinanceiro.clientesUnicos} />
+                {resumoFinanceiro.atendimentosPorCliente > 0 && (
+                  <MetricCard helper="media de vendas por cliente" label="Atendimentos/cliente" value={resumoFinanceiro.atendimentosPorCliente.toFixed(2)} />
+                )}
+                {resumoFinanceiro.receitaPorHora > 0 && (
+                  <MetricCard helper="receita por hora trabalhada" label="Receita por hora" value={formatarMoeda(resumoFinanceiro.receitaPorHora)} />
+                )}
+                {resumoFinanceiro.topServico && (
+                  <MetricCard helper={`${resumoFinanceiro.topServico.percentual}% dos atendimentos`} label="Top servico" value={resumoFinanceiro.topServico.nome} />
+                )}
+                <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
+              </div>
+              <p className="scroll-hint">
+                Arraste para o lado para ver mais <span aria-hidden="true">→</span>
+              </p>
+            </section>
+
+            <section className="finance-card-grid">
               <PaymentChart items={resumoFinanceiro.formasPagamento} total={resumoFinanceiro.totalReceita} />
               {resumoFinanceiro.distribuicaoHoras && <HoursDistributionBar dados={resumoFinanceiro.distribuicaoHoras} />}
             </section>
