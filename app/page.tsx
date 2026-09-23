@@ -466,7 +466,15 @@ export default function AdminDashboard() {
 
   const vendasFiltradas = useMemo(() => filtrarVendasPorPeriodo(vendas, periodoFinanceiro), [periodoFinanceiro, vendas]);
   const resumoFinanceiro = useMemo(
-    () => calcularResumoFinanceiro(vendasFiltradas, agendamentos, produtos, periodoFinanceiro, empresa?.horarios_atendimento),
+    () =>
+      calcularResumoFinanceiro(
+        vendasFiltradas,
+        agendamentos,
+        produtos,
+        periodoFinanceiro,
+        empresa?.horarios_atendimento,
+        empresa?.dias_atendimento,
+      ),
     [agendamentos, produtos, vendasFiltradas, periodoFinanceiro, empresa],
   );
   const faturamentoPorDia = useMemo(() => agruparVendasPorDiaDoMes(vendas), [vendas]);
@@ -1960,15 +1968,29 @@ export default function AdminDashboard() {
             <ServiceTilesRow items={resumoFinanceiro.servicosMaisVendidos} total={resumoFinanceiro.totalServicosRealizados} />
 
             <section className="finance-dashboard-grid" aria-label="Resumo financeiro">
-              <MetricCard helper="receita no periodo" label="Faturamento" value={formatarMoeda(resumoFinanceiro.totalReceita)} />
+              <MetricCard
+                helper={`${vendasFiltradas.length} ${vendasFiltradas.length === 1 ? "atendimento" : "atendimentos"}`}
+                label="Faturamento"
+                value={formatarMoeda(resumoFinanceiro.totalReceita)}
+              />
               <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
               {resumoFinanceiro.taxaOcupacao !== null && (
                 <MetricCard helper="agendamentos vs. horarios disponiveis" label="Taxa de ocupacao" value={`${resumoFinanceiro.taxaOcupacao}%`} />
               )}
               <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
               <MetricCard helper="clientes atendidos no periodo" label="Clientes unicos" value={resumoFinanceiro.clientesUnicos} />
+              {resumoFinanceiro.atendimentosPorCliente > 0 && (
+                <MetricCard helper="media de vendas por cliente" label="Atendimentos/cliente" value={resumoFinanceiro.atendimentosPorCliente.toFixed(2)} />
+              )}
+              {resumoFinanceiro.receitaPorHora > 0 && (
+                <MetricCard helper="receita por hora trabalhada" label="Receita por hora" value={formatarMoeda(resumoFinanceiro.receitaPorHora)} />
+              )}
+              {resumoFinanceiro.topServico && (
+                <MetricCard helper={`${resumoFinanceiro.topServico.percentual}% dos atendimentos`} label="Top servico" value={resumoFinanceiro.topServico.nome} />
+              )}
               <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
               <PaymentChart items={resumoFinanceiro.formasPagamento} total={resumoFinanceiro.totalReceita} />
+              {resumoFinanceiro.distribuicaoHoras && <HoursDistributionBar dados={resumoFinanceiro.distribuicaoHoras} />}
             </section>
 
             <section className="finance-card-grid">
@@ -3013,6 +3035,34 @@ function ServiceTilesRow({ items, total }: { items: RankingItem[]; total: number
   );
 }
 
+function HoursDistributionBar({
+  dados,
+}: {
+  dados: { fechadoHoras: number; ociosoHoras: number; totalHoras: number; trabalhadasHoras: number };
+}) {
+  const total = dados.totalHoras || 1;
+  const formatarHoras = (valor: number) => `${Math.round(valor)} hrs`;
+
+  return (
+    <article className="finance-chart-card hours-distribution">
+      <div>
+        <span>Distribuicao de horas</span>
+        <strong>{formatarHoras(dados.totalHoras)} disponiveis</strong>
+      </div>
+      <div className="hours-distribution-track">
+        <span className="hours-segment trabalhadas" style={{ width: `${(dados.trabalhadasHoras / total) * 100}%` }} />
+        <span className="hours-segment ocioso" style={{ width: `${(dados.ociosoHoras / total) * 100}%` }} />
+        <span className="hours-segment fechado" style={{ width: `${(dados.fechadoHoras / total) * 100}%` }} />
+      </div>
+      <div className="hours-distribution-legend">
+        <span><em className="dot trabalhadas" />Trabalhadas · {formatarHoras(dados.trabalhadasHoras)}</span>
+        <span><em className="dot ocioso" />Ocioso · {formatarHoras(dados.ociosoHoras)}</span>
+        <span><em className="dot fechado" />Fechada · {formatarHoras(dados.fechadoHoras)}</span>
+      </div>
+    </article>
+  );
+}
+
 function PaymentChart({ items, total }: { items: PaymentItem[]; total: number }) {
   const maiorValor = Math.max(...items.map((item) => item.valor), 1);
 
@@ -3351,12 +3401,30 @@ function filtrarAgendamentosPorPeriodo(agendamentos: Agendamento[], periodo: Per
   return agendamentos.filter((agendamento) => new Date(agendamento.data_agendamento) >= inicio);
 }
 
+function contarDiasAbertosNoPeriodo(periodo: PeriodoFinanceiro, diasAtendimento?: number[] | null) {
+  const totalDias = contarDiasDoPeriodo(periodo);
+  if (!totalDias) return null;
+
+  const diasSet = new Set(diasAtendimento?.length ? diasAtendimento : DIAS_ATENDIMENTO_PADRAO);
+  const hoje = new Date();
+  let abertos = 0;
+
+  for (let i = 0; i < totalDias; i++) {
+    const data = new Date(hoje);
+    data.setDate(data.getDate() - i);
+    if (diasSet.has(data.getDay())) abertos++;
+  }
+
+  return abertos;
+}
+
 function calcularResumoFinanceiro(
   vendas: Venda[],
   agendamentos: Agendamento[],
   produtos: Produto[],
   periodo: PeriodoFinanceiro,
   horariosAtendimento?: string[] | null,
+  diasAtendimento?: number[] | null,
 ) {
   const produtoTotais = new Map<string, number>();
   const servicoTotais = new Map<string, number>();
@@ -3418,16 +3486,50 @@ function calcularResumoFinanceiro(
       ? Math.round((agendamentosAtivosNoPeriodo.length / (diasNoPeriodo * slotsPorDia)) * 100)
       : null;
 
+  const { inicio: aberturaMin, fim: fechamentoMin } = calcularJanelaHorario(horariosAtendimento);
+  const minutosPorDiaAberto = fechamentoMin - aberturaMin;
+  const diasAbertosNoPeriodo = contarDiasAbertosNoPeriodo(periodo, diasAtendimento);
+  const minutosTrabalhados = agendamentosAtivosNoPeriodo.reduce((total, agendamento) => {
+    const servico = firstRelation(agendamento.servicos);
+    return total + (servico?.duracao && servico.duracao > 0 ? servico.duracao : AGENDA_DURACAO_PADRAO_MIN);
+  }, 0);
+  const distribuicaoHoras =
+    diasNoPeriodo && diasAbertosNoPeriodo !== null
+      ? (() => {
+          const minutosDisponiveis = diasAbertosNoPeriodo * minutosPorDiaAberto;
+          const minutosOciosos = Math.max(0, minutosDisponiveis - minutosTrabalhados);
+          const minutosFechado = Math.max(0, diasNoPeriodo * 24 * 60 - minutosDisponiveis);
+          return {
+            fechadoHoras: minutosFechado / 60,
+            ociosoHoras: minutosOciosos / 60,
+            totalHoras: (minutosDisponiveis + minutosFechado) / 60,
+            trabalhadasHoras: minutosTrabalhados / 60,
+          };
+        })()
+      : null;
+
+  const atendimentosPorCliente = clientesUnicosSet.size > 0 ? vendas.length / clientesUnicosSet.size : 0;
+  const receitaPorHora = minutosTrabalhados > 0 ? totalReceita / (minutosTrabalhados / 60) : 0;
+  const rankingServicos = ordenarRanking(servicoTotais);
+  const topServico =
+    rankingServicos.length > 0 && totalServicosRealizados > 0
+      ? { nome: rankingServicos[0].nome, percentual: Math.round((rankingServicos[0].total / totalServicosRealizados) * 100) }
+      : null;
+
   return {
+    atendimentosPorCliente,
     clientesUnicos: clientesUnicosSet.size,
+    distribuicaoHoras,
     estoqueBaixo: produtos.filter((produto) => (produto.estoque || 0) <= 2),
     formasPagamento: Array.from(formaTotais.entries())
       .map(([nome, dados]) => ({ nome, total: dados.total, valor: dados.valor }))
       .sort((a, b) => b.valor - a.valor),
     produtosMaisVendidos: ordenarRanking(produtoTotais),
     produtosSemGiro: produtos.filter((produto) => !produtosComGiro.has(produto.id)),
-    servicosMaisVendidos: ordenarRanking(servicoTotais),
+    receitaPorHora,
+    servicosMaisVendidos: rankingServicos,
     taxaOcupacao,
+    topServico,
     totalServicosRealizados,
     ticketMedio: vendas.length > 0 ? totalReceita / vendas.length : 0,
     totalReceita,

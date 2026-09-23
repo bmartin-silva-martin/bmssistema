@@ -1981,6 +1981,66 @@ th {
   gap: 1rem;
 }
 
+.hours-distribution-track {
+  background: rgb(255 255 255 / 0.06);
+  border-radius: 999px;
+  display: flex;
+  height: 0.9rem;
+  overflow: hidden;
+  width: 100%;
+}
+
+.hours-segment {
+  display: block;
+  height: 100%;
+}
+
+.hours-segment.trabalhadas {
+  background: #4ade80;
+}
+
+.hours-segment.ocioso {
+  background: linear-gradient(90deg, var(--brand-btn-start), var(--brand-btn-end));
+}
+
+.hours-segment.fechado {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.hours-distribution-legend {
+  color: #aab2bf;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  font-weight: 700;
+  gap: 0.9rem;
+}
+
+.hours-distribution-legend span {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.hours-distribution-legend .dot {
+  border-radius: 50%;
+  display: inline-block;
+  height: 0.55rem;
+  width: 0.55rem;
+}
+
+.hours-distribution-legend .dot.trabalhadas {
+  background: #4ade80;
+}
+
+.hours-distribution-legend .dot.ocioso {
+  background: var(--brand-start);
+}
+
+.hours-distribution-legend .dot.fechado {
+  background: rgb(255 255 255 / 0.3);
+}
+
 .service-tiles-bars {
   display: flex;
   gap: 0.65rem;
