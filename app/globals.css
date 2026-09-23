@@ -3861,6 +3861,103 @@ th {
   padding: 0.8rem 1rem;
 }
 
+.empresa-summary-card {
+  align-items: center;
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.02));
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 24px;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem;
+}
+
+.empresa-summary-card span:first-child {
+  color: #aab2bf;
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.empresa-summary-card h3 {
+  color: #ffffff;
+  font-size: 1.3rem;
+  margin: 0.2rem 0 0.2rem;
+}
+
+.empresa-summary-card p {
+  color: #8f98a8;
+  margin: 0;
+}
+
+.empresa-summary-badge {
+  background: rgb(255 112 74 / 0.16);
+  border-radius: 999px;
+  color: #ffad98;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.5rem 0.85rem;
+  white-space: nowrap;
+}
+
+.settings-hub-list {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.settings-hub-list h2 {
+  color: #c8cdd5;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+}
+
+.settings-hub-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+  color: #e7eaf0;
+  cursor: pointer;
+  display: flex;
+  gap: 0.85rem;
+  min-height: 3.6rem;
+  padding: 0.85rem 0.1rem;
+  text-align: left;
+  width: 100%;
+}
+
+.settings-hub-row:first-of-type {
+  border-top: 0;
+}
+
+.settings-hub-row-icon {
+  align-items: center;
+  background: rgb(255 255 255 / 0.06);
+  border-radius: 10px;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 1rem;
+  height: 2.2rem;
+  justify-content: center;
+  width: 2.2rem;
+}
+
+.settings-hub-row-label {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.settings-hub-row-chevron {
+  color: #7f8998;
+  font-size: 1.3rem;
+}
+
 .schedule-settings > div p {
   color: #aeb6c4;
   margin: 0.35rem 0 0;

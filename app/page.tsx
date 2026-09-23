@@ -2106,6 +2106,17 @@ export default function AdminDashboard() {
             title="Configuracoes"
           >
             <article className="admin-panel schedule-settings">
+              <section className="empresa-summary-card">
+                <div>
+                  <span>Minha empresa</span>
+                  <h3>{empresa?.nome || "Sua barbearia"}</h3>
+                  <p>{empresa?.plano ? `Plano ${empresa.plano}` : "Sem plano definido"}</p>
+                </div>
+                {diasRestantesLicenca(empresa) !== null && (
+                  <span className="empresa-summary-badge">{diasRestantesLicenca(empresa)}d de licenca</span>
+                )}
+              </section>
+
               <section className="owner-profile-card">
                 <div>
                   <span>Perfil do dono</span>
@@ -2167,6 +2178,16 @@ export default function AdminDashboard() {
               <button className="admin-pill-button primary wide" disabled={salvandoConfiguracao} onClick={salvarConfiguracaoAgenda} type="button">
                 {salvandoConfiguracao ? "Salvando..." : "Salvar configuracoes"}
               </button>
+            </article>
+
+            <article className="admin-panel settings-hub-list">
+              <h2>Configuracoes adicionais</h2>
+              <SettingsHubRow icon="✂" label="Servicos" onClick={() => abrirSecao("servicos")} />
+              <SettingsHubRow icon="▣" label="Produtos" onClick={() => abrirSecao("produtos")} />
+              <SettingsHubRow icon="♡" label="Clientes" onClick={() => abrirSecao("clientes")} />
+              <SettingsHubRow icon="$" label="Financeiro" onClick={() => abrirSecao("financeiro")} />
+              <SettingsHubRow icon="✦" label="Inteligencia" onClick={() => abrirSecao("inteligencia")} />
+              <SettingsHubRow icon="⌂" label="Meu link do cliente" onClick={() => abrirSecao("visao")} />
             </article>
           </AdminSectionShell>
         )}
@@ -2297,6 +2318,16 @@ export default function AdminDashboard() {
         />
       )}
     </main>
+  );
+}
+
+function SettingsHubRow({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button className="settings-hub-row" onClick={onClick} type="button">
+      <span className="settings-hub-row-icon" aria-hidden="true">{icon}</span>
+      <span className="settings-hub-row-label">{label}</span>
+      <span className="settings-hub-row-chevron" aria-hidden="true">›</span>
+    </button>
   );
 }
 
