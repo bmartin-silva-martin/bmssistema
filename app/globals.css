@@ -1988,6 +1988,27 @@ th {
   height: 9rem;
   overflow-x: auto;
   padding-bottom: 0.2rem;
+  scrollbar-width: none;
+}
+
+.revenue-bar-chart-bars::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-hint {
+  align-items: center;
+  color: #7f8998;
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  gap: 0.3rem;
+  justify-content: center;
+  margin: 0;
+}
+
+.revenue-bar-chart .scroll-hint span {
+  color: var(--brand-start);
+  font-size: 0.9rem;
 }
 
 .revenue-bar-chart-col {
@@ -2734,9 +2755,12 @@ th {
 
   .admin-metrics-grid,
   .admin-two-columns,
-  .finance-dashboard-grid,
   .finance-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .finance-dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .payment-bar-row {

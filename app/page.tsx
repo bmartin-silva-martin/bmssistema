@@ -2970,6 +2970,11 @@ function RevenueBarChart({ dias }: { dias: { dia: number; valor: number }[] }) {
           </div>
         ))}
       </div>
+      {diasComMovimento.length > 9 && (
+        <p className="scroll-hint">
+          Arraste para o lado para ver mais <span aria-hidden="true">→</span>
+        </p>
+      )}
     </article>
   );
 }
