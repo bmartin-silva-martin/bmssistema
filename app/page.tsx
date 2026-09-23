@@ -1824,11 +1824,11 @@ export default function AdminDashboard() {
           <AddFormSheet onClose={() => setAddServicoOpen(false)} title="Novo servico">
             <form className="form-stack add-sheet-form" onSubmit={cadastrarServico}>
               <div className="form-row-foto-nome">
-                <label className="servico-foto-picker">
+                <label className="item-foto-picker">
                   Foto
                   <input
                     accept="image/*"
-                    className="servico-foto-input"
+                    className="item-foto-input"
                     onChange={async (event) => {
                       const file = event.target.files?.[0];
                       if (file) {
@@ -1901,34 +1901,59 @@ export default function AdminDashboard() {
         {addProdutoOpen && (
           <AddFormSheet onClose={() => setAddProdutoOpen(false)} title="Novo produto">
             <form className="form-stack add-sheet-form" onSubmit={cadastrarProduto}>
-              <label>
-                Nome
-                <input
-                  onChange={(event) => setProdutoForm((form) => ({ ...form, nome: event.target.value }))}
-                  placeholder="Ex: Pomada"
-                  value={produtoForm.nome}
-                />
-              </label>
-              <label>
-                Preco de venda
-                <input
-                  inputMode="decimal"
-                  onChange={(event) => setProdutoForm((form) => ({ ...form, preco: event.target.value }))}
-                  placeholder="R$ 0,00"
-                  type="number"
-                  value={produtoForm.preco}
-                />
-              </label>
-              <label>
-                Preco de custo
-                <input
-                  inputMode="decimal"
-                  onChange={(event) => setProdutoForm((form) => ({ ...form, custo: event.target.value }))}
-                  placeholder="R$ 0,00"
-                  type="number"
-                  value={produtoForm.custo}
-                />
-              </label>
+              <div className="form-row-foto-nome">
+                <label className="item-foto-picker">
+                  Foto
+                  <input
+                    accept="image/*"
+                    className="item-foto-input"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        const dataUrl = await redimensionarFoto(file);
+                        setProdutoForm((form) => ({ ...form, foto_url: dataUrl }));
+                      }
+                    }}
+                    type="file"
+                  />
+                  {produtoForm.foto_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt="" src={produtoForm.foto_url} />
+                  ) : (
+                    <span aria-hidden="true">📷</span>
+                  )}
+                </label>
+                <label>
+                  Nome do produto
+                  <input
+                    onChange={(event) => setProdutoForm((form) => ({ ...form, nome: event.target.value }))}
+                    placeholder="Ex: Pomada"
+                    value={produtoForm.nome}
+                  />
+                </label>
+              </div>
+              <div className="form-row-2">
+                <label>
+                  Preco de venda
+                  <input
+                    inputMode="decimal"
+                    onChange={(event) => setProdutoForm((form) => ({ ...form, preco: event.target.value }))}
+                    placeholder="R$ 0,00"
+                    type="number"
+                    value={produtoForm.preco}
+                  />
+                </label>
+                <label>
+                  Preco de custo
+                  <input
+                    inputMode="decimal"
+                    onChange={(event) => setProdutoForm((form) => ({ ...form, custo: event.target.value }))}
+                    placeholder="R$ 0,00"
+                    type="number"
+                    value={produtoForm.custo}
+                  />
+                </label>
+              </div>
               {produtoForm.preco && produtoForm.custo && Number(produtoForm.custo) > 0 && (
                 <p className="produto-lucro-preview">
                   Margem:{" "}
@@ -1938,43 +1963,27 @@ export default function AdminDashboard() {
                   de lucro
                 </p>
               )}
-              <label>
-                Comissao (%)
-                <input
-                  inputMode="decimal"
-                  onChange={(event) => setProdutoForm((form) => ({ ...form, comissao: event.target.value }))}
-                  placeholder="Ex: 20%"
-                  type="number"
-                  value={produtoForm.comissao}
-                />
-              </label>
-              <label>
-                Estoque
-                <input
-                  inputMode="numeric"
-                  onChange={(event) => setProdutoForm((form) => ({ ...form, estoque: event.target.value }))}
-                  type="number"
-                  value={produtoForm.estoque}
-                />
-              </label>
-              <label className="foto-upload-label">
-                Foto do produto
-                <input
-                  accept="image/*"
-                  className="foto-upload-input"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      const dataUrl = await redimensionarFoto(file);
-                      setProdutoForm((form) => ({ ...form, foto_url: dataUrl }));
-                    }
-                  }}
-                  type="file"
-                />
-                {produtoForm.foto_url && (
-                  <img alt="Preview" className="foto-preview-thumb" src={produtoForm.foto_url} />
-                )}
-              </label>
+              <div className="form-row-2">
+                <label>
+                  Estoque
+                  <input
+                    inputMode="numeric"
+                    onChange={(event) => setProdutoForm((form) => ({ ...form, estoque: event.target.value }))}
+                    type="number"
+                    value={produtoForm.estoque}
+                  />
+                </label>
+                <label>
+                  Comissao (%)
+                  <input
+                    inputMode="decimal"
+                    onChange={(event) => setProdutoForm((form) => ({ ...form, comissao: event.target.value }))}
+                    placeholder="Ex: 20%"
+                    type="number"
+                    value={produtoForm.comissao}
+                  />
+                </label>
+              </div>
               <button
                 className="admin-pill-button primary wide"
                 disabled={salvandoProduto}
@@ -3729,11 +3738,11 @@ function EditableServicoList({
               {editando && (
                 <div className="compact-edit-panel">
                   <div className="form-row-foto-nome">
-                    <label className="servico-foto-picker">
+                    <label className="item-foto-picker">
                       Foto
                       <input
                         accept="image/*"
-                        className="servico-foto-input"
+                        className="item-foto-input"
                         onChange={async (event) => {
                           const file = event.target.files?.[0];
                           if (file) {
@@ -3918,96 +3927,105 @@ function EditableProdutoList({
 
               {editando && (
                 <div className="compact-edit-panel">
-                  <label>
-                    Nome
-                    <input
-                      onChange={(event) =>
-                        setProdutos(
-                          produtos.map((item) => (item.id === produto.id ? { ...item, nome: event.target.value } : item)),
-                        )
-                      }
-                      value={produto.nome}
-                    />
-                  </label>
-                  <label>
-                    Preco de venda
-                    <input
-                      onChange={(event) =>
-                        setProdutos(
-                          produtos.map((item) =>
-                            item.id === produto.id ? { ...item, preco: Number(event.target.value) } : item,
-                          ),
-                        )
-                      }
-                      type="number"
-                      value={produto.preco || 0}
-                    />
-                  </label>
-                  <label>
-                    Preco de custo
-                    <input
-                      onChange={(event) =>
-                        setProdutos(
-                          produtos.map((item) =>
-                            item.id === produto.id ? { ...item, preco_custo: Number(event.target.value) || null } : item,
-                          ),
-                        )
-                      }
-                      type="number"
-                      value={produto.preco_custo || 0}
-                    />
-                  </label>
+                  <div className="form-row-foto-nome">
+                    <label className="item-foto-picker">
+                      Foto
+                      <input
+                        accept="image/*"
+                        className="item-foto-input"
+                        onChange={async (event) => {
+                          const file = event.target.files?.[0];
+                          if (file) {
+                            const dataUrl = await redimensionarFoto(file);
+                            setProdutos(produtos.map((item) => (item.id === produto.id ? { ...item, foto_url: dataUrl } : item)));
+                          }
+                        }}
+                        type="file"
+                      />
+                      {produto.foto_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt="" src={produto.foto_url} />
+                      ) : (
+                        <span aria-hidden="true">📷</span>
+                      )}
+                    </label>
+                    <label>
+                      Nome
+                      <input
+                        onChange={(event) =>
+                          setProdutos(
+                            produtos.map((item) => (item.id === produto.id ? { ...item, nome: event.target.value } : item)),
+                          )
+                        }
+                        value={produto.nome}
+                      />
+                    </label>
+                  </div>
+                  <div className="form-row-2">
+                    <label>
+                      Preco de venda
+                      <input
+                        onChange={(event) =>
+                          setProdutos(
+                            produtos.map((item) =>
+                              item.id === produto.id ? { ...item, preco: Number(event.target.value) } : item,
+                            ),
+                          )
+                        }
+                        type="number"
+                        value={produto.preco || 0}
+                      />
+                    </label>
+                    <label>
+                      Preco de custo
+                      <input
+                        onChange={(event) =>
+                          setProdutos(
+                            produtos.map((item) =>
+                              item.id === produto.id ? { ...item, preco_custo: Number(event.target.value) || null } : item,
+                            ),
+                          )
+                        }
+                        type="number"
+                        value={produto.preco_custo || 0}
+                      />
+                    </label>
+                  </div>
                   {produto.preco && produto.preco_custo && produto.preco_custo > 0 && (
                     <p className="produto-lucro-preview">
                       Margem: <strong>{(((produto.preco - produto.preco_custo) / produto.preco_custo) * 100).toFixed(1)}%</strong> de lucro
                     </p>
                   )}
-                  <label>
-                    Estoque
-                    <input
-                      onChange={(event) =>
-                        setProdutos(
-                          produtos.map((item) =>
-                            item.id === produto.id ? { ...item, estoque: Number(event.target.value) } : item,
-                          ),
-                        )
-                      }
-                      type="number"
-                      value={produto.estoque || 0}
-                    />
-                  </label>
-                  <label>
-                    Comissao
-                    <input
-                      onChange={(event) =>
-                        setProdutos(
-                          produtos.map((item) =>
-                            item.id === produto.id ? { ...item, comissao_percentual: Number(event.target.value) } : item,
-                          ),
-                        )
-                      }
-                      type="number"
-                      value={produto.comissao_percentual || 0}
-                    />
-                  </label>
-                  <label className="foto-upload-label">
-                    Foto do produto
-                    <input
-                      accept="image/*"
-                      className="foto-upload-input"
-                      onChange={async (event) => {
-                        const file = event.target.files?.[0];
-                        if (file) {
-                          const dataUrl = await redimensionarFoto(file);
-                          setProdutos(produtos.map((item) => (item.id === produto.id ? { ...item, foto_url: dataUrl } : item)));
+                  <div className="form-row-2">
+                    <label>
+                      Estoque
+                      <input
+                        onChange={(event) =>
+                          setProdutos(
+                            produtos.map((item) =>
+                              item.id === produto.id ? { ...item, estoque: Number(event.target.value) } : item,
+                            ),
+                          )
                         }
-                      }}
-                      type="file"
-                    />
-                    {produto.foto_url && (
-                      <img alt="Preview" className="foto-preview-thumb" src={produto.foto_url} />
-                    )}
-                  </label>
+                        type="number"
+                        value={produto.estoque || 0}
+                      />
+                    </label>
+                    <label>
+                      Comissao
+                      <input
+                        onChange={(event) =>
+                          setProdutos(
+                            produtos.map((item) =>
+                              item.id === produto.id ? { ...item, comissao_percentual: Number(event.target.value) } : item,
+                            ),
+                          )
+                        }
+                        type="number"
+                        value={produto.comissao_percentual || 0}
+                      />
+                    </label>
+                  </div>
                   <button className="admin-pill-button primary" onClick={async () => { await onSave(produto); setEditandoId(null); }} type="button">
                     Salvar produto
                   </button>
