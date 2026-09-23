@@ -3531,8 +3531,54 @@ th {
 .compact-edit-panel label:last-of-type,
 .compact-edit-panel .admin-pill-button,
 .compact-edit-panel .produto-lucro-preview,
-.compact-edit-panel .foto-upload-label {
+.compact-edit-panel .foto-upload-label,
+.compact-edit-panel .precos-por-dia {
   grid-column: 1 / -1;
+}
+
+.precos-por-dia {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 14px;
+  padding: 0.75rem 0.9rem;
+}
+
+.precos-por-dia summary {
+  color: #ffb199;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.precos-por-dia-hint {
+  color: #8f98a8;
+  font-size: 0.78rem;
+  margin: 0.6rem 0;
+}
+
+.precos-por-dia-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.precos-por-dia-grid label {
+  color: #c8cdd5;
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 800;
+  gap: 0.3rem;
+  letter-spacing: 0.03em;
+}
+
+.precos-por-dia-grid input {
+  background: #242832;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 12px;
+  color: #ffffff;
+  min-height: 2.9rem;
+  padding: 0.5rem 0.7rem;
 }
 
 .compact-edit-panel input {

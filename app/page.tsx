@@ -36,6 +36,7 @@ type Servico = {
   nome: string;
   preco: number;
   duracao: number | null;
+  precos_por_dia?: Record<string, number> | null;
 };
 
 type Produto = {
@@ -59,6 +60,7 @@ type ServicoResumo = {
   duracao?: number | null;
   nome: string;
   preco: number | null;
+  precos_por_dia?: Record<string, number> | null;
 };
 
 type Profissional = {
@@ -134,6 +136,15 @@ type DiaPainel = {
 };
 
 const diasCurtos = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+const DIAS_SEMANA_COMPLETOS = [
+  "Domingo",
+  "Segunda-feira",
+  "Terca-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sabado",
+];
 const mesesCurtos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const DIAS_ATENDIMENTO_PADRAO = [1, 2, 3, 4, 5, 6];
 const DONO_STORAGE_KEY = "bms_nome_dono";
@@ -483,7 +494,7 @@ export default function AdminDashboard() {
     if (!atendimentoAberto) return 0;
 
     const servico = firstRelation(atendimentoAberto.servicos);
-    const totalServico = servico?.preco || 0;
+    const totalServico = obterPrecoServicoNoDia(servico, atendimentoAberto.data_agendamento);
     const totalProdutos = produtos.reduce((total, produto) => {
       const quantidade = Number(itensVenda[produto.id] || 0);
       return total + quantidade * (produto.preco || 0);
@@ -545,11 +556,11 @@ export default function AdminDashboard() {
       perfilResponse,
       profissionaisResponse,
     ] = await Promise.all([
-      supabase.from("servicos").select("id,nome,preco,duracao").eq("empresa_id", empresaId).order("nome"),
+      supabase.from("servicos").select("id,nome,preco,duracao,precos_por_dia").eq("empresa_id", empresaId).order("nome"),
       supabase
         .from("agendamentos")
         .select(
-          "id,cliente_id,servico_id,profissional_id,data_agendamento,status,lembrete_enviado_em,lembrete_status,clientes(id,nome,telefone,data_nascimento),servicos(nome,preco,duracao),profissionais(id,nome,foto_url)",
+          "id,cliente_id,servico_id,profissional_id,data_agendamento,status,lembrete_enviado_em,lembrete_status,clientes(id,nome,telefone,data_nascimento),servicos(nome,preco,duracao,precos_por_dia),profissionais(id,nome,foto_url)",
         )
         .eq("empresa_id", empresaId)
         .neq("status", "cancelado")
@@ -796,6 +807,7 @@ export default function AdminDashboard() {
         duracao: servico.duracao || 30,
         nome: servico.nome,
         preco: servico.preco,
+        precos_por_dia: servico.precos_por_dia && Object.keys(servico.precos_por_dia).length > 0 ? servico.precos_por_dia : null,
       })
       .eq("id", servico.id)
       .eq("empresa_id", empresaIdAtual);
@@ -2816,7 +2828,11 @@ function AgendaTimeline({
               </div>
               <div className="agenda-grid-card-service-row">
                 <span className="agenda-grid-card-service">{servico?.nome || "Servico"}</span>
-                {servico?.preco != null && <span className="agenda-grid-card-price">{formatarMoeda(servico.preco)}</span>}
+                {servico?.preco != null && (
+                  <span className="agenda-grid-card-price">
+                    {formatarMoeda(obterPrecoServicoNoDia(servico, agendamento.data_agendamento))}
+                  </span>
+                )}
               </div>
               <span className="agenda-grid-card-professional">{profissional?.nome || "Sem profissional"}</span>
               <div className="agenda-grid-card-actions">
@@ -3337,7 +3353,7 @@ function SaleModal({
           <div className="sale-modal-chips">
             <span className="sale-modal-chip">
               {servico?.nome || "Servico"}
-              <em>{formatarMoeda(servico?.preco || 0)}</em>
+              <em>{formatarMoeda(obterPrecoServicoNoDia(servico, agendamento.data_agendamento))}</em>
             </span>
           </div>
         </div>
@@ -3422,6 +3438,14 @@ function formatarTelefone(telefone: string | null) {
 
 function formatarMoeda(valor: number) {
   return new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" }).format(valor);
+}
+
+function obterPrecoServicoNoDia(servico: ServicoResumo | Servico | null | undefined, dataIso: string) {
+  const precoBase = servico?.preco || 0;
+  if (!servico?.precos_por_dia) return precoBase;
+  const dia = new Date(dataIso).getDay();
+  const override = servico.precos_por_dia[String(dia)];
+  return typeof override === "number" && override > 0 ? override : precoBase;
 }
 
 function agruparVendasPorDiaDoMes(vendas: Venda[]) {
@@ -3707,6 +3731,40 @@ function EditableServicoList({
                       value={servico.duracao || 30}
                     />
                   </label>
+                  <details className="precos-por-dia">
+                    <summary>Modo avancado de valores</summary>
+                    <p className="precos-por-dia-hint">
+                      Defina um preco diferente para dias especificos. Deixe em branco para usar o preco base ({formatarMoeda(servico.preco || 0)}).
+                    </p>
+                    <div className="precos-por-dia-grid">
+                      {DIAS_SEMANA_COMPLETOS.map((label, index) => (
+                        <label key={label}>
+                          {label}
+                          <input
+                            inputMode="decimal"
+                            onChange={(event) => {
+                              const valor = event.target.value;
+                              setServicos(
+                                servicos.map((item) => {
+                                  if (item.id !== servico.id) return item;
+                                  const atual = { ...(item.precos_por_dia || {}) };
+                                  if (valor) {
+                                    atual[String(index)] = Number(valor);
+                                  } else {
+                                    delete atual[String(index)];
+                                  }
+                                  return { ...item, precos_por_dia: atual };
+                                }),
+                              );
+                            }}
+                            placeholder="R$ 0,00"
+                            type="number"
+                            value={servico.precos_por_dia?.[String(index)] ?? ""}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </details>
                   <button className="admin-pill-button primary" onClick={async () => { await onSave(servico); setEditandoId(null); }} type="button">
                     Salvar servico
                   </button>
