@@ -4949,8 +4949,7 @@ th {
 .agenda-new-button { min-height: 2.7rem; padding: .55rem .8rem; }
 .agenda-lock-button { height: 2.55rem; width: 2.55rem; }
 @media (max-width: 380px) {
-  .agenda-summary-grid { grid-template-columns: 1fr; }
-  .agenda-summary-grid article { min-height: 5.5rem; }
+  .agenda-summary-grid article { min-height: 5.5rem; padding: .65rem; }
   .reminder-header { align-items: flex-start; flex-direction: column; }
   .reminder-header .admin-pill-button { width: 100%; }
 }
