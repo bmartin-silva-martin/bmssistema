@@ -138,13 +138,13 @@ type DiaPainel = {
 
 const diasCurtos = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const DIAS_SEMANA_COMPLETOS = [
-  "Domingo",
-  "Segunda-feira",
-  "Terca-feira",
-  "Quarta-feira",
-  "Quinta-feira",
-  "Sexta-feira",
-  "Sabado",
+  { label: "Segunda-feira", dow: 1 },
+  { label: "Terca-feira", dow: 2 },
+  { label: "Quarta-feira", dow: 3 },
+  { label: "Quinta-feira", dow: 4 },
+  { label: "Sexta-feira", dow: 5 },
+  { label: "Sabado", dow: 6 },
+  { label: "Domingo", dow: 0 },
 ];
 const mesesCurtos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const DIAS_ATENDIMENTO_PADRAO = [1, 2, 3, 4, 5, 6];
@@ -3807,7 +3807,7 @@ function EditableServicoList({
                       Defina um preco diferente para dias especificos. Deixe em branco para usar o preco base ({formatarMoeda(servico.preco || 0)}).
                     </p>
                     <div className="precos-por-dia-grid">
-                      {DIAS_SEMANA_COMPLETOS.map((label, index) => (
+                      {DIAS_SEMANA_COMPLETOS.map(({ label, dow }) => (
                         <label key={label}>
                           {label}
                           <input
@@ -3819,9 +3819,9 @@ function EditableServicoList({
                                   if (item.id !== servico.id) return item;
                                   const atual = { ...(item.precos_por_dia || {}) };
                                   if (valor) {
-                                    atual[String(index)] = Number(valor);
+                                    atual[String(dow)] = Number(valor);
                                   } else {
-                                    delete atual[String(index)];
+                                    delete atual[String(dow)];
                                   }
                                   return { ...item, precos_por_dia: atual };
                                 }),
@@ -3829,7 +3829,7 @@ function EditableServicoList({
                             }}
                             placeholder="R$ 0,00"
                             type="number"
-                            value={servico.precos_por_dia?.[String(index)] ?? ""}
+                            value={servico.precos_por_dia?.[String(dow)] ?? ""}
                           />
                         </label>
                       ))}

@@ -3578,7 +3578,7 @@ th {
   padding: 0.5rem 0.7rem;
 }
 
-.compact-edit-panel .precos-por-dia-grid label:last-of-type {
+.compact-edit-panel .precos-por-dia-grid label:first-child {
   grid-column: auto;
 }
 
