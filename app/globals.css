@@ -3511,6 +3511,8 @@ th {
   border-top: 1px solid rgb(255 255 255 / 0.08);
   margin-top: 0.25rem;
   padding-top: 0.65rem;
+  max-width: 24rem;
+  margin-inline: auto;
 }
 
 .compact-edit-panel label {
@@ -4667,6 +4669,9 @@ th {
 .add-sheet-form {
   display: grid;
   gap: 0.65rem;
+  max-width: 24rem;
+  margin-inline: auto;
+  width: 100%;
 }
 
 .add-sheet-form label {
