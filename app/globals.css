@@ -1981,6 +1981,51 @@ th {
   gap: 1rem;
 }
 
+.revenue-bar-chart-bars {
+  align-items: flex-end;
+  display: flex;
+  gap: 0.5rem;
+  height: 9rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.revenue-bar-chart-col {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 1.6rem;
+}
+
+.revenue-bar-chart-track {
+  align-items: flex-end;
+  background: rgb(255 255 255 / 0.06);
+  border-radius: 999px;
+  display: flex;
+  height: 7rem;
+  overflow: hidden;
+  width: 0.55rem;
+}
+
+.revenue-bar-chart-fill {
+  background: linear-gradient(180deg, var(--brand-btn-end), var(--brand-btn-start));
+  border-radius: 999px;
+  display: block;
+  width: 100%;
+}
+
+.revenue-bar-chart-fill.empty {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.revenue-bar-chart-col small {
+  color: #7f8998;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
 .finance-chart-card span,
 .finance-card-header span {
   color: #aab2bf;

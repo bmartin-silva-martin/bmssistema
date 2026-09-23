@@ -469,6 +469,7 @@ export default function AdminDashboard() {
     () => calcularResumoFinanceiro(vendasFiltradas, agendamentos, produtos),
     [agendamentos, produtos, vendasFiltradas],
   );
+  const faturamentoPorDia = useMemo(() => agruparVendasPorDiaDoMes(vendas), [vendas]);
 
   const totalAtendimentoAberto = useMemo(() => {
     if (!atendimentoAberto) return 0;
@@ -1954,6 +1955,8 @@ export default function AdminDashboard() {
               </button>
             </div>
 
+            <RevenueBarChart dias={faturamentoPorDia} />
+
             <section className="finance-dashboard-grid" aria-label="Resumo financeiro">
               <MetricCard helper="receita no periodo" label="Faturamento" value={formatarMoeda(resumoFinanceiro.totalReceita)} />
               <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
@@ -2944,6 +2947,33 @@ function AppointmentList({
   );
 }
 
+function RevenueBarChart({ dias }: { dias: { dia: number; valor: number }[] }) {
+  const hojeDia = new Date().getDate();
+  const diasComMovimento = dias.filter((item) => item.dia <= hojeDia);
+  const maiorValor = Math.max(...diasComMovimento.map((item) => item.valor), 1);
+
+  return (
+    <article className="finance-chart-card revenue-bar-chart">
+      <div>
+        <span>Faturamento por dia (mes atual)</span>
+      </div>
+      <div className="revenue-bar-chart-bars">
+        {diasComMovimento.map((item) => (
+          <div className="revenue-bar-chart-col" key={item.dia}>
+            <div className="revenue-bar-chart-track">
+              <span
+                className={item.valor > 0 ? "revenue-bar-chart-fill" : "revenue-bar-chart-fill empty"}
+                style={{ height: `${Math.max(item.valor > 0 ? 6 : 2, (item.valor / maiorValor) * 100)}%` }}
+              />
+            </div>
+            <small>{String(item.dia).padStart(2, "0")}</small>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function PaymentChart({ items, total }: { items: PaymentItem[]; total: number }) {
   const maiorValor = Math.max(...items.map((item) => item.valor), 1);
 
@@ -3231,6 +3261,23 @@ function formatarTelefone(telefone: string | null) {
 
 function formatarMoeda(valor: number) {
   return new Intl.NumberFormat("pt-BR", { currency: "BRL", style: "currency" }).format(valor);
+}
+
+function agruparVendasPorDiaDoMes(vendas: Venda[]) {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = agora.getMonth();
+  const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+  const totaisPorDia = new Array(ultimoDia).fill(0);
+
+  vendas.forEach((venda) => {
+    const data = new Date(venda.created_at);
+    if (data.getFullYear() === ano && data.getMonth() === mes) {
+      totaisPorDia[data.getDate() - 1] += venda.total || 0;
+    }
+  });
+
+  return totaisPorDia.map((valor, index) => ({ dia: index + 1, valor }));
 }
 
 function filtrarVendasPorPeriodo(vendas: Venda[], periodo: PeriodoFinanceiro) {
