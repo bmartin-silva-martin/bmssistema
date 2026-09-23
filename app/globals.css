@@ -1705,6 +1705,17 @@ th {
   color: #aab2bf;
 }
 
+.finance-dashboard-grid .admin-metric-card.accent {
+  background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
+  border-color: transparent;
+}
+
+.admin-metric-card.accent span,
+.admin-metric-card.accent p,
+.admin-metric-card.accent strong {
+  color: #ffffff;
+}
+
 .admin-two-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2013,6 +2024,20 @@ th {
   min-width: 6rem;
   font-size: 0.95rem;
   text-align: right;
+}
+
+.payment-bar-row > span {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.payment-bar-percent {
+  color: var(--brand-start);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .finance-card-grid {

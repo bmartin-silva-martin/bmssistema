@@ -1956,7 +1956,9 @@ export default function AdminDashboard() {
 
             <section className="finance-dashboard-grid" aria-label="Resumo financeiro">
               <MetricCard helper="receita no periodo" label="Faturamento" value={formatarMoeda(resumoFinanceiro.totalReceita)} />
+              <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
               <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
+              <MetricCard helper="clientes atendidos no periodo" label="Clientes unicos" value={resumoFinanceiro.clientesUnicos} />
               <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
               <PaymentChart items={resumoFinanceiro.formasPagamento} total={resumoFinanceiro.totalReceita} />
             </section>
@@ -2844,9 +2846,19 @@ function TodayReminderPanel({
   );
 }
 
-function MetricCard({ helper, label, value }: { helper: string; label: string; value: number | string }) {
+function MetricCard({
+  accent,
+  helper,
+  label,
+  value,
+}: {
+  accent?: boolean;
+  helper: string;
+  label: string;
+  value: number | string;
+}) {
   return (
-    <article className="metric-card admin-metric-card">
+    <article className={`metric-card admin-metric-card${accent ? " accent" : ""}`}>
       <span>{label}</span>
       <strong>{value}</strong>
       <p>{helper}</p>
@@ -2948,7 +2960,10 @@ function PaymentChart({ items, total }: { items: PaymentItem[]; total: number })
         <div className="payment-bars">
           {items.map((item) => (
             <div className="payment-bar-row" key={item.nome}>
-              <span>{item.nome}</span>
+              <span>
+                {item.nome}
+                <em className="payment-bar-percent">{total > 0 ? Math.round((item.valor / total) * 100) : 0}%</em>
+              </span>
               <div>
                 <em style={{ width: `${Math.max(8, (item.valor / maiorValor) * 100)}%` }} />
               </div>
@@ -3269,7 +3284,20 @@ function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], 
       });
   }
 
+  const clientePorAgendamento = new Map<number, number>();
+  agendamentos.forEach((agendamento) => {
+    if (agendamento.cliente_id) clientePorAgendamento.set(agendamento.id, agendamento.cliente_id);
+  });
+  const clientesUnicosSet = new Set<number>();
+  vendas.forEach((venda) => {
+    const clienteId = venda.agendamento_id ? clientePorAgendamento.get(venda.agendamento_id) : undefined;
+    if (clienteId) clientesUnicosSet.add(clienteId);
+  });
+
+  const totalReceita = vendas.reduce((total, venda) => total + (venda.total || 0), 0);
+
   return {
+    clientesUnicos: clientesUnicosSet.size,
     estoqueBaixo: produtos.filter((produto) => (produto.estoque || 0) <= 2),
     formasPagamento: Array.from(formaTotais.entries())
       .map(([nome, dados]) => ({ nome, total: dados.total, valor: dados.valor }))
@@ -3277,7 +3305,8 @@ function calcularResumoFinanceiro(vendas: Venda[], agendamentos: Agendamento[], 
     produtosMaisVendidos: ordenarRanking(produtoTotais),
     produtosSemGiro: produtos.filter((produto) => !produtosComGiro.has(produto.id)),
     servicosMaisVendidos: ordenarRanking(servicoTotais),
-    totalReceita: vendas.reduce((total, venda) => total + (venda.total || 0), 0),
+    ticketMedio: vendas.length > 0 ? totalReceita / vendas.length : 0,
+    totalReceita,
   };
 }
 
