@@ -2691,6 +2691,8 @@ function AgendaHero({
   const [valoresOcultos, setValoresOcultos] = useState(false);
   const nomeExibido = nomeDono || empresa?.nome || "barbeiro";
   const exibirValor = (valor: number) => (valoresOcultos ? "R$ ••••" : formatarMoeda(valor));
+  const diasAbertos = new Set(empresa?.dias_atendimento?.length ? empresa.dias_atendimento : DIAS_ATENDIMENTO_PADRAO);
+  const diaEstaAberto = (iso: string) => diasAbertos.has(new Date(`${iso}T00:00:00`).getDay());
 
   return (
     <section className="agenda-hero agenda-app-header">
@@ -2752,7 +2754,9 @@ function AgendaHero({
           >
             <small>{dia.semana}</small>
             <strong>{dia.dia}</strong>
-            {diasComAgendamento?.has(dia.iso) && <span className="agenda-day-dot" aria-hidden="true" />}
+            {(diaEstaAberto(dia.iso) || diasComAgendamento?.has(dia.iso)) && (
+              <span className="agenda-day-dot" aria-hidden="true" />
+            )}
           </button>
         ))}
       </div>
