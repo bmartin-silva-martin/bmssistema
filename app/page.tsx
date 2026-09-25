@@ -2660,6 +2660,20 @@ function MobileBottomNav({
   );
 }
 
+function BarberChairIcon() {
+  return (
+    <svg fill="currentColor" height="1em" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg">
+      <rect height="4" rx="2" width="8" x="8" y="1" />
+      <rect height="7" rx="2" width="10" x="7" y="5" />
+      <rect height="4" rx="1" width="2" x="4" y="11" />
+      <rect height="4" rx="1" width="2" x="18" y="11" />
+      <rect height="3" rx="1.5" width="14" x="5" y="12" />
+      <rect height="5" width="2" x="11" y="15" />
+      <ellipse cx="12" cy="21" rx="6" ry="1.5" />
+    </svg>
+  );
+}
+
 function AgendaHero({
   agendamentos,
   dias,
@@ -2769,17 +2783,17 @@ function AgendaHero({
           </div>
           <div className="agenda-summary-count-row">
             <strong className="agenda-summary-count">{agendamentosHoje.length}</strong>
-            <span className="agenda-summary-decor" aria-hidden="true">💈</span>
+            <span className="agenda-summary-decor" aria-hidden="true"><BarberChairIcon /></span>
           </div>
         </article>
         <article>
           <div className="agenda-summary-top">
-            <span className="agenda-summary-icon" aria-hidden="true">💈</span>
+            <span className="agenda-summary-icon" aria-hidden="true">💰</span>
             <div><span>Esta semana</span><strong>{exibirValor(totalSemana)}</strong></div>
           </div>
           <div className="agenda-summary-count-row">
             <strong className="agenda-summary-count">{agendamentos.length}</strong>
-            <span className="agenda-summary-decor" aria-hidden="true">💈</span>
+            <span className="agenda-summary-decor" aria-hidden="true"><BarberChairIcon /></span>
           </div>
         </article>
       </div>

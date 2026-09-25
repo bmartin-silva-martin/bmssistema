@@ -4859,7 +4859,7 @@ th {
 .agenda-summary-top strong { display: block; font-size: clamp(.95rem, 3vw, 1.15rem); margin-top: .2rem; }
 .agenda-summary-count-row { align-items: flex-end; display: flex; justify-content: space-between; margin-top: 1rem; }
 .agenda-summary-count { font-size: clamp(1.8rem, 8vw, 2.6rem); letter-spacing: -.06em; line-height: 1; }
-.agenda-summary-decor { font-size: 1.8rem; opacity: .55; }
+.agenda-summary-decor { align-items: center; display: inline-flex; font-size: 1.8rem; opacity: .55; }
 .agenda-timeline-panel { background: rgb(20 22 28 / .58); border: 1px solid rgb(255 255 255 / .06); border-radius: 22px; padding: 1rem; }
 .profissional-filtro-strip { display: flex; gap: .55rem; margin: 0 0 1rem; overflow-x: auto; padding: .15rem .1rem .35rem; scrollbar-width: none; }
 .profissional-filtro-strip button { align-items: center; background: rgb(255 255 255 / .055); border: 1px solid rgb(255 255 255 / .08); border-radius: 999px; color: #aab2bf; cursor: pointer; display: inline-flex; flex: 0 0 auto; gap: .4rem; min-height: 2.75rem; padding: .45rem .8rem; }
