@@ -1757,6 +1757,16 @@ export default function AdminDashboard() {
               onNotify={enviarLembrete}
               profissionais={profissionais}
             />
+            <p className="agenda-horario-footer">
+              Seu horario de funcionamento cadastrado e das{" "}
+              {formatarHoraMinutos(Math.min(...(empresa?.horarios_atendimento?.length ? empresa.horarios_atendimento : HORARIOS_ATENDIMENTO_PADRAO).map(horaParaMinutos)))}hrs
+              {" "}as{" "}
+              {formatarHoraMinutos(Math.max(...(empresa?.horarios_atendimento?.length ? empresa.horarios_atendimento : HORARIOS_ATENDIMENTO_PADRAO).map(horaParaMinutos)))}hrs.
+              {" "}
+              <button onClick={() => abrirSecao("configuracoes")} type="button">
+                Editar horarios
+              </button>
+            </p>
             </article>
             <article className="admin-panel">
               <button
