@@ -3507,6 +3507,16 @@ th {
   border-color: rgb(255 139 92 / 0.4);
 }
 
+.row-icon-button.danger:hover {
+  background: rgb(239 68 68 / 0.18);
+  border-color: rgb(248 113 113 / 0.45);
+}
+
+.compact-row-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .compact-edit-panel {
   display: grid;
   grid-column: 1 / -1;
@@ -3561,7 +3571,7 @@ th {
 .precos-por-dia-grid {
   display: grid;
   gap: 0.6rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .precos-por-dia-grid label {

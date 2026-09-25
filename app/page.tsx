@@ -148,6 +148,7 @@ const DIAS_SEMANA_COMPLETOS = [
 ];
 const mesesCurtos = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 const DIAS_ATENDIMENTO_PADRAO = [1, 2, 3, 4, 5, 6];
+const DURACOES_SERVICO_OPCOES = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 75, 90, 105, 120];
 const DONO_STORAGE_KEY = "bms_nome_dono";
 const EMPRESA_SELECT =
   "id,nome,plano,ativo,dias_atendimento,horarios_atendimento,nome_responsavel,slug,owner_user_id,licenca_install_id,licenca_expires_at,licenca_grace_days,features";
@@ -366,7 +367,6 @@ export default function AdminDashboard() {
   const [configDias, setConfigDias] = useState<number[]>(DIAS_ATENDIMENTO_PADRAO);
   const [configHorarios, setConfigHorarios] = useState<string[]>(HORARIOS_ATENDIMENTO_PADRAO);
   const [novoHorario, setNovoHorario] = useState("");
-  const [addServicoOpen, setAddServicoOpen] = useState(false);
   const [addProdutoOpen, setAddProdutoOpen] = useState(false);
   const [periodoInteligencia, setPeriodoInteligencia] = useState<"7" | "30" | "custom">("30");
   const [inteligenciaDataInicio, setInteligenciaDataInicio] = useState("");
@@ -766,7 +766,6 @@ export default function AdminDashboard() {
     }
 
     setServicoForm({ duracao: "30", foto_url: "", nome: "", preco: "" });
-    setAddServicoOpen(false);
     await carregarDados();
     setMensagem("Servico cadastrado com sucesso.");
   }
@@ -1821,75 +1820,78 @@ export default function AdminDashboard() {
             title="Servicos"
           >
             <article className="admin-panel">
-              <div className="panel-header-with-action">
-                <h2>Servicos</h2>
-                <button className="add-item-btn" onClick={() => setAddServicoOpen(true)} type="button">+ Novo</button>
-              </div>
+              <h2>Inserir um novo servico</h2>
+              <form className="form-stack add-sheet-form inline-add-form" onSubmit={cadastrarServico}>
+                <div className="form-row-foto-nome">
+                  <label className="item-foto-picker">
+                    Foto
+                    <input
+                      accept="image/*"
+                      className="item-foto-input"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          const dataUrl = await redimensionarFoto(file);
+                          setServicoForm((form) => ({ ...form, foto_url: dataUrl }));
+                        }
+                      }}
+                      type="file"
+                    />
+                    {servicoForm.foto_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img alt="" src={servicoForm.foto_url} />
+                    ) : (
+                      <span aria-hidden="true">📷</span>
+                    )}
+                  </label>
+                  <label>
+                    Nome do servico
+                    <input
+                      onChange={(event) => setServicoForm((form) => ({ ...form, nome: event.target.value }))}
+                      placeholder="Ex: Corte masculino"
+                      value={servicoForm.nome}
+                    />
+                  </label>
+                </div>
+                <div className="form-row-2">
+                  <label>
+                    Duracao (min)
+                    <select
+                      onChange={(event) => setServicoForm((form) => ({ ...form, duracao: event.target.value }))}
+                      value={servicoForm.duracao}
+                    >
+                      {Array.from(new Set([...DURACOES_SERVICO_OPCOES, Number(servicoForm.duracao) || 0]))
+                        .filter((minutos) => minutos > 0)
+                        .sort((a, b) => a - b)
+                        .map((minutos) => (
+                          <option key={minutos} value={minutos}>
+                            {minutos} min
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    Preco
+                    <input
+                      inputMode="decimal"
+                      onChange={(event) => setServicoForm((form) => ({ ...form, preco: event.target.value }))}
+                      placeholder="R$ 0,00"
+                      type="number"
+                      value={servicoForm.preco}
+                    />
+                  </label>
+                </div>
+                <button className="admin-pill-button primary wide" disabled={salvandoServico} type="submit">
+                  {salvandoServico ? "Salvando..." : "Adicionar a lista"}
+                </button>
+              </form>
+            </article>
+
+            <article className="admin-panel">
+              <h2>Lista de servicos</h2>
               <EditableServicoList servicos={servicos} setServicos={setServicos} onSave={atualizarServico} onDelete={excluirServico} />
             </article>
           </AdminSectionShell>
-        )}
-
-        {addServicoOpen && (
-          <AddFormSheet onClose={() => setAddServicoOpen(false)} title="Novo servico">
-            <form className="form-stack add-sheet-form" onSubmit={cadastrarServico}>
-              <div className="form-row-foto-nome">
-                <label className="item-foto-picker">
-                  Foto
-                  <input
-                    accept="image/*"
-                    className="item-foto-input"
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0];
-                      if (file) {
-                        const dataUrl = await redimensionarFoto(file);
-                        setServicoForm((form) => ({ ...form, foto_url: dataUrl }));
-                      }
-                    }}
-                    type="file"
-                  />
-                  {servicoForm.foto_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt="" src={servicoForm.foto_url} />
-                  ) : (
-                    <span aria-hidden="true">📷</span>
-                  )}
-                </label>
-                <label>
-                  Nome do servico
-                  <input
-                    onChange={(event) => setServicoForm((form) => ({ ...form, nome: event.target.value }))}
-                    placeholder="Ex: Corte masculino"
-                    value={servicoForm.nome}
-                  />
-                </label>
-              </div>
-              <div className="form-row-2">
-                <label>
-                  Duracao (min)
-                  <input
-                    inputMode="numeric"
-                    onChange={(event) => setServicoForm((form) => ({ ...form, duracao: event.target.value }))}
-                    type="number"
-                    value={servicoForm.duracao}
-                  />
-                </label>
-                <label>
-                  Preco
-                  <input
-                    inputMode="decimal"
-                    onChange={(event) => setServicoForm((form) => ({ ...form, preco: event.target.value }))}
-                    placeholder="R$ 0,00"
-                    type="number"
-                    value={servicoForm.preco}
-                  />
-                </label>
-              </div>
-              <button className="admin-pill-button primary wide" disabled={salvandoServico} type="submit">
-                {salvandoServico ? "Salvando..." : "Adicionar servico"}
-              </button>
-            </form>
-          </AddFormSheet>
         )}
 
         {activeSection === "produtos" && (
@@ -3765,9 +3767,16 @@ function EditableServicoList({
                   {servico.duracao || 30} min. - {formatarMoeda(servico.preco || 0)}
                 </span>
               </div>
-              <button aria-label="Editar servico" className="row-icon-button" onClick={() => setEditandoId(editando ? null : servico.id)} type="button">
-                ✎
-              </button>
+              <div className="compact-row-actions">
+                <button aria-label="Editar servico" className="row-icon-button" onClick={() => setEditandoId(editando ? null : servico.id)} type="button">
+                  ✎
+                </button>
+                {onDelete && (
+                  <button aria-label="Excluir servico" className="row-icon-button danger" onClick={() => onDelete(servico.id)} type="button">
+                    🗑
+                  </button>
+                )}
+              </div>
 
               {editando && (
                 <div className="compact-edit-panel">
@@ -3810,7 +3819,7 @@ function EditableServicoList({
                   <div className="form-row-2">
                     <label>
                       Duracao
-                      <input
+                      <select
                         onChange={(event) =>
                           setServicos(
                             servicos.map((item) =>
@@ -3818,9 +3827,16 @@ function EditableServicoList({
                             ),
                           )
                         }
-                        type="number"
                         value={servico.duracao || 30}
-                      />
+                      >
+                        {Array.from(new Set([...DURACOES_SERVICO_OPCOES, servico.duracao || 30]))
+                          .sort((a, b) => a - b)
+                          .map((minutos) => (
+                            <option key={minutos} value={minutos}>
+                              {minutos} min
+                            </option>
+                          ))}
+                      </select>
                     </label>
                     <label>
                       Preco
@@ -3874,11 +3890,6 @@ function EditableServicoList({
                   <button className="admin-pill-button primary" onClick={async () => { await onSave(servico); setEditandoId(null); }} type="button">
                     Salvar servico
                   </button>
-                  {onDelete && (
-                    <button className="admin-pill-button cancel-appt-btn" onClick={async () => { await onDelete(servico.id); setEditandoId(null); }} type="button">
-                      Excluir servico
-                    </button>
-                  )}
                 </div>
               )}
             </article>
