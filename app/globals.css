@@ -1656,6 +1656,7 @@ th {
 .admin-section {
   display: grid;
   gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .admin-section-heading {
