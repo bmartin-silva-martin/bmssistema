@@ -2309,6 +2309,51 @@ th {
   font-size: clamp(1.2rem, 3vw, 1.65rem);
 }
 
+.finance-highlight-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.finance-highlight-grid .admin-metric-card {
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgb(34 36 42 / 0.96), rgb(22 24 30 / 0.98));
+  padding: clamp(1rem, 3vw, 1.35rem);
+}
+
+.finance-highlight-grid .admin-metric-card.accent {
+  background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
+  border-color: transparent;
+}
+
+.finance-list-card h2 {
+  font-size: clamp(1.1rem, 3vw, 1.4rem);
+  margin: 0 0 0.5rem;
+}
+
+.finance-data-row {
+  align-items: center;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+}
+
+.finance-data-row:first-of-type {
+  border-top: none;
+}
+
+.finance-data-row span {
+  color: #aab2bf;
+  font-size: 0.9rem;
+}
+
+.finance-data-row strong {
+  color: #ffffff;
+  font-size: 0.95rem;
+  text-align: right;
+}
+
 .finance-ranking-row,
 .finance-product-row {
   display: grid;

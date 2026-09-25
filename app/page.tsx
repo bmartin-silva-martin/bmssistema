@@ -2055,6 +2055,13 @@ export default function AdminDashboard() {
 
             <ServiceTilesRow items={resumoFinanceiro.servicosMaisVendidos} total={resumoFinanceiro.totalServicosRealizados} />
 
+            <section className="finance-highlight-grid" aria-label="Destaques">
+              <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
+              {resumoFinanceiro.taxaOcupacao !== null && (
+                <MetricCard helper="agendamentos vs. horarios disponiveis" label="Taxa de ocupacao" value={`${resumoFinanceiro.taxaOcupacao}%`} />
+              )}
+            </section>
+
             <section aria-label="Resumo financeiro">
               <div className="finance-metric-scroll">
                 <MetricCard
@@ -2062,21 +2069,7 @@ export default function AdminDashboard() {
                   label="Faturamento"
                   value={formatarMoeda(resumoFinanceiro.totalReceita)}
                 />
-                <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
-                {resumoFinanceiro.taxaOcupacao !== null && (
-                  <MetricCard helper="agendamentos vs. horarios disponiveis" label="Taxa de ocupacao" value={`${resumoFinanceiro.taxaOcupacao}%`} />
-                )}
                 <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
-                <MetricCard helper="clientes atendidos no periodo" label="Clientes unicos" value={resumoFinanceiro.clientesUnicos} />
-                {resumoFinanceiro.atendimentosPorCliente > 0 && (
-                  <MetricCard helper="media de vendas por cliente" label="Atendimentos/cliente" value={resumoFinanceiro.atendimentosPorCliente.toFixed(2)} />
-                )}
-                {resumoFinanceiro.receitaPorHora > 0 && (
-                  <MetricCard helper="receita por hora trabalhada" label="Receita por hora" value={formatarMoeda(resumoFinanceiro.receitaPorHora)} />
-                )}
-                {resumoFinanceiro.topServico && (
-                  <MetricCard helper={`${resumoFinanceiro.topServico.percentual}% dos atendimentos`} label="Top servico" value={resumoFinanceiro.topServico.nome} />
-                )}
                 <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
               </div>
               <p className="scroll-hint">
@@ -2087,6 +2080,32 @@ export default function AdminDashboard() {
             <section className="finance-card-grid">
               <PaymentChart items={resumoFinanceiro.formasPagamento} total={resumoFinanceiro.totalReceita} />
               {resumoFinanceiro.distribuicaoHoras && <HoursDistributionBar dados={resumoFinanceiro.distribuicaoHoras} />}
+            </section>
+
+            <section className="finance-list-card" aria-label="Mais dados">
+              <h2>Mais dados</h2>
+              <div className="finance-data-row">
+                <span>Clientes unicos</span>
+                <strong>{resumoFinanceiro.clientesUnicos}</strong>
+              </div>
+              {resumoFinanceiro.atendimentosPorCliente > 0 && (
+                <div className="finance-data-row">
+                  <span>Atendimentos por cliente</span>
+                  <strong>{resumoFinanceiro.atendimentosPorCliente.toFixed(2)}</strong>
+                </div>
+              )}
+              {resumoFinanceiro.receitaPorHora > 0 && (
+                <div className="finance-data-row">
+                  <span>Receita por hora</span>
+                  <strong>{formatarMoeda(resumoFinanceiro.receitaPorHora)}</strong>
+                </div>
+              )}
+              {resumoFinanceiro.topServico && (
+                <div className="finance-data-row">
+                  <span>Top servico</span>
+                  <strong>{resumoFinanceiro.topServico.nome} ({resumoFinanceiro.topServico.percentual}%)</strong>
+                </div>
+              )}
             </section>
 
             <section className="finance-card-grid">
