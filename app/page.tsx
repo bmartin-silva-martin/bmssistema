@@ -218,6 +218,14 @@ function minutosAgora() {
   return agora.getHours() * 60 + agora.getMinutes();
 }
 
+function scrollParaPainelEdicao(id: string) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+}
+
 function formatarHoraMinutos(minutos: number) {
   const h = String(Math.floor(minutos / 60)).padStart(2, "0");
   const m = String(minutos % 60).padStart(2, "0");
@@ -3768,7 +3776,16 @@ function EditableServicoList({
                 </span>
               </div>
               <div className="compact-row-actions">
-                <button aria-label="Editar servico" className="row-icon-button" onClick={() => setEditandoId(editando ? null : servico.id)} type="button">
+                <button
+                  aria-label="Editar servico"
+                  className="row-icon-button"
+                  onClick={() => {
+                    const abrir = !editando;
+                    setEditandoId(abrir ? servico.id : null);
+                    if (abrir) scrollParaPainelEdicao(`servico-edit-${servico.id}`);
+                  }}
+                  type="button"
+                >
                   ✎
                 </button>
                 {onDelete && (
@@ -3779,7 +3796,7 @@ function EditableServicoList({
               </div>
 
               {editando && (
-                <div className="compact-edit-panel">
+                <div className="compact-edit-panel" id={`servico-edit-${servico.id}`}>
                   <div className="form-row-foto-nome">
                     <label className="item-foto-picker">
                       Foto
@@ -3966,12 +3983,21 @@ function EditableProdutoList({
                   ) : null}
                 </span>
               </div>
-              <button aria-label="Editar produto" className="row-icon-button" onClick={() => setEditandoId(editando ? null : produto.id)} type="button">
+              <button
+                aria-label="Editar produto"
+                className="row-icon-button"
+                onClick={() => {
+                  const abrir = !editando;
+                  setEditandoId(abrir ? produto.id : null);
+                  if (abrir) scrollParaPainelEdicao(`produto-edit-${produto.id}`);
+                }}
+                type="button"
+              >
                 ✎
               </button>
 
               {editando && (
-                <div className="compact-edit-panel">
+                <div className="compact-edit-panel" id={`produto-edit-${produto.id}`}>
                   <div className="form-row-foto-nome">
                     <label className="item-foto-picker">
                       Foto
