@@ -4,6 +4,26 @@ import Link from "next/link";
 import type { Session } from "@supabase/supabase-js";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useState } from "react";
+import {
+  anosDisponiveis,
+  calcularPendencias,
+  calcularUpsellProduto,
+  contarDiasAbertosNoIntervalo,
+  detalharFormaPagamento,
+  filtrarAgendamentosPorIntervalo,
+  filtrarAgendamentosPorVisao,
+  filtrarVendasPorIntervalo,
+  filtrarVendasPorVisao,
+  listarDetalhesVendas,
+  MESES_FILTRO,
+  nomeFormaPagamento,
+  resolverIntervaloFinanceiro,
+  type FiltroMes,
+  type IntervaloFinanceiro,
+  type PeriodoFinanceiro,
+  type VisaoBalanco,
+} from "@/lib/financeiro";
+import { gerarRelatorioFinanceiroPdf } from "@/lib/pdfRelatorio";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const EMPRESA_ID_LEGADO = 1;
@@ -98,22 +118,21 @@ type VendaItem = {
   produtos: { nome: string } | { nome: string }[] | null;
 };
 
+type VendaAgendamento = {
+  data_agendamento: string;
+  profissional_id?: number | null;
+  clientes?: { nome: string } | { nome: string }[] | null;
+  profissionais?: { nome: string } | { nome: string }[] | null;
+  servicos: ServicoResumo | ServicoResumo[] | null;
+};
+
 type Venda = {
   agendamento_id: number | null;
   created_at: string;
   forma_pagamento?: string | null;
   id: number;
   total: number | null;
-  agendamentos:
-    | {
-        data_agendamento: string;
-        servicos: ServicoResumo | ServicoResumo[] | null;
-      }
-    | {
-        data_agendamento: string;
-        servicos: ServicoResumo | ServicoResumo[] | null;
-      }[]
-    | null;
+  agendamentos: VendaAgendamento | VendaAgendamento[] | null;
   venda_itens: VendaItem[] | null;
 };
 
@@ -128,7 +147,6 @@ type PaymentItem = RankingItem & {
 
 type AdminSection = "visao" | "agenda" | "servicos" | "produtos" | "financeiro" | "clientes" | "inteligencia" | "configuracoes";
 type AbaClientes = "cadastro" | "historico" | "ranking";
-type PeriodoFinanceiro = "hoje" | "7" | "30" | "todos";
 type DiaPainel = {
   dia: string;
   iso: string;
@@ -359,6 +377,10 @@ export default function AdminDashboard() {
   const [produtoForm, setProdutoForm] = useState({ comissao: "", custo: "", estoque: "0", foto_url: "", nome: "", preco: "" });
   const [abaClientes, setAbaClientes] = useState<AbaClientes>("cadastro");
   const [periodoFinanceiro, setPeriodoFinanceiro] = useState<PeriodoFinanceiro>("hoje");
+  // Quando preenchido, o filtro mensal substitui Hoje/7/30/Tudo.
+  const [mesFinanceiro, setMesFinanceiro] = useState<FiltroMes | null>(null);
+  const [visaoBalanco, setVisaoBalanco] = useState<VisaoBalanco>("geral");
+  const [formaPagamentoDetalhe, setFormaPagamentoDetalhe] = useState<string | null>(null);
   const [atendimentoAberto, setAtendimentoAberto] = useState<Agendamento | null>(null);
   const [itensVenda, setItensVenda] = useState<Record<number, string>>({});
   const [salvandoServico, setSalvandoServico] = useState(false);
@@ -484,18 +506,35 @@ export default function AdminDashboard() {
       .sort((a, b) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime());
   }, [agendamentosAtivos]);
 
-  const vendasFiltradas = useMemo(() => filtrarVendasPorPeriodo(vendas, periodoFinanceiro), [periodoFinanceiro, vendas]);
+  const intervaloFinanceiro = useMemo(
+    () => resolverIntervaloFinanceiro(periodoFinanceiro, mesFinanceiro),
+    [periodoFinanceiro, mesFinanceiro],
+  );
+  const agendamentosDaVisao = useMemo(() => filtrarAgendamentosPorVisao(agendamentos, visaoBalanco), [agendamentos, visaoBalanco]);
+  const vendasFiltradas = useMemo(
+    () => filtrarVendasPorVisao(filtrarVendasPorIntervalo(vendas, intervaloFinanceiro), visaoBalanco),
+    [intervaloFinanceiro, vendas, visaoBalanco],
+  );
   const resumoFinanceiro = useMemo(
     () =>
       calcularResumoFinanceiro(
         vendasFiltradas,
-        agendamentos,
+        agendamentosDaVisao,
         produtos,
-        periodoFinanceiro,
+        intervaloFinanceiro,
         empresa?.horarios_atendimento,
         empresa?.dias_atendimento,
       ),
-    [agendamentos, produtos, vendasFiltradas, periodoFinanceiro, empresa],
+    [agendamentosDaVisao, produtos, vendasFiltradas, intervaloFinanceiro, empresa],
+  );
+  const anosFinanceiro = useMemo(
+    () => anosDisponiveis([...vendas.map((venda) => venda.created_at), ...agendamentos.map((agendamento) => agendamento.data_agendamento)]),
+    [agendamentos, vendas],
+  );
+  // "Ver mais" por forma de pagamento: reaproveita as vendas ja carregadas e filtradas (periodo + visao).
+  const detalheFormaPagamento = useMemo(
+    () => (formaPagamentoDetalhe ? detalharFormaPagamento(vendasFiltradas, formaPagamentoDetalhe) : []),
+    [formaPagamentoDetalhe, vendasFiltradas],
   );
   const faturamentoPorDia = useMemo(() => agruparVendasPorDiaDoMes(vendas), [vendas]);
 
@@ -587,7 +626,7 @@ export default function AdminDashboard() {
       supabase
         .from("vendas")
         .select(
-          "id,created_at,total,agendamento_id,agendamentos(data_agendamento,servicos(nome,preco)),venda_itens(produto_id,quantidade,valor_unitario,produtos(nome))",
+          "id,created_at,total,forma_pagamento,agendamento_id,agendamentos(data_agendamento,profissional_id,clientes(nome),profissionais(nome),servicos(nome,preco)),venda_itens(produto_id,quantidade,valor_unitario,produtos(nome))",
         )
         .eq("empresa_id", empresaId)
         .order("created_at", { ascending: false }),
@@ -1425,6 +1464,41 @@ export default function AdminDashboard() {
     setMensagem(`Atendimento finalizado. Total registrado: ${formatarMoeda(totalAtendimentoAberto)}.`);
   }
 
+  // Usa somente os dados ja carregados (RLS da empresa logada) e os filtros ativos na tela.
+  function gerarPdfFinanceiro() {
+    const profissionalSelecionado =
+      visaoBalanco === "geral" ? null : profissionais.find((profissional) => profissional.id === visaoBalanco) || null;
+    const pdf = gerarRelatorioFinanceiroPdf({
+      empresa: empresa?.nome || "",
+      formasPagamento: resumoFinanceiro.formasPagamento,
+      geradoEm: new Date(),
+      pendencias: resumoFinanceiro.pendencias,
+      periodo: intervaloFinanceiro.descricao,
+      profissional: profissionalSelecionado
+        ? { atendimentos: vendasFiltradas.length, nome: profissionalSelecionado.nome, receita: resumoFinanceiro.totalReceita }
+        : null,
+      receita: resumoFinanceiro.totalReceita,
+      taxaOcupacao: resumoFinanceiro.taxaOcupacao,
+      ticketMedio: resumoFinanceiro.ticketMedio,
+      upsellProduto: resumoFinanceiro.upsellProduto,
+      vendas: listarDetalhesVendas(vendasFiltradas),
+      visao: profissionalSelecionado ? `Profissional: ${profissionalSelecionado.nome}` : "Geral",
+    });
+    const sufixo = mesFinanceiro
+      ? `${mesFinanceiro.year}-${String(mesFinanceiro.month).padStart(2, "0")}`
+      : periodoFinanceiro === "todos"
+        ? "tudo"
+        : periodoFinanceiro === "hoje"
+          ? dataLocalISO(new Date())
+          : `${periodoFinanceiro}-dias`;
+    const url = URL.createObjectURL(new Blob([pdf], { type: "application/pdf" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `relatorio-financeiro-${sufixo}.pdf`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   if (!authReady) {
     return (
       <main className="admin-login-page">
@@ -2022,32 +2096,99 @@ export default function AdminDashboard() {
 
             <div className="finance-filter" aria-label="Periodo financeiro">
               <button
-                className={periodoFinanceiro === "hoje" ? "active" : ""}
-                onClick={() => setPeriodoFinanceiro("hoje")}
+                className={!mesFinanceiro && periodoFinanceiro === "hoje" ? "active" : ""}
+                onClick={() => {
+                  setPeriodoFinanceiro("hoje");
+                  setMesFinanceiro(null);
+                }}
                 type="button"
               >
                 Hoje
               </button>
               <button
-                className={periodoFinanceiro === "7" ? "active" : ""}
-                onClick={() => setPeriodoFinanceiro("7")}
+                className={!mesFinanceiro && periodoFinanceiro === "7" ? "active" : ""}
+                onClick={() => {
+                  setPeriodoFinanceiro("7");
+                  setMesFinanceiro(null);
+                }}
                 type="button"
               >
                 7 dias
               </button>
               <button
-                className={periodoFinanceiro === "30" ? "active" : ""}
-                onClick={() => setPeriodoFinanceiro("30")}
+                className={!mesFinanceiro && periodoFinanceiro === "30" ? "active" : ""}
+                onClick={() => {
+                  setPeriodoFinanceiro("30");
+                  setMesFinanceiro(null);
+                }}
                 type="button"
               >
                 30 dias
               </button>
               <button
-                className={periodoFinanceiro === "todos" ? "active" : ""}
-                onClick={() => setPeriodoFinanceiro("todos")}
+                className={!mesFinanceiro && periodoFinanceiro === "todos" ? "active" : ""}
+                onClick={() => {
+                  setPeriodoFinanceiro("todos");
+                  setMesFinanceiro(null);
+                }}
                 type="button"
               >
                 Tudo
+              </button>
+            </div>
+
+            {/* Controles funcionais provisorios, sem estilo proprio: o visual sera ajustado depois. */}
+            <div aria-label="Filtros do financeiro">
+              <label>
+                Mes
+                <select
+                  onChange={(event) => {
+                    const month = Number(event.target.value);
+                    setMesFinanceiro(month ? { month, year: mesFinanceiro?.year ?? new Date().getFullYear() } : null);
+                  }}
+                  value={mesFinanceiro?.month ?? ""}
+                >
+                  <option value="">Periodo acima</option>
+                  {MESES_FILTRO.map((mes, index) => (
+                    <option key={mes} value={index + 1}>
+                      {mes}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Ano
+                <select
+                  disabled={!mesFinanceiro}
+                  onChange={(event) => {
+                    const year = Number(event.target.value);
+                    setMesFinanceiro((atual) => (atual ? { ...atual, year } : atual));
+                  }}
+                  value={mesFinanceiro?.year ?? new Date().getFullYear()}
+                >
+                  {anosFinanceiro.map((ano) => (
+                    <option key={ano} value={ano}>
+                      {ano}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Meu balanco
+                <select
+                  onChange={(event) => setVisaoBalanco(event.target.value === "geral" ? "geral" : Number(event.target.value))}
+                  value={String(visaoBalanco)}
+                >
+                  <option value="geral">Geral</option>
+                  {profissionais.map((profissional) => (
+                    <option key={profissional.id} value={profissional.id}>
+                      {profissional.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button onClick={gerarPdfFinanceiro} type="button">
+                Gerar PDF
               </button>
             </div>
 
@@ -2082,12 +2223,69 @@ export default function AdminDashboard() {
               {resumoFinanceiro.distribuicaoHoras && <HoursDistributionBar dados={resumoFinanceiro.distribuicaoHoras} />}
             </section>
 
+            {/* "Ver mais" por forma de pagamento (provisorio, sem estilo proprio). */}
+            <div aria-label="Detalhar forma de pagamento">
+              <label>
+                Ver mais
+                <select onChange={(event) => setFormaPagamentoDetalhe(event.target.value || null)} value={formaPagamentoDetalhe ?? ""}>
+                  <option value="">Forma de pagamento</option>
+                  {resumoFinanceiro.formasPagamento.map((forma) => (
+                    <option key={forma.nome} value={forma.nome}>
+                      {forma.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {formaPagamentoDetalhe && (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Cliente</th>
+                      <th>Profissional</th>
+                      <th>Valor</th>
+                      <th>Forma</th>
+                      <th>Venda / agendamento</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detalheFormaPagamento.map((linha) => (
+                      <tr key={linha.id}>
+                        <td>{new Date(linha.data).toLocaleDateString("pt-BR")}</td>
+                        <td>{linha.cliente}</td>
+                        <td>{linha.profissional}</td>
+                        <td>{formatarMoeda(linha.valor)}</td>
+                        <td>{linha.formaPagamento}</td>
+                        <td>
+                          #{linha.id} / {linha.agendamentoId ?? "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
             <section className="finance-list-card" aria-label="Mais dados">
               <h2>Mais dados</h2>
               <div className="finance-data-row">
                 <span>Clientes unicos</span>
                 <strong>{resumoFinanceiro.clientesUnicos}</strong>
               </div>
+              {resumoFinanceiro.upsellProduto.percentual !== null && (
+                <div className="finance-data-row">
+                  <span>Upsell produto</span>
+                  <strong>{resumoFinanceiro.upsellProduto.percentual}%</strong>
+                </div>
+              )}
+              {resumoFinanceiro.pendencias.percentual !== null && (
+                <div className="finance-data-row">
+                  <span>Pendencias</span>
+                  <strong>
+                    {resumoFinanceiro.pendencias.percentual}% ({resumoFinanceiro.pendencias.parte})
+                  </strong>
+                </div>
+              )}
               {resumoFinanceiro.atendimentosPorCliente > 0 && (
                 <div className="finance-data-row">
                   <span>Atendimentos por cliente</span>
@@ -3565,60 +3763,11 @@ function agruparVendasPorDiaDoMes(vendas: Venda[]) {
   return totaisPorDia.map((valor, index) => ({ dia: index + 1, valor }));
 }
 
-function calcularInicioPeriodo(periodo: PeriodoFinanceiro) {
-  if (periodo === "todos") return null;
-
-  const hoje = new Date();
-  const inicio = new Date(hoje);
-  inicio.setHours(0, 0, 0, 0);
-
-  if (periodo === "7") inicio.setDate(inicio.getDate() - 6);
-  if (periodo === "30") inicio.setDate(inicio.getDate() - 29);
-
-  return inicio;
-}
-
-function contarDiasDoPeriodo(periodo: PeriodoFinanceiro) {
-  if (periodo === "hoje") return 1;
-  if (periodo === "7") return 7;
-  if (periodo === "30") return 30;
-  return null;
-}
-
-function filtrarVendasPorPeriodo(vendas: Venda[], periodo: PeriodoFinanceiro) {
-  const inicio = calcularInicioPeriodo(periodo);
-  if (!inicio) return vendas;
-  return vendas.filter((venda) => new Date(venda.created_at) >= inicio);
-}
-
-function filtrarAgendamentosPorPeriodo(agendamentos: Agendamento[], periodo: PeriodoFinanceiro) {
-  const inicio = calcularInicioPeriodo(periodo);
-  if (!inicio) return agendamentos;
-  return agendamentos.filter((agendamento) => new Date(agendamento.data_agendamento) >= inicio);
-}
-
-function contarDiasAbertosNoPeriodo(periodo: PeriodoFinanceiro, diasAtendimento?: number[] | null) {
-  const totalDias = contarDiasDoPeriodo(periodo);
-  if (!totalDias) return null;
-
-  const diasSet = new Set(diasAtendimento?.length ? diasAtendimento : DIAS_ATENDIMENTO_PADRAO);
-  const hoje = new Date();
-  let abertos = 0;
-
-  for (let i = 0; i < totalDias; i++) {
-    const data = new Date(hoje);
-    data.setDate(data.getDate() - i);
-    if (diasSet.has(data.getDay())) abertos++;
-  }
-
-  return abertos;
-}
-
 function calcularResumoFinanceiro(
   vendas: Venda[],
   agendamentos: Agendamento[],
   produtos: Produto[],
-  periodo: PeriodoFinanceiro,
+  intervalo: IntervaloFinanceiro,
   horariosAtendimento?: string[] | null,
   diasAtendimento?: number[] | null,
 ) {
@@ -3628,7 +3777,7 @@ function calcularResumoFinanceiro(
   const produtosComGiro = new Set<number>();
 
   vendas.forEach((venda) => {
-    const forma = venda.forma_pagamento || "Nao informado";
+    const forma = nomeFormaPagamento(venda);
     const formaAtual = formaTotais.get(forma) || { total: 0, valor: 0 };
     formaTotais.set(forma, {
       total: formaAtual.total + 1,
@@ -3650,7 +3799,7 @@ function calcularResumoFinanceiro(
   });
 
   if (servicoTotais.size === 0) {
-    filtrarAgendamentosPorPeriodo(agendamentos, periodo)
+    filtrarAgendamentosPorIntervalo(agendamentos, intervalo)
       .filter((agendamento) => agendamento.status === "finalizado")
       .forEach((agendamento) => {
         const servico = firstRelation(agendamento.servicos);
@@ -3672,9 +3821,9 @@ function calcularResumoFinanceiro(
   const totalReceita = vendas.reduce((total, venda) => total + (venda.total || 0), 0);
   const totalServicosRealizados = Array.from(servicoTotais.values()).reduce((total, valor) => total + valor, 0);
 
-  const diasNoPeriodo = contarDiasDoPeriodo(periodo);
+  const diasNoPeriodo = intervalo.dias;
   const slotsPorDia = horariosAtendimento?.length || HORARIOS_ATENDIMENTO_PADRAO.length;
-  const agendamentosAtivosNoPeriodo = filtrarAgendamentosPorPeriodo(agendamentos, periodo).filter(
+  const agendamentosAtivosNoPeriodo = filtrarAgendamentosPorIntervalo(agendamentos, intervalo).filter(
     (agendamento) => agendamento.status.toLowerCase() !== "cancelado",
   );
   const taxaOcupacao =
@@ -3684,7 +3833,10 @@ function calcularResumoFinanceiro(
 
   const { inicio: aberturaMin, fim: fechamentoMin } = calcularJanelaHorario(horariosAtendimento);
   const minutosPorDiaAberto = fechamentoMin - aberturaMin;
-  const diasAbertosNoPeriodo = contarDiasAbertosNoPeriodo(periodo, diasAtendimento);
+  const diasAbertosNoPeriodo = contarDiasAbertosNoIntervalo(
+    intervalo,
+    diasAtendimento?.length ? diasAtendimento : DIAS_ATENDIMENTO_PADRAO,
+  );
   const minutosTrabalhados = agendamentosAtivosNoPeriodo.reduce((total, agendamento) => {
     const servico = firstRelation(agendamento.servicos);
     return total + (servico?.duracao && servico.duracao > 0 ? servico.duracao : AGENDA_DURACAO_PADRAO_MIN);
@@ -3720,6 +3872,7 @@ function calcularResumoFinanceiro(
     formasPagamento: Array.from(formaTotais.entries())
       .map(([nome, dados]) => ({ nome, total: dados.total, valor: dados.valor }))
       .sort((a, b) => b.valor - a.valor),
+    pendencias: calcularPendencias(filtrarAgendamentosPorIntervalo(agendamentos, intervalo)),
     produtosMaisVendidos: ordenarRanking(produtoTotais),
     produtosSemGiro: produtos.filter((produto) => !produtosComGiro.has(produto.id)),
     receitaPorHora,
@@ -3729,6 +3882,7 @@ function calcularResumoFinanceiro(
     totalServicosRealizados,
     ticketMedio: vendas.length > 0 ? totalReceita / vendas.length : 0,
     totalReceita,
+    upsellProduto: calcularUpsellProduto(vendas),
   };
 }
 
