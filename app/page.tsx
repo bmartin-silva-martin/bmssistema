@@ -15,9 +15,11 @@ import {
   filtrarVendasPorIntervalo,
   filtrarVendasPorVisao,
   listarDetalhesVendas,
+  FORMAS_PAGAMENTO,
   MESES_FILTRO,
-  nomeFormaPagamento,
+  montarVendaFinalizacao,
   resolverIntervaloFinanceiro,
+  resumirFormasPagamento,
   type FiltroMes,
   type IntervaloFinanceiro,
   type PeriodoFinanceiro,
@@ -383,6 +385,8 @@ export default function AdminDashboard() {
   const [formaPagamentoDetalhe, setFormaPagamentoDetalhe] = useState<string | null>(null);
   const [atendimentoAberto, setAtendimentoAberto] = useState<Agendamento | null>(null);
   const [itensVenda, setItensVenda] = useState<Record<number, string>>({});
+  const [formaPagamentoVenda, setFormaPagamentoVenda] = useState("");
+  const [avisoFinalizacao, setAvisoFinalizacao] = useState("");
   const [salvandoServico, setSalvandoServico] = useState(false);
   const [salvandoProduto, setSalvandoProduto] = useState(false);
   const [finalizandoVenda, setFinalizandoVenda] = useState(false);
@@ -1122,6 +1126,8 @@ export default function AdminDashboard() {
   function abrirFinalizacao(agendamento: Agendamento) {
     setAtendimentoAberto(agendamento);
     setItensVenda({});
+    setFormaPagamentoVenda("");
+    setAvisoFinalizacao("");
   }
 
   async function cancelarAgendamentoDono(agendamento: Agendamento) {
@@ -1399,6 +1405,19 @@ export default function AdminDashboard() {
   async function finalizarAtendimento() {
     if (!atendimentoAberto) return;
 
+    const novaVenda = montarVendaFinalizacao({
+      agendamentoId: atendimentoAberto.id,
+      empresaId: empresaIdAtual,
+      formaPagamento: formaPagamentoVenda,
+      total: totalAtendimentoAberto,
+    });
+
+    if (!novaVenda.ok) {
+      setAvisoFinalizacao(novaVenda.erro);
+      return;
+    }
+    setAvisoFinalizacao("");
+
     const itensSelecionados = produtos
       .map((produto) => ({
         produto,
@@ -1411,11 +1430,7 @@ export default function AdminDashboard() {
 
     const { data: venda, error: vendaError } = await supabase
       .from("vendas")
-      .insert({
-        agendamento_id: atendimentoAberto.id,
-        empresa_id: empresaIdAtual,
-        total: totalAtendimentoAberto,
-      })
+      .insert(novaVenda.venda)
       .select("id")
       .single();
 
@@ -2616,7 +2631,9 @@ export default function AdminDashboard() {
       {atendimentoAberto && (
         <SaleModal
           agendamento={atendimentoAberto}
+          aviso={avisoFinalizacao}
           finalizando={finalizandoVenda}
+          formaPagamento={formaPagamentoVenda}
           itensVenda={itensVenda}
           onCancel={async () => {
             await cancelarAgendamentoDono(atendimentoAberto);
@@ -2626,6 +2643,10 @@ export default function AdminDashboard() {
           onConfirm={finalizarAtendimento}
           onNotify={() => enviarLembrete(atendimentoAberto)}
           produtos={produtos}
+          setFormaPagamento={(forma) => {
+            setFormaPagamentoVenda(forma);
+            setAvisoFinalizacao("");
+          }}
           setItensVenda={setItensVenda}
           total={totalAtendimentoAberto}
         />
@@ -3586,24 +3607,30 @@ function FinanceProductCard({ emptyLabel, produtos, title, useModal }: { emptyLa
 
 function SaleModal({
   agendamento,
+  aviso,
   finalizando,
+  formaPagamento,
   itensVenda,
   onCancel,
   onClose,
   onConfirm,
   onNotify,
   produtos,
+  setFormaPagamento,
   setItensVenda,
   total,
 }: {
   agendamento: Agendamento;
+  aviso: string;
   finalizando: boolean;
+  formaPagamento: string;
   itensVenda: Record<number, string>;
   onCancel: () => void | Promise<void>;
   onClose: () => void;
   onConfirm: () => void;
   onNotify: () => void | Promise<void>;
   produtos: Produto[];
+  setFormaPagamento: (forma: string) => void;
   setItensVenda: Dispatch<SetStateAction<Record<number, string>>>;
   total: number;
 }) {
@@ -3695,6 +3722,27 @@ function SaleModal({
           <strong>{formatarMoeda(total)}</strong>
         </div>
 
+        {/* Controle funcional minimo; o visual sera ajustado depois. */}
+        <div className="sale-modal-section">
+          <label>
+            <span className="sale-modal-label">Forma de pagamento</span>
+            <select onChange={(event) => setFormaPagamento(event.target.value)} required value={formaPagamento}>
+              <option value="">Selecione</option>
+              {FORMAS_PAGAMENTO.map((forma) => (
+                <option key={forma} value={forma}>
+                  {forma}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {aviso && (
+          <p className="notice notice-error" role="alert">
+            {aviso}
+          </p>
+        )}
+
         <button className="sale-modal-confirm" disabled={finalizando} onClick={onConfirm} type="button">
           {finalizando ? "Finalizando..." : "Finalizar e lançar financeiro"}
         </button>
@@ -3773,17 +3821,9 @@ function calcularResumoFinanceiro(
 ) {
   const produtoTotais = new Map<string, number>();
   const servicoTotais = new Map<string, number>();
-  const formaTotais = new Map<string, { total: number; valor: number }>();
   const produtosComGiro = new Set<number>();
 
   vendas.forEach((venda) => {
-    const forma = nomeFormaPagamento(venda);
-    const formaAtual = formaTotais.get(forma) || { total: 0, valor: 0 };
-    formaTotais.set(forma, {
-      total: formaAtual.total + 1,
-      valor: formaAtual.valor + (venda.total || 0),
-    });
-
     venda.venda_itens?.forEach((item) => {
       const produto = firstRelation(item.produtos);
       if (!produto?.nome) return;
@@ -3869,9 +3909,7 @@ function calcularResumoFinanceiro(
     clientesUnicos: clientesUnicosSet.size,
     distribuicaoHoras,
     estoqueBaixo: produtos.filter((produto) => (produto.estoque || 0) <= 2),
-    formasPagamento: Array.from(formaTotais.entries())
-      .map(([nome, dados]) => ({ nome, total: dados.total, valor: dados.valor }))
-      .sort((a, b) => b.valor - a.valor),
+    formasPagamento: resumirFormasPagamento(vendas),
     pendencias: calcularPendencias(filtrarAgendamentosPorIntervalo(agendamentos, intervalo)),
     produtosMaisVendidos: ordenarRanking(produtoTotais),
     produtosSemGiro: produtos.filter((produto) => !produtosComGiro.has(produto.id)),

@@ -249,6 +249,53 @@ export function nomeFormaPagamento(venda: Pick<VendaFinanceira, "forma_pagamento
   return venda.forma_pagamento?.trim() || FORMA_PAGAMENTO_NAO_INFORMADA;
 }
 
+// Mesmos rotulos do fluxo legado e dos valores ja gravados no banco ("Pix", "Débito").
+// vendas.forma_pagamento e text sem constraint, entao a validacao fica aqui.
+export const FORMAS_PAGAMENTO = ["Pix", "Crédito", "Débito", "Dinheiro", "Assinatura"] as const;
+export type FormaPagamento = (typeof FORMAS_PAGAMENTO)[number];
+
+export const MENSAGEM_FORMA_PAGAMENTO_OBRIGATORIA = "Selecione a forma de pagamento para finalizar o atendimento.";
+
+export function formaPagamentoValida(valor: string | null | undefined): valor is FormaPagamento {
+  return FORMAS_PAGAMENTO.includes(valor as FormaPagamento);
+}
+
+/** Payload de vendas na finalizacao; so difere do anterior por exigir e gravar forma_pagamento. */
+export function montarVendaFinalizacao(dados: {
+  agendamentoId: number;
+  empresaId: number;
+  formaPagamento: string | null | undefined;
+  total: number;
+}) {
+  if (!formaPagamentoValida(dados.formaPagamento)) {
+    return { erro: MENSAGEM_FORMA_PAGAMENTO_OBRIGATORIA, ok: false as const };
+  }
+
+  return {
+    ok: true as const,
+    venda: {
+      agendamento_id: dados.agendamentoId,
+      empresa_id: dados.empresaId,
+      forma_pagamento: dados.formaPagamento,
+      total: dados.total,
+    },
+  };
+}
+
+export function resumirFormasPagamento(vendas: Pick<VendaFinanceira, "forma_pagamento" | "total">[]) {
+  const totais = new Map<string, { total: number; valor: number }>();
+
+  vendas.forEach((venda) => {
+    const forma = nomeFormaPagamento(venda);
+    const atual = totais.get(forma) || { total: 0, valor: 0 };
+    totais.set(forma, { total: atual.total + 1, valor: atual.valor + (venda.total || 0) });
+  });
+
+  return Array.from(totais.entries())
+    .map(([nome, dados]) => ({ nome, total: dados.total, valor: dados.valor }))
+    .sort((a, b) => b.valor - a.valor);
+}
+
 export function listarDetalhesVendas(vendas: VendaFinanceira[]): LinhaDetalheVenda[] {
   return vendas
     .map((venda) => {
