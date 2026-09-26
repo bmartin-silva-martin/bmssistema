@@ -20,9 +20,9 @@ function persistir(venda, id) {
 
 describe("finalizacao com forma de pagamento", () => {
   it("aceita somente as formas conhecidas (compativeis com os valores ja gravados)", () => {
-    assert.deepEqual([...FORMAS_PAGAMENTO], ["Pix", "Crédito", "Débito", "Dinheiro", "Assinatura"]);
+    assert.deepEqual([...FORMAS_PAGAMENTO], ["Pix", "Crédito", "Débito", "Dinheiro"]);
     FORMAS_PAGAMENTO.forEach((forma) => assert.ok(formaPagamentoValida(forma)));
-    ["", null, undefined, "pix", "PIX", "Nao informado", "Boleto"].forEach((forma) =>
+    ["", null, undefined, "pix", "PIX", "Nao informado", "Boleto", "Assinatura"].forEach((forma) =>
       assert.equal(formaPagamentoValida(forma), false, String(forma)),
     );
   });

@@ -251,7 +251,7 @@ export function nomeFormaPagamento(venda: Pick<VendaFinanceira, "forma_pagamento
 
 // Mesmos rotulos do fluxo legado e dos valores ja gravados no banco ("Pix", "Débito").
 // vendas.forma_pagamento e text sem constraint, entao a validacao fica aqui.
-export const FORMAS_PAGAMENTO = ["Pix", "Crédito", "Débito", "Dinheiro", "Assinatura"] as const;
+export const FORMAS_PAGAMENTO = ["Pix", "Crédito", "Débito", "Dinheiro"] as const;
 export type FormaPagamento = (typeof FORMAS_PAGAMENTO)[number];
 
 export const MENSAGEM_FORMA_PAGAMENTO_OBRIGATORIA = "Selecione a forma de pagamento para finalizar o atendimento.";
