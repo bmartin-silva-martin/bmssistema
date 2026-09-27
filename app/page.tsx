@@ -5085,15 +5085,15 @@ function InteligenciaPanel({
     <div className="inteligencia-panel">
       <div className="inteligencia-grid">
 
-        <article className="inteligencia-card">
-          <h3>Receita — {labelPeriodo}</h3>
+        <article className="inteligencia-card hero">
+          <h3>💰 Receita — {labelPeriodo}</h3>
           <strong className="inteligencia-numero">{formatarMoeda(receita30)}</strong>
           {periodo !== "7" && <span>Ultimos 7 dias: {formatarMoeda(receita7)}</span>}
           <span>Ticket medio: {formatarMoeda(ticketMedio)}</span>
           <span>{vendas30.length} atendimento{vendas30.length !== 1 ? "s" : ""} no periodo</span>
         </article>
 
-        <InteligenciaListCard className="inteligencia-card" title={`Servicos mais populares — ${labelPeriodo}`}>
+        <InteligenciaListCard className="inteligencia-card" title={`✂️ Servicos mais populares — ${labelPeriodo}`}>
           {topServicos.length === 0 ? (
             <span className="inteligencia-vazio">Sem dados suficientes</span>
           ) : (
@@ -5104,7 +5104,7 @@ function InteligenciaPanel({
           )}
         </InteligenciaListCard>
 
-        <InteligenciaListCard className="inteligencia-card destaque-alerta" title="Produtos com baixo giro">
+        <InteligenciaListCard className="inteligencia-card destaque-alerta" title="📦 Produtos com baixo giro">
           <p className="inteligencia-subtitulo">Menos de 2 unidades vendidas em 30 dias — considere fazer uma promocao.</p>
           {produtosBaixoGiro.length === 0 ? (
             <span className="inteligencia-vazio">Todos os produtos estao girando bem!</span>
@@ -5116,7 +5116,7 @@ function InteligenciaPanel({
           )}
         </InteligenciaListCard>
 
-        <InteligenciaListCard className="inteligencia-card destaque-positivo" title="Sugestao de recompra">
+        <InteligenciaListCard className="inteligencia-card destaque-positivo" title="🔁 Sugestao de recompra">
           <p className="inteligencia-subtitulo">Produtos que mais saem — mantenha estoque em dia.</p>
           {produtosMaisVendidos.length === 0 ? (
             <span className="inteligencia-vazio">Sem dados de venda ainda.</span>
@@ -5128,7 +5128,7 @@ function InteligenciaPanel({
           )}
         </InteligenciaListCard>
 
-        <InteligenciaListCard className="inteligencia-card destaque-alerta" title="Clientes para reativar">
+        <InteligenciaListCard className="inteligencia-card destaque-alerta" title="👋 Clientes para reativar">
           <p className="inteligencia-subtitulo">{clientesInativos.length} clientes sem visita ha mais de {labelPeriodo}.</p>
           {clientesInativos.length === 0 ? (
             <span className="inteligencia-vazio">Nenhum cliente inativo!</span>
@@ -5155,7 +5155,7 @@ function InteligenciaPanel({
         </InteligenciaListCard>
 
         {produtosBaixoGiro.length > 0 && (
-          <InteligenciaListCard className="inteligencia-card destaque-sugestao" title="Sugestao de promocao">
+          <InteligenciaListCard className="inteligencia-card destaque-sugestao" title="🏷️ Sugestao de promocao">
             <InteligenciaVerMais
               items={produtosBaixoGiro.map((p) => ({
                 key: String(p.id),

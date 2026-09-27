@@ -4787,37 +4787,64 @@ th {
 .inteligencia-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 700px) {
+  .inteligencia-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
 }
 
 .inteligencia-card {
-  border: 1px solid rgb(255 255 255 / 0.08);
-  border-radius: 14px;
+  background: linear-gradient(180deg, #181c24, #141820);
+  border: 1px solid rgb(255 255 255 / 0.07);
+  border-radius: 22px;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
   padding: 1.1rem 1.25rem;
 }
 
+.inteligencia-card.hero {
+  background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end));
+  border-color: transparent;
+}
+
 .inteligencia-card h3 {
-  color: #e2e8f0;
-  font-size: 0.88rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  align-items: center;
+  color: #9aa1b0;
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 800;
+  gap: 0.4rem;
+  letter-spacing: 0.05em;
   margin: 0;
   text-transform: uppercase;
 }
 
+.inteligencia-card.hero h3 {
+  color: rgb(255 255 255 / 0.85);
+}
+
 .inteligencia-numero {
   color: #4ade80;
-  font-size: 1.8rem;
-  font-weight: 800;
+  font-size: clamp(1.7rem, 7vw, 2.1rem);
+  font-weight: 900;
   line-height: 1;
 }
 
+.inteligencia-card.hero .inteligencia-numero {
+  color: #ffffff;
+}
+
 .inteligencia-card span {
-  color: #64748b;
+  color: #8f98a8;
   font-size: 0.82rem;
+}
+
+.inteligencia-card.hero span {
+  color: rgb(255 255 255 / 0.85);
 }
 
 .inteligencia-subtitulo {
@@ -4841,8 +4868,12 @@ th {
 }
 
 .inteligencia-card ul li {
+  background: rgb(255 255 255 / 0.04);
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.65rem 0.85rem;
 }
 
 .inteligencia-card ul li strong {
@@ -4851,7 +4882,7 @@ th {
 }
 
 .inteligencia-card ul li span {
-  color: #64748b;
+  color: #8f98a8;
   font-size: 0.78rem;
 }
 
@@ -4909,8 +4940,8 @@ th {
 }
 
 .inteligencia-card.destaque-alerta {
-  border-color: rgb(251 191 36 / 0.2);
-  background: rgb(251 191 36 / 0.04);
+  background: linear-gradient(180deg, rgb(251 191 36 / 0.09), rgb(251 191 36 / 0.02) 60%, #141820);
+  border-color: rgb(251 191 36 / 0.22);
 }
 
 .inteligencia-card.destaque-alerta h3 {
@@ -4918,8 +4949,8 @@ th {
 }
 
 .inteligencia-card.destaque-positivo {
-  border-color: rgb(34 197 94 / 0.2);
-  background: rgb(34 197 94 / 0.04);
+  background: linear-gradient(180deg, rgb(34 197 94 / 0.09), rgb(34 197 94 / 0.02) 60%, #141820);
+  border-color: rgb(34 197 94 / 0.22);
 }
 
 .inteligencia-card.destaque-positivo h3 {
@@ -4927,8 +4958,8 @@ th {
 }
 
 .inteligencia-card.destaque-sugestao {
+  background: linear-gradient(180deg, rgb(139 92 246 / 0.1), rgb(139 92 246 / 0.02) 60%, #141820);
   border-color: rgb(139 92 246 / 0.25);
-  background: rgb(139 92 246 / 0.05);
 }
 
 .inteligencia-card.destaque-sugestao h3 {
