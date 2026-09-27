@@ -15,7 +15,8 @@ registerHooks({
 });
 
 const { horarioLocalDoInstante, lerHorarioLocal, lerInstante, minutosAteHorarioLocal } = await import("../lib/horarioLocal.ts");
-const { classificarResultadoEnvio, montarMensagemLembrete, montarMensagemManual, telefoneWhatsAppValido, tipoLembreteElegivel } = await import(
+const { classificarResultadoEnvio, montarMensagemLembrete, montarMensagemManual, telefoneWhatsAppValido, tipoLembreteElegivel, tipoLembretePorHorario } =
+  await import(
   "../lib/lembretesWhatsApp.ts"
 );
 const { processarLembretesAutomaticos } = await import("../lib/lembretesAutomaticos.ts");
@@ -103,6 +104,13 @@ describe("elegibilidade", () => {
     // 131 min: fora do 2h e perto demais dele para o do dia (precisa de 220 min = 130 + 90).
     assert.equal(tipoLembreteElegivel(agendamento({ data_agendamento: "2026-09-28 10:11:00" }), AGORA_08H), null);
     assert.equal(tipoLembreteElegivel(agendamento({ data_agendamento: "2026-09-28 11:40:00" }), AGORA_08H), "reminder_day");
+  });
+
+  it("regra de horario do push nao depende de aceita_lembrete", () => {
+    for (const aceita of [false, null, undefined, true]) {
+      assert.equal(tipoLembretePorHorario(agendamento({ aceita_lembrete: aceita }), AGORA_08H), "reminder_day", String(aceita));
+      assert.equal(tipoLembretePorHorario(agendamento({ aceita_lembrete: aceita, data_agendamento: "2026-09-28 10:00:00" }), AGORA_08H), "reminder_2h");
+    }
   });
 
   it("aceita_lembrete precisa ser true", () => {
@@ -629,20 +637,56 @@ describe("processamento automatico", () => {
     assert.equal(chamadas.length, 2);
   });
 
-  it("agendamento sem aceita_lembrete nao recebe em nenhum canal", async () => {
+  // aceita_lembrete = consentimento de WhatsApp; push depende somente da inscricao do aparelho.
+  // Sem inscricao cobre navegador sem suporte a push e Safari/iPhone fora do app instalado.
+  const cenariosCanais = [
+    ["aceita WhatsApp e recusa push", true, false, true, false],
+    ["recusa WhatsApp e aceita push", false, true, false, true],
+    ["aceita ambos", true, true, true, true],
+    ["recusa ambos", false, false, false, false],
+    ["navegador sem suporte a push + WhatsApp marcado", true, false, true, false],
+    ["Safari/iPhone sem push + WhatsApp marcado", true, false, true, false],
+    ["aceita_lembrete nulo (legado) + push", null, true, false, true],
+  ];
+
+  for (const [nome, aceita, inscrito, esperaWhatsApp, esperaPush] of cenariosCanais) {
+    it(`canais independentes: ${nome}`, async () => {
+      for (const data_agendamento of ["2026-09-28T15:00:00+00:00", "2026-09-28 10:00:00"]) {
+        const repo = criarRepositorioMemoria({
+          agendamentos: [candidato(1, { aceita_lembrete: aceita, data_agendamento })],
+          comPush: inscrito ? [1] : [],
+          empresas: EMPRESAS,
+        });
+        const pushes = [];
+        const { chamadas, enviar } = criarEnvio();
+
+        const resumo = await executar(repo, enviar, { enviarPush: async (empresaId, id) => (pushes.push(id), "enviado") });
+
+        assert.equal(chamadas.length, esperaWhatsApp ? 1 : 0, `whatsapp ${data_agendamento}`);
+        assert.equal(pushes.length, esperaPush ? 1 : 0, `push ${data_agendamento}`);
+        assert.equal(resumo.whatsapp.enviados, esperaWhatsApp ? 1 : 0);
+        assert.equal(resumo.push.enviados, esperaPush ? 1 : 0);
+        assert.deepEqual(repo.mensagens.map((m) => m.canal).sort(), [...(esperaPush ? ["push"] : []), ...(esperaWhatsApp ? ["whatsapp"] : [])]);
+      }
+    });
+  }
+
+  it("push sem consentimento de WhatsApp segue as mesmas regras de horario e status", async () => {
     const repo = criarRepositorioMemoria({
-      agendamentos: [candidato(1, { aceita_lembrete: false }), candidato(2, { aceita_lembrete: null })],
-      comPush: [1, 2],
+      agendamentos: [
+        candidato(1, { aceita_lembrete: false, status: "cancelado" }),
+        candidato(2, { aceita_lembrete: false, data_agendamento: "2026-09-28 10:15:00" }),
+        candidato(3, { aceita_lembrete: false, created_at: "2026-09-28T10:30:00+00:00" }),
+        candidato(4, { aceita_lembrete: false, ultimo_manual_em: "2026-09-28T10:50:00.000Z" }),
+      ],
+      comPush: [1, 2, 3, 4],
       empresas: EMPRESAS,
     });
     const pushes = [];
-    const { chamadas, enviar } = criarEnvio();
 
-    await executar(repo, enviar, { enviarPush: async (empresaId, id) => (pushes.push(id), "enviado") });
+    await executar(repo, criarEnvio().enviar, { enviarPush: async (empresaId, id) => (pushes.push(id), "enviado") });
 
-    assert.deepEqual(chamadas, []);
     assert.deepEqual(pushes, []);
-    assert.deepEqual(repo.mensagens, []);
   });
 
   it("lembrete manual recente impede o automatico em seguida", async () => {

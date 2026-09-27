@@ -188,6 +188,10 @@ export async function POST(request: Request) {
 
     if (clienteBuscaError) return errorResponse("Nao foi possivel localizar o cadastro.", 500);
 
+    // Consentimento de WhatsApp deste agendamento; somente o booleano true vale (nunca "false" como texto).
+    // clientes.aceita_lembrete so e preenchido no cadastro novo e nao e usado pelo cron.
+    const aceitaLembreteWhatsApp = body.aceitaLembrete === true;
+
     let clienteId = clienteExistente?.id;
     if (!clienteId) {
       const dataNascimento = typeof body.dataNascimento === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.dataNascimento)
@@ -196,7 +200,7 @@ export async function POST(request: Request) {
       const { data: novoCliente, error: clienteInsertError } = await supabase
         .from("clientes")
         .insert({
-          aceita_lembrete: Boolean(body.aceitaLembrete),
+          aceita_lembrete: aceitaLembreteWhatsApp,
           data_nascimento: dataNascimento,
           empresa_id: empresa.id,
           nome,
@@ -212,7 +216,7 @@ export async function POST(request: Request) {
     const { data: agendamento, error: agendamentoError } = await supabase
       .from("agendamentos")
       .insert({
-        aceita_lembrete: Boolean(body.aceitaLembrete),
+        aceita_lembrete: aceitaLembreteWhatsApp,
         cliente_id: clienteId,
         data_agendamento: `${data} ${hora}:00`,
         empresa_id: empresa.id,

@@ -16,6 +16,7 @@ registerHooks({
 });
 
 const { formNovoAgendamentoInicial, montarAgendamentoManual } = await import("../lib/agendamentoManual.ts");
+const { montarPedidoAgendamentoPublico } = await import("../lib/agendamentoPublico.ts");
 
 describe("agendamento manual do painel", () => {
   const base = { clienteId: 7, empresaId: 1, profissionalId: 3, servicoId: 5 };
@@ -64,6 +65,59 @@ describe("agendamento manual do painel", () => {
   });
 });
 
+describe("tela publica: WhatsApp separado do push", () => {
+  const pedido = {
+    data: "2027-01-04",
+    dataNascimento: "",
+    empresa: "alfa",
+    hora: "09:00",
+    nome: "Ana",
+    profissionalId: null,
+    servicoId: 5,
+    telefone: "5511999990000",
+  };
+
+  it("aceitaLembrete do pedido vem somente da escolha de WhatsApp", () => {
+    assert.equal(montarPedidoAgendamentoPublico({ ...pedido, aceitaLembreteWhatsApp: true }).aceitaLembrete, true);
+    assert.equal(montarPedidoAgendamentoPublico({ ...pedido, aceitaLembreteWhatsApp: false }).aceitaLembrete, false);
+    for (const valor of [undefined, null, "true", 1]) {
+      assert.equal(montarPedidoAgendamentoPublico({ ...pedido, aceitaLembreteWhatsApp: valor }).aceitaLembrete, false, String(valor));
+    }
+    // Campos de push/notificacao nao existem no pedido e nao influenciam o consentimento.
+    const comPermissao = montarPedidoAgendamentoPublico({ ...pedido, aceitaLembreteWhatsApp: false, notificationPermission: "granted", pushAutorizado: true });
+    assert.equal(comPermissao.aceitaLembrete, false);
+    assert.ok(!Object.keys(comPermissao).some((chave) => /push|notif/i.test(chave)));
+  });
+
+  it("pagina liga o consentimento ao checkbox de WhatsApp e o push a permissao do navegador", async () => {
+    const pagina = await readFile(new URL("app/agendamentos/page.tsx", raiz), "utf8");
+
+    assert.match(pagina, /const \[aceitaLembreteWhatsApp, setAceitaLembreteWhatsApp\] = useState\(false\);/);
+    assert.match(pagina, /const \[pushAutorizado, setPushAutorizado\] = useState\(false\);/);
+    // Unico lugar que altera o consentimento de WhatsApp: o checkbox.
+    assert.deepEqual(pagina.match(/setAceitaLembreteWhatsApp\(/g), ["setAceitaLembreteWhatsApp("]);
+    assert.match(pagina, /checked=\{aceitaLembreteWhatsApp\}\s*onChange=\{\(event\) => setAceitaLembreteWhatsApp\(event\.target\.checked\)\}/);
+    assert.match(pagina, /Receber lembretes deste agendamento pelo WhatsApp/);
+    assert.match(pagina, /montarPedidoAgendamentoPublico\(\{\s*aceitaLembreteWhatsApp,/);
+    // Permissao de notificacao alimenta so o push.
+    assert.match(pagina, /setPushAutorizado\(permission === "granted"\)/);
+    assert.match(pagina, /if \(!pushAutorizado \|\| !vapidPublicKey \|\| Notification\.permission !== "granted"\)/);
+    assert.doesNotMatch(pagina, /aceitaLembreteWhatsApp[^\n]*(permission|Notification|pushAutorizado)/);
+    assert.doesNotMatch(pagina, /(permission|Notification|pushAutorizado)[^\n]*setAceitaLembreteWhatsApp/);
+    assert.doesNotMatch(pagina, /\baceitaLembrete\b(?!WhatsApp)/);
+  });
+
+  it("textos de notificacao nao prometem WhatsApp", async () => {
+    const pagina = await readFile(new URL("app/agendamentos/page.tsx", raiz), "utf8");
+    const inicio = pagina.indexOf("async function pedirNotificacao");
+    const trechoNotificacao = pagina.slice(inicio, pagina.indexOf("async function salvarInscricaoPush"));
+
+    assert.doesNotMatch(trechoNotificacao, /WhatsApp/);
+    assert.match(pagina, /Ativar notificações neste dispositivo/);
+    assert.doesNotMatch(pagina, /lembrar pelo WhatsApp informado|agendamento pelo WhatsApp\./);
+  });
+});
+
 // PostgREST falso: suficiente para a rota publica e para o repositorio do cron.
 let baseUrl = "";
 let tabelas = {};
@@ -78,6 +132,8 @@ function filtrar(linhas, params) {
       if (valor.startsWith("in.(")) return valor.slice(4, -1).split(",").includes(String(linha[coluna]));
       if (valor.startsWith("gte.")) return String(linha[coluna]) >= valor.slice(4);
       if (valor.startsWith("lte.")) return String(linha[coluna]) <= valor.slice(4);
+      if (valor.startsWith("lt.")) return String(linha[coluna]) < valor.slice(3);
+      if (valor === "is.null") return linha[coluna] == null;
       throw new Error(`Filtro nao suportado no fake: ${coluna}=${valor}`);
     }),
   );
@@ -105,7 +161,20 @@ const servidor = http.createServer(async (req, res) => {
     return responder(res, 201, objeto ? inseridas[0] : inseridas);
   }
 
-  const linhas = filtrar(tabelas[tabela] || [], url.searchParams);
+  if (req.method === "PATCH") {
+    const alteradas = filtrar(tabelas[tabela] || [], url.searchParams);
+    for (const linha of alteradas) Object.assign(linha, JSON.parse(corpo));
+    return responder(res, 200, alteradas);
+  }
+
+  let linhas = filtrar(tabelas[tabela] || [], url.searchParams);
+  if (tabela === "agendamentos") {
+    linhas = linhas.map((linha) => ({
+      clientes: tabelas.clientes.find((c) => c.id === linha.cliente_id) || null,
+      servicos: tabelas.servicos.find((sv) => sv.id === linha.servico_id) || null,
+      ...linha,
+    }));
+  }
   if (objeto) return linhas.length === 1 ? responder(res, 200, linhas[0]) : responder(res, 406, { code: "PGRST116" });
   return responder(res, 200, linhas);
 });
@@ -125,7 +194,8 @@ beforeEach(() => {
     clientes: [],
     empresas: [{ ativo: true, dias_atendimento: null, horarios_atendimento: null, id: 1, licenca_expires_at: null, slug: "alfa" }],
     mensagens_whatsapp: [],
-    servicos: [{ empresa_id: 1, id: 5 }],
+    push_subscriptions: [],
+    servicos: [{ empresa_id: 1, id: 5, nome: "Corte" }],
   };
 });
 
@@ -150,6 +220,8 @@ describe("agendamento publico", () => {
     [true, true],
     [false, false],
     [undefined, false],
+    ["false", false],
+    ["true", false],
   ]) {
     it(`continua funcionando e grava aceita_lembrete = ${esperado} (enviado: ${aceitaLembrete})`, async () => {
       const res = await reservar({ aceitaLembrete });
@@ -163,8 +235,8 @@ describe("agendamento publico", () => {
   }
 });
 
-describe("cron considera somente aceita_lembrete = true", () => {
-  it("repositorio do cron filtra no banco por aceita_lembrete = true", async () => {
+describe("cron: WhatsApp exige aceita_lembrete = true; push nao", () => {
+  it("repositorio devolve todos os confirmados e o WhatsApp filtra pelo consentimento", async () => {
     const { criarRepositorioSupabase } = await import("../lib/lembretesAutomaticos.ts");
     const { getSupabaseServerClient } = await import("../lib/pushReminders.ts");
     const linha = (id, aceita_lembrete) => ({
@@ -182,8 +254,54 @@ describe("cron considera somente aceita_lembrete = true", () => {
     });
     tabelas.agendamentos = [linha(1, true), linha(2, false), linha(3, null)];
 
-    const candidatos = await criarRepositorioSupabase(getSupabaseServerClient()).buscarCandidatos("2026-09-28");
+    const repositorio = criarRepositorioSupabase(getSupabaseServerClient());
+    const candidatos = await repositorio.buscarCandidatos("2026-09-28");
+    assert.deepEqual(candidatos.map((c) => [c.id, c.aceita_lembrete]), [[1, true], [2, false], [3, null]]);
 
-    assert.deepEqual(candidatos.map((c) => [c.id, c.aceita_lembrete]), [[1, true]]);
+    const { processarLembretesAutomaticos } = await import("../lib/lembretesAutomaticos.ts");
+    const whatsapp = [];
+    const push = [];
+    const resumo = await processarLembretesAutomaticos({
+      agora: new Date("2026-09-28T11:00:00Z"),
+      enviar: async (numero, texto) => (whatsapp.push(texto), { tipo: "ok" }),
+      enviarPush: async (empresaId, id) => (push.push(id), "enviado"),
+      repositorio: { ...repositorio, buscarAgendamentosComPush: async (empresaId, ids) => new Set(ids) },
+    });
+
+    assert.equal(resumo.whatsapp.elegiveis, 1);
+    assert.equal(whatsapp.length, 1);
+    assert.match(whatsapp[0], /^Olá, Cliente 1!/);
+    assert.deepEqual(push.sort(), [1, 2, 3]);
+  });
+
+  it("agendamento publico com WhatsApp marcado e sem push (ex.: Safari/iPhone) recebe WhatsApp", async () => {
+    const { POST } = await import("../app/api/public-booking/route.ts");
+    const res = await POST(
+      new Request("http://localhost/api/public-booking", {
+        body: JSON.stringify({ aceitaLembrete: true, data: "2027-01-04", empresa: "alfa", hora: "09:00", nome: "Ana", servicoId: 5, telefone: "11999990000" }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }),
+    );
+    assert.equal(res.status, 200);
+    assert.deepEqual(tabelas.push_subscriptions, []);
+
+    const { criarRepositorioSupabase, processarLembretesAutomaticos } = await import("../lib/lembretesAutomaticos.ts");
+    const { getSupabaseServerClient } = await import("../lib/pushReminders.ts");
+    const whatsapp = [];
+    const push = [];
+
+    // 07:00 locais: faltam 2h para o horario das 09:00.
+    const resumo = await processarLembretesAutomaticos({
+      agora: new Date("2027-01-04T10:00:00Z"),
+      enviar: async (numero, texto) => (whatsapp.push([numero, texto]), { tipo: "ok" }),
+      enviarPush: async (empresaId, id) => (push.push(id), "enviado"),
+      repositorio: criarRepositorioSupabase(getSupabaseServerClient()),
+    });
+
+    assert.equal(resumo.whatsapp.enviados, 1);
+    assert.equal(whatsapp[0][0], "5511999990000");
+    assert.match(whatsapp[0][1], /hoje às 09:00 para Corte/);
+    assert.deepEqual(push, []);
   });
 });

@@ -35,14 +35,14 @@ type DadosMensagem = {
   servico?: string | null;
 };
 
-// Regras:
-// - somente aceita_lembrete = true e status "confirmado", no dia local do agendamento;
+// Regras de horario (comuns a WhatsApp e push):
+// - somente status "confirmado", no dia local do agendamento;
 // - lembrete manual nos ultimos 90 min bloqueia qualquer automatico (e o do dia, se foi hoje);
 // - reminder_2h (prioritario): primeira execucao em que faltem entre 30 e 130 minutos;
 // - reminder_day: a partir das 08:00 locais, faltando >= 220 min (90 min antes do 2h),
 //   e somente se o agendamento nao foi criado no proprio dia. Sem created_at confiavel, nao envia.
-export function tipoLembreteElegivel(agendamento: AgendamentoParaLembrete, agora: Date): TipoLembrete | null {
-  if (agendamento.aceita_lembrete !== true) return null;
+// Consentimento nao entra aqui: WhatsApp exige aceita_lembrete; push depende so da inscricao.
+export function tipoLembretePorHorario(agendamento: AgendamentoParaLembrete, agora: Date): TipoLembrete | null {
   if ((agendamento.status || "").toLowerCase() !== "confirmado") return null;
 
   const horario = lerHorarioLocal(agendamento.data_agendamento);
@@ -70,6 +70,12 @@ export function tipoLembreteElegivel(agendamento: AgendamentoParaLembrete, agora
   if (!criadoEm || horarioLocalDoInstante(criadoEm).data === agoraLocal.data) return null;
 
   return "reminder_day";
+}
+
+// WhatsApp: aceita_lembrete representa exclusivamente o consentimento do agendamento para WhatsApp.
+export function tipoLembreteElegivel(agendamento: AgendamentoParaLembrete, agora: Date): TipoLembrete | null {
+  if (agendamento.aceita_lembrete !== true) return null;
+  return tipoLembretePorHorario(agendamento, agora);
 }
 
 export function telefoneWhatsAppValido(telefone: string | null | undefined) {

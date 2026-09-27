@@ -9,7 +9,7 @@ import {
   type StatusMensagem,
   telefoneWhatsAppValido,
   type TipoLembrete,
-  tipoLembreteElegivel,
+  tipoLembretePorHorario,
 } from "@/lib/lembretesWhatsApp";
 
 export const PROCESSANDO_TRAVADO_MINUTOS = 10;
@@ -221,9 +221,12 @@ async function processarCanal(
   return resumo;
 }
 
-async function processarWhatsApp(itens: Item[], opcoes: OpcoesProcessamento): Promise<ResumoCanal> {
+async function processarWhatsApp(todos: Item[], opcoes: OpcoesProcessamento): Promise<ResumoCanal> {
   const { enviar, repositorio } = opcoes;
   if (!enviar) return resumoVazio(false);
+
+  // Somente quem marcou o consentimento de WhatsApp neste agendamento.
+  const itens = todos.filter((item) => item.agendamento.aceita_lembrete === true);
   if (itens.length === 0) return resumoVazio(true);
 
   let nomesEmpresas: Map<number, string>;
@@ -261,7 +264,8 @@ async function processarPush(itens: Item[], opcoes: OpcoesProcessamento): Promis
   const { enviarPush, repositorio } = opcoes;
   if (!enviarPush) return resumoVazio(false);
 
-  // Reserva apenas quem tem inscricao push, para nao criar uma linha "ignorado" por agendamento.
+  // Nao depende de aceita_lembrete (consentimento de WhatsApp): a inscricao push ja e a autorizacao.
+  // Reserva apenas quem tem inscricao, para nao criar uma linha "ignorado" por agendamento.
   const comPush: Item[] = [];
   try {
     const porEmpresa = new Map<number, Item[]>();
@@ -290,7 +294,7 @@ export async function processarLembretesAutomaticos(opcoes: OpcoesProcessamento)
 
   const candidatos = await repositorio.buscarCandidatos(horarioLocalDoInstante(agora).data);
   const itens = candidatos
-    .map((agendamento) => ({ agendamento, tipo: tipoLembreteElegivel(agendamento, agora) }))
+    .map((agendamento) => ({ agendamento, tipo: tipoLembretePorHorario(agendamento, agora) }))
     .filter((item): item is Item => item.tipo !== null)
     .sort((a, b) => a.agendamento.data_agendamento.localeCompare(b.agendamento.data_agendamento));
 
@@ -344,12 +348,12 @@ export function criarRepositorioSupabase(supabase: SupabaseClient): RepositorioL
 
     async buscarCandidatos(dataLocal) {
       // Mesmo formato sem fuso usado na gravacao, para o banco comparar no mesmo referencial.
+      // Sem filtro de aceita_lembrete: ele vale so para WhatsApp e e aplicado no processamento.
       const { data, error } = await supabase
         .from("agendamentos")
         .select(
           "id,empresa_id,data_agendamento,created_at,status,aceita_lembrete,lembrete_enviado_em,lembrete_status,clientes(nome,telefone),servicos(nome),profissionais(nome)",
         )
-        .eq("aceita_lembrete", true)
         .eq("status", "confirmado")
         .gte("data_agendamento", `${dataLocal} 00:00:00`)
         .lte("data_agendamento", `${dataLocal} 23:59:59`)

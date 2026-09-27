@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { montarPedidoAgendamentoPublico } from "@/lib/agendamentoPublico";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const EMPRESA_ID_LEGADO = 1;
@@ -156,7 +157,8 @@ export default function AgendamentoPublicoPage() {
   const [buscandoHistorico, setBuscandoHistorico] = useState(false);
   const [nomeConfirmado, setNomeConfirmado] = useState(false);
   const [notificacaoRespondida, setNotificacaoRespondida] = useState(false);
-  const [aceitaLembrete, setAceitaLembrete] = useState(false);
+  const [pushAutorizado, setPushAutorizado] = useState(false);
+  const [aceitaLembreteWhatsApp, setAceitaLembreteWhatsApp] = useState(false);
   const [servicoConfirmado, setServicoConfirmado] = useState(false);
   const [horarioConfirmado, setHorarioConfirmado] = useState(false);
   const [profissionalId, setProfissionalId] = useState<number | null>(null);
@@ -299,18 +301,18 @@ export default function AgendamentoPublicoPage() {
 
   async function pedirNotificacao() {
     if (!("Notification" in window)) {
-      setAceitaLembrete(false);
-      setMensagem("Seu navegador nao permite notificacoes. Vamos seguir com o agendamento pelo WhatsApp.");
+      setPushAutorizado(false);
+      setMensagem("Este navegador não permite notificações. Você pode seguir com o agendamento normalmente.");
       setNotificacaoRespondida(true);
       rolarParaProximaEtapa();
       return;
     }
 
     const permission = await Notification.requestPermission();
-    setAceitaLembrete(permission === "granted");
+    setPushAutorizado(permission === "granted");
 
     if (permission !== "granted") {
-      setMensagem("Tudo bem, voce ainda pode agendar. A barbearia podera lembrar pelo WhatsApp informado.");
+      setMensagem("Tudo bem, você pode agendar normalmente sem notificações.");
     } else {
       setMensagem("Notificacoes ativadas. Ao confirmar, vamos salvar este aparelho para receber lembretes.");
     }
@@ -322,7 +324,7 @@ export default function AgendamentoPublicoPage() {
   async function salvarInscricaoPush(clienteId: number, agendamentoId: number) {
     const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
-    if (!aceitaLembrete || !vapidPublicKey || Notification.permission !== "granted") {
+    if (!pushAutorizado || !vapidPublicKey || Notification.permission !== "granted") {
       return false;
     }
 
@@ -386,17 +388,19 @@ export default function AgendamentoPublicoPage() {
     const response = await fetch("/api/public-booking", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        aceitaLembrete,
-        data,
-        dataNascimento: dataNascimento || null,
-        empresa: empresaId,
-        hora: horario,
-        nome: nomeLimpo,
-        profissionalId,
-        servicoId,
-        telefone: telefoneLimpo,
-      }),
+      body: JSON.stringify(
+        montarPedidoAgendamentoPublico({
+          aceitaLembreteWhatsApp,
+          data,
+          dataNascimento,
+          empresa: empresaId,
+          hora: horario,
+          nome: nomeLimpo,
+          profissionalId,
+          servicoId,
+          telefone: telefoneLimpo,
+        }),
+      ),
     });
     const resultado = await response.json().catch(() => null);
 
@@ -410,13 +414,13 @@ export default function AgendamentoPublicoPage() {
     setAgendamentoIdConfirmado(resultado.agendamentoId);
     setAgendamentoConcluido(true);
     setMensagem(
-      aceitaLembrete
+      pushAutorizado
         ? "Agendamento confirmado! Estamos testando a notificacao neste aparelho."
         : "Agendamento confirmado! A barbearia recebeu sua reserva.",
     );
     rolarParaProximaEtapa();
 
-    if (aceitaLembrete) {
+    if (pushAutorizado) {
       salvarInscricaoPush(resultado.clienteId, resultado.agendamentoId)
         .then((notificacoesEnviadas) => {
           if (notificacoesEnviadas) {
@@ -622,19 +626,19 @@ export default function AgendamentoPublicoPage() {
           <>
             <AssistantBubble>Como vai, {primeiroNome}! Tudo bem?</AssistantBubble>
             <AssistantBubble wide>
-              Para que possamos lembra-lo de seu agendamento, ative suas notificacoes clicando abaixo:
+              Se quiser, ative as notificações neste dispositivo para receber lembretes do agendamento:
             </AssistantBubble>
 
             {!notificacaoRespondida ? (
               <div className="chat-action-stack">
                 <button className="chat-action-button" onClick={pedirNotificacao} type="button">
-                  Ativar notificacoes
+                  Ativar notificações neste dispositivo
                 </button>
                 <button
                   className="chat-secondary-button"
                   onClick={() => {
                     setNotificacaoRespondida(true);
-                    setAceitaLembrete(false);
+                    setPushAutorizado(false);
                     rolarParaProximaEtapa();
                   }}
                   type="button"
@@ -789,6 +793,14 @@ export default function AgendamentoPublicoPage() {
                   type="date"
                   value={dataNascimento}
                 />
+              </label>
+              <label className="chat-consent-option">
+                <input
+                  checked={aceitaLembreteWhatsApp}
+                  onChange={(event) => setAceitaLembreteWhatsApp(event.target.checked)}
+                  type="checkbox"
+                />
+                Receber lembretes deste agendamento pelo WhatsApp
               </label>
             </div>
 

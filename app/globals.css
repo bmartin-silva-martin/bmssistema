@@ -5401,3 +5401,20 @@ th {
   height: 1.4rem;
   flex: none;
 }
+
+/* Consentimento de WhatsApp no agendamento publico; visual final sera feito na sessao de UI. */
+.chat-consent-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  color: #cbd5e1;
+}
+
+.chat-final-form .chat-consent-option input {
+  width: 1.4rem;
+  height: 1.4rem;
+  min-height: 1.4rem;
+  flex: none;
+  padding: 0;
+}
