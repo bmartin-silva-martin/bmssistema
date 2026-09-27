@@ -73,6 +73,7 @@ type Produto = {
 };
 
 type ClienteResumo = {
+  created_at?: string | null;
   data_nascimento?: string | null;
   id: number;
   nome: string;
@@ -394,6 +395,7 @@ export default function AdminDashboard() {
   const [salvandoConfiguracao, setSalvandoConfiguracao] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [buscaHistorico, setBuscaHistorico] = useState("");
+  const [clienteAnalisarId, setClienteAnalisarId] = useState<number | null>(null);
   const [nomeDono, setNomeDono] = useState(() => {
     if (typeof window === "undefined") return "";
 
@@ -473,6 +475,8 @@ export default function AdminDashboard() {
     if (filtroProfissionalId === "todos") return agendamentosDoDiaSelecionado;
     return agendamentosDoDiaSelecionado.filter((agendamento) => agendamento.profissional_id === filtroProfissionalId);
   }, [agendamentosDoDiaSelecionado, filtroProfissionalId]);
+
+  const clienteEmAnalise = clientes.find((cliente) => cliente.id === clienteAnalisarId) || null;
 
   const historicoAgendamentos = useMemo(() => {
     return agendamentos
@@ -625,7 +629,7 @@ export default function AdminDashboard() {
         .order("nome"),
       supabase
         .from("clientes")
-        .select("id,nome,telefone,data_nascimento")
+        .select("id,nome,telefone,data_nascimento,created_at")
         .eq("empresa_id", empresaId)
         .order("nome", { ascending: true }),
       supabase
@@ -2297,31 +2301,48 @@ export default function AdminDashboard() {
             onOpenMenu={() => setMobileDrawerOpen(true)}
             title="Clientes"
           >
-            <div className="section-tabs">
-              <button className={abaClientes === "cadastro" ? "active" : ""} onClick={() => setAbaClientes("cadastro")} type="button">Cadastro</button>
-              <button className={abaClientes === "historico" ? "active" : ""} onClick={() => setAbaClientes("historico")} type="button">Historico</button>
-              <button className={abaClientes === "ranking" ? "active" : ""} onClick={() => setAbaClientes("ranking")} type="button">Ranking</button>
-            </div>
+            {clienteEmAnalise ? (
+              <ClienteAnalisarPanel
+                agendamentos={agendamentos}
+                cliente={clienteEmAnalise}
+                onBack={() => setClienteAnalisarId(null)}
+                vendas={vendas}
+              />
+            ) : (
+              <>
+                <div className="section-tabs">
+                  <button className={abaClientes === "cadastro" ? "active" : ""} onClick={() => setAbaClientes("cadastro")} type="button">Cadastro</button>
+                  <button className={abaClientes === "historico" ? "active" : ""} onClick={() => setAbaClientes("historico")} type="button">Historico</button>
+                  <button className={abaClientes === "ranking" ? "active" : ""} onClick={() => setAbaClientes("ranking")} type="button">Ranking</button>
+                </div>
 
-            {abaClientes === "cadastro" && (
-              <article className="admin-panel">
-                <h2>Cadastro de clientes</h2>
-                <EditableClienteList clientes={clientes} onDelete={excluirCliente} setClientes={setClientes} onSave={atualizarCliente} />
-              </article>
-            )}
+                {abaClientes === "cadastro" && (
+                  <article className="admin-panel">
+                    <h2>Cadastro de clientes</h2>
+                    <EditableClienteList
+                      clientes={clientes}
+                      onAnalisar={setClienteAnalisarId}
+                      onDelete={excluirCliente}
+                      onSave={atualizarCliente}
+                      setClientes={setClientes}
+                    />
+                  </article>
+                )}
 
-            {abaClientes === "historico" && (
-              <article className="admin-panel">
-                <h2>Historico por cliente</h2>
-                <HistoricoClientePanel agendamentos={agendamentos} clientes={clientes} vendas={vendas} />
-              </article>
-            )}
+                {abaClientes === "historico" && (
+                  <article className="admin-panel">
+                    <h2>Historico por cliente</h2>
+                    <HistoricoClientePanel agendamentos={agendamentos} clientes={clientes} vendas={vendas} />
+                  </article>
+                )}
 
-            {abaClientes === "ranking" && (
-              <article className="admin-panel">
-                <h2>Ranking de clientes</h2>
-                <RankingClientePanel agendamentos={agendamentos} clientes={clientes} />
-              </article>
+                {abaClientes === "ranking" && (
+                  <article className="admin-panel">
+                    <h2>Ranking de clientes</h2>
+                    <RankingClientePanel agendamentos={agendamentos} clientes={clientes} />
+                  </article>
+                )}
+              </>
             )}
           </AdminSectionShell>
         )}
@@ -3809,6 +3830,23 @@ function formatarAniversario(data?: string | null) {
   return `${dia}/${mes}`;
 }
 
+function formatarTempoDesde(data?: string | null) {
+  if (!data) return "Sem data de cadastro";
+
+  const inicio = new Date(data).getTime();
+  if (Number.isNaN(inicio)) return "Sem data de cadastro";
+
+  const dias = Math.max(0, Math.floor((Date.now() - inicio) / (1000 * 60 * 60 * 24)));
+  if (dias < 1) return "Cliente novo";
+  if (dias < 30) return `${dias} dia${dias === 1 ? "" : "s"}`;
+
+  const meses = Math.floor(dias / 30);
+  if (meses < 12) return `${meses} ${meses === 1 ? "mes" : "meses"}`;
+
+  const anos = Math.floor(meses / 12);
+  return `${anos} ${anos === 1 ? "ano" : "anos"}`;
+}
+
 function formatarTelefone(telefone: string | null) {
   if (!telefone) return "Telefone nao informado";
   const digits = telefone.replace(/\D/g, "");
@@ -4368,11 +4406,13 @@ function EditableProdutoList({
 
 function EditableClienteList({
   clientes,
+  onAnalisar,
   onDelete,
   onSave,
   setClientes,
 }: {
   clientes: ClienteResumo[];
+  onAnalisar: (id: number) => void;
   onDelete?: (id: number) => Promise<void>;
   onSave: (cliente: ClienteResumo) => Promise<void>;
   setClientes: Dispatch<SetStateAction<ClienteResumo[]>>;
@@ -4380,11 +4420,20 @@ function EditableClienteList({
   const [busca, setBusca] = useState("");
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [limite, setLimite] = useState(3);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const [somenteAniversariantes, setSomenteAniversariantes] = useState(false);
   const termoBusca = normalizarBusca(busca);
+  const mesAtual = new Date().getMonth() + 1;
   const clientesFiltrados = clientes.filter((cliente) => {
-    return [cliente.nome, cliente.telefone || "", formatarAniversario(cliente.data_nascimento)]
+    const bateBusca = [cliente.nome, cliente.telefone || "", formatarAniversario(cliente.data_nascimento)]
       .map(normalizarBusca)
       .some((valor) => valor.includes(termoBusca));
+    if (!bateBusca) return false;
+    if (somenteAniversariantes) {
+      const mesNascimento = cliente.data_nascimento ? Number(cliente.data_nascimento.split("-")[1]) : null;
+      if (mesNascimento !== mesAtual) return false;
+    }
+    return true;
   });
   const clientesVisiveis = clientesFiltrados.slice(0, limite);
 
@@ -4398,21 +4447,44 @@ function EditableClienteList({
 
   return (
     <div className="client-manager">
-      <input
-        className="manager-search"
-        onChange={(event) => {
-          setBusca(event.target.value);
-          setLimite(3);
-        }}
-        placeholder="Buscar por nome, WhatsApp ou aniversario"
-        value={busca}
-      />
-
-      <div className="client-summary-grid">
-        <span>{clientes.length} clientes</span>
-        <span>{clientes.filter((cliente) => cliente.telefone).length} com WhatsApp</span>
-        <span>{clientes.filter((cliente) => cliente.data_nascimento).length} aniversarios</span>
+      <div className="client-search-row">
+        <input
+          className="manager-search"
+          onChange={(event) => {
+            setBusca(event.target.value);
+            setLimite(3);
+          }}
+          placeholder="Buscar por nome, WhatsApp ou aniversario"
+          value={busca}
+        />
+        <button
+          aria-label="Mostrar filtros"
+          className={`client-search-icon-button${filtrosAbertos ? " active" : ""}`}
+          onClick={() => setFiltrosAbertos((aberto) => !aberto)}
+          type="button"
+        >
+          ⏷
+        </button>
+        <button
+          aria-label="Aniversariantes do mes"
+          className={`client-search-icon-button${somenteAniversariantes ? " active" : ""}`}
+          onClick={() => {
+            setSomenteAniversariantes((valor) => !valor);
+            setLimite(3);
+          }}
+          type="button"
+        >
+          🗓
+        </button>
       </div>
+
+      {filtrosAbertos && (
+        <div className="client-summary-grid">
+          <span>{clientes.length} clientes</span>
+          <span>{clientes.filter((cliente) => cliente.telefone).length} com WhatsApp</span>
+          <span>{clientes.filter((cliente) => cliente.data_nascimento).length} aniversarios</span>
+        </div>
+      )}
 
       <div className="client-card-list">
         {clientesVisiveis.map((cliente) => {
@@ -4437,6 +4509,14 @@ function EditableClienteList({
                     💬
                   </a>
                 )}
+                <button
+                  aria-label="Ver estatisticas"
+                  className="client-card-icon-button"
+                  onClick={() => onAnalisar(cliente.id)}
+                  type="button"
+                >
+                  📊
+                </button>
                 <button
                   aria-label="Editar cliente"
                   className="client-card-icon-button"
@@ -4671,6 +4751,87 @@ function HistoricoClientePanel({
 
       {!busca && (
         <div className="empty-state">Digite o nome do cliente para ver o historico completo.</div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Analisar cliente ----------
+
+function ClienteAnalisarPanel({
+  agendamentos,
+  cliente,
+  onBack,
+  vendas,
+}: {
+  agendamentos: Agendamento[];
+  cliente: ClienteResumo;
+  onBack: () => void;
+  vendas: Venda[];
+}) {
+  const agendamentosCliente = agendamentos
+    .filter((ag) => firstRelation(ag.clientes)?.id === cliente.id)
+    .sort((a, b) => b.data_agendamento.localeCompare(a.data_agendamento));
+
+  const vendasCliente = vendas.filter((v) => {
+    if (!v.agendamento_id) return false;
+    return agendamentosCliente.some((ag) => ag.id === v.agendamento_id);
+  });
+
+  const totalGasto = vendasCliente.reduce((acc, v) => acc + (v.total || 0), 0);
+  const ticketMedio = vendasCliente.length > 0 ? totalGasto / vendasCliente.length : 0;
+
+  const contagemServicos = new Map<string, number>();
+  agendamentosCliente.forEach((ag) => {
+    const nome = firstRelation(ag.servicos)?.nome || "Servico nao informado";
+    contagemServicos.set(nome, (contagemServicos.get(nome) || 0) + 1);
+  });
+  const servicosRealizados: RankingItem[] = Array.from(contagemServicos.entries()).map(([nome, total]) => ({ nome, total }));
+  const totalServicos = servicosRealizados.reduce((acc, item) => acc + item.total, 0);
+
+  return (
+    <div className="cliente-analisar-panel">
+      <div className="cliente-analisar-header">
+        <button aria-label="Voltar para a lista de clientes" className="admin-section-topbar-btn" onClick={onBack} type="button">
+          ←
+        </button>
+        <div>
+          <p className="admin-kicker">Analisar</p>
+          <strong>{cliente.nome}</strong>
+          <span>{formatarTelefone(cliente.telefone)}</span>
+        </div>
+      </div>
+
+      <div className="finance-quad-grid cliente-analisar-metrics">
+        <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(ticketMedio)} />
+        <MetricCard helper="tempo desde o cadastro" label="Em atividade" value={formatarTempoDesde(cliente.created_at)} />
+      </div>
+
+      <ServiceTilesRow items={servicosRealizados} total={totalServicos} />
+
+      {agendamentosCliente.length === 0 ? (
+        <div className="empty-state">Nenhum atendimento encontrado para este cliente.</div>
+      ) : (
+        <div className="historico-lista">
+          {agendamentosCliente.map((ag) => {
+            const servico = firstRelation(ag.servicos);
+            const venda = vendasCliente.find((v) => v.agendamento_id === ag.id);
+            const valor = venda?.total ?? servico?.preco ?? 0;
+            return (
+              <article className="historico-item" key={ag.id}>
+                <div className="historico-item-data">
+                  {new Date(ag.data_agendamento).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  <br />
+                  {new Date(ag.data_agendamento).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                </div>
+                <div className="historico-item-corpo">
+                  <strong>{servico?.nome || "Servico nao informado"}</strong>
+                  {valor > 0 ? <span className="historico-valor">{formatarMoeda(valor)}</span> : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
       )}
     </div>
   );

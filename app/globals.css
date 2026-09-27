@@ -3950,6 +3950,69 @@ th {
   text-transform: uppercase;
 }
 
+.client-search-row {
+  align-items: stretch;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.client-search-row .manager-search {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.client-search-icon-button {
+  align-items: center;
+  background: #1c2029;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  color: #d7dbe2;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 1.1rem;
+  justify-content: center;
+  width: 3rem;
+}
+
+.client-search-icon-button.active {
+  background: rgb(255 112 74 / 0.16);
+  border-color: rgb(255 139 92 / 0.4);
+  color: #ffad98;
+}
+
+.cliente-analisar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cliente-analisar-header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cliente-analisar-header > div {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.cliente-analisar-header strong {
+  color: #ffffff;
+  font-size: 1.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cliente-analisar-header span {
+  color: #9aa1b0;
+  font-size: 0.82rem;
+}
+
 .client-card-list {
   display: grid;
   gap: 0.85rem;
