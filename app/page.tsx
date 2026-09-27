@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Session } from "@supabase/supabase-js";
+import { formNovoAgendamentoInicial, montarAgendamentoManual } from "@/lib/agendamentoManual";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useState } from "react";
 import {
@@ -413,14 +414,7 @@ export default function AdminDashboard() {
   const [diaAgendaSelecionado, setDiaAgendaSelecionado] = useState(dataLocalISO());
   const [agendaWeekOffset, setAgendaWeekOffset] = useState(0);
   const [novoAgendamentoAberto, setNovoAgendamentoAberto] = useState(false);
-  const [novoAgendamentoForm, setNovoAgendamentoForm] = useState({
-    clienteNome: "",
-    clienteTelefone: "",
-    data: dataLocalISO(),
-    horario: "",
-    profissionalId: "",
-    servicoId: "",
-  });
+  const [novoAgendamentoForm, setNovoAgendamentoForm] = useState(() => formNovoAgendamentoInicial(dataLocalISO()));
   const [salvandoNovoAgendamento, setSalvandoNovoAgendamento] = useState(false);
 
   const empresaIdAtual = empresa?.id || EMPRESA_ID_LEGADO;
@@ -1256,14 +1250,15 @@ export default function AdminDashboard() {
       clienteId = novoCliente.id;
     }
 
-    const { error: agendamentoError } = await supabase.from("agendamentos").insert({
-      cliente_id: clienteId,
-      data_agendamento: `${novoAgendamentoForm.data} ${novoAgendamentoForm.horario}:00`,
-      empresa_id: empresaIdAtual,
-      profissional_id: profissionalId,
-      servico_id: servicoId,
-      status: "confirmado",
-    });
+    const { error: agendamentoError } = await supabase.from("agendamentos").insert(
+      montarAgendamentoManual({
+        clienteId,
+        empresaId: empresaIdAtual,
+        form: novoAgendamentoForm,
+        profissionalId,
+        servicoId,
+      }),
+    );
 
     setSalvandoNovoAgendamento(false);
 
@@ -1274,14 +1269,7 @@ export default function AdminDashboard() {
 
     setDiaAgendaSelecionado(novoAgendamentoForm.data);
     setNovoAgendamentoAberto(false);
-    setNovoAgendamentoForm({
-      clienteNome: "",
-      clienteTelefone: "",
-      data: dataLocalISO(),
-      horario: "",
-      profissionalId: "",
-      servicoId: "",
-    });
+    setNovoAgendamentoForm(formNovoAgendamentoInicial(dataLocalISO()));
     await carregarDados();
     setMensagem(`Agendamento de ${nome} criado com sucesso.`);
   }
@@ -2610,6 +2598,16 @@ export default function AdminDashboard() {
                 value={novoAgendamentoForm.horario}
               />
             </label>
+            <div className="reminder-consent-field">
+              <label>
+                <input
+                  checked={novoAgendamentoForm.aceitaLembrete}
+                  onChange={(event) => setNovoAgendamentoForm((form) => ({ ...form, aceitaLembrete: event.target.checked }))}
+                  type="checkbox"
+                />
+                Enviar lembretes por WhatsApp
+              </label>
+            </div>
             <button className="admin-pill-button primary wide" disabled={salvandoNovoAgendamento} type="submit">
               {salvandoNovoAgendamento ? "Agendando..." : "Confirmar agendamento"}
             </button>

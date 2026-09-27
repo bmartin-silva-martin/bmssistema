@@ -4,7 +4,8 @@
 -- Escrita somente server-side (service role). O dono da empresa apenas le as proprias mensagens.
 
 -- O lembrete do dia depende de agendamentos.created_at (nao envia para agendamento criado no dia).
--- A coluna nao esta versionada neste repositorio; abortar aqui evita publicar codigo com premissa falsa.
+-- Confirmada em producao (timestamp without time zone, default now(); lido como UTC, fuso padrao do Supabase), mas nao
+-- versionada neste repositorio; a checagem passa em producao e so protege ambientes sem a coluna.
 do $$
 begin
   if not exists (
