@@ -26,6 +26,7 @@ let baseUrl = "";
 let tabelas = {};
 let enviosWhatsApp = [];
 let enviosPush = [];
+let escritas = [];
 let evolutionFora = false;
 let pushFora = false;
 let sequencia = 100;
@@ -94,6 +95,8 @@ const servidor = http.createServer(async (req, res) => {
     const tabela = url.pathname.slice("/rest/v1/".length);
     const objeto = req.headers.accept?.includes("vnd.pgrst.object");
 
+    if (req.method !== "GET" && req.method !== "HEAD") escritas.push(`${req.method} ${tabela}`);
+
     if (req.method === "POST") {
       const nova = JSON.parse(corpo);
       // Indice unico parcial (agendamento_id, tipo, canal) da migration.
@@ -144,8 +147,8 @@ webpush.sendNotification = async (inscricao) => {
 
 let GET;
 
-function chamar(headers = {}) {
-  return GET(new Request("https://bmssistema-sss2.vercel.app/api/cron/reminders", { headers, method: "GET" }));
+function chamar(headers = {}, consulta = "") {
+  return GET(new Request(`https://bmssistema-sss2.vercel.app/api/cron/reminders${consulta}`, { headers, method: "GET" }));
 }
 
 const autorizado = () => chamar({ Authorization: `Bearer ${SEGREDO_CRON}` });
@@ -176,6 +179,7 @@ beforeEach(() => {
   tabelas = fixtures();
   enviosWhatsApp = [];
   enviosPush = [];
+  escritas = [];
   evolutionFora = false;
   pushFora = false;
 });
@@ -284,5 +288,120 @@ describe("GET /api/cron/reminders: chamada autenticada", () => {
     for (const proibido of ["11999990000", "5511999990000", "Cliente 10", SEGREDO_CRON, SEGREDO_EVOLUTION, SEGREDO_SERVICE, "instancia", baseUrl]) {
       assert.ok(!texto.includes(proibido), proibido);
     }
+  });
+});
+
+describe("GET /api/cron/reminders?dryRun=1", () => {
+  const dryRun = (consulta = "?dryRun=1", token = SEGREDO_CRON) => chamar({ Authorization: `Bearer ${token}` }, consulta);
+
+  function cenarioMisto() {
+    const semConsentimento = { ...agendamento(12, "16:00"), aceita_lembrete: false };
+    const telefoneInvalido = { ...agendamento(13, "09:30"), clientes: { nome: "Cliente 13", telefone: "123" } };
+    const cedoDemais = agendamento(14, "08:20");
+    const cancelado = { ...agendamento(15, "15:30"), status: "cancelado" };
+    tabelas.agendamentos.push(semConsentimento, telefoneInvalido, cedoDemais, cancelado);
+    tabelas.push_subscriptions.push({ agendamento_id: 12, empresa_id: 1, endpoint: `${baseUrl}/push/12`, ...chavesInscricao() });
+  }
+
+  function semEfeitos(antes) {
+    assert.deepEqual(escritas, []);
+    assert.deepEqual(enviosWhatsApp, []);
+    assert.deepEqual(enviosPush, []);
+    assert.deepEqual(tabelas, antes);
+  }
+
+  for (const [nome, headers] of [
+    ["sem Authorization", {}],
+    ["token incorreto", { Authorization: "Bearer outro-segredo" }],
+  ]) {
+    it(`${nome} retorna 401 sem ler nem escrever nada`, async () => {
+      const antes = structuredClone(tabelas);
+      const res = await chamar(headers, "?dryRun=1");
+
+      assert.equal(res.status, 401);
+      assert.deepEqual(await res.json(), { error: "Nao autorizado." });
+      semEfeitos(antes);
+    });
+  }
+
+  it("token correto retorna 200 so com contagens e sem efeito colateral", async () => {
+    cenarioMisto();
+    const antes = structuredClone(tabelas);
+
+    const res = await dryRun();
+    const dados = await res.json();
+
+    assert.equal(res.status, 200);
+    // 10 (dia) e 11 (2h) com consentimento; 12 sem consentimento; 13 telefone invalido; 14 fora da janela; 15 cancelado.
+    // Push: 10, 11 e 12 (push nao depende do consentimento de WhatsApp).
+    assert.deepEqual(dados, {
+      dryRun: true,
+      pushConfigured: true,
+      pushEligible: 3,
+      reminder2hEligible: 1,
+      reminderDayEligible: 1,
+      verificados: 5,
+      whatsappConfigured: true,
+    });
+    semEfeitos(antes);
+  });
+
+  for (const consulta of ["?dryRun=true", "?dryRun=0", "?dryRun", "?x=1&dryRun=1"]) {
+    it(`${consulta} tambem e dry run (nunca cai no envio real)`, async () => {
+      const antes = structuredClone(tabelas);
+      const dados = await (await dryRun(consulta)).json();
+
+      assert.equal(dados.dryRun, true);
+      semEfeitos(antes);
+    });
+  }
+
+  it("com Evolution ou push fora do ar continua sem chamar nenhum dos dois", async () => {
+    evolutionFora = true;
+    pushFora = true;
+    const antes = structuredClone(tabelas);
+
+    assert.equal((await dryRun()).status, 200);
+    semEfeitos(antes);
+  });
+
+  it("depois da execucao real, o que ja foi enviado deixa de contar", async () => {
+    cenarioMisto();
+    await autorizado();
+    assert.equal(enviosWhatsApp.length, 2);
+    assert.equal(enviosPush.length, 3);
+
+    enviosWhatsApp = [];
+    enviosPush = [];
+    escritas = [];
+    const antes = structuredClone(tabelas);
+    const dados = await (await dryRun()).json();
+
+    assert.equal(dados.reminderDayEligible, 0);
+    assert.equal(dados.reminder2hEligible, 0);
+    assert.equal(dados.pushEligible, 0);
+    semEfeitos(antes);
+  });
+
+  it("mensagem em erro com tentativas sobrando volta a contar, como no envio real", async () => {
+    tabelas.mensagens_whatsapp.push(
+      { agendamento_id: 10, canal: "whatsapp", empresa_id: 1, id: 1, status: "erro", tentativas: 1, tipo: "reminder_day" },
+      { agendamento_id: 11, canal: "whatsapp", empresa_id: 1, id: 2, status: "falha_definitiva", tentativas: 3, tipo: "reminder_2h" },
+    );
+    const dados = await (await dryRun()).json();
+
+    assert.equal(dados.reminderDayEligible, 1);
+    assert.equal(dados.reminder2hEligible, 0);
+    assert.deepEqual(escritas, []);
+  });
+
+  it("resposta nao expoe telefone, nome, servico, IDs nem segredos", async () => {
+    cenarioMisto();
+    const texto = await (await dryRun()).text();
+
+    for (const proibido of ["11999990000", "Cliente", "Corte", "Barbearia", "agendamento", "push/", SEGREDO_CRON, SEGREDO_EVOLUTION, SEGREDO_SERVICE, baseUrl]) {
+      assert.ok(!texto.includes(proibido), proibido);
+    }
+    assert.ok(Object.values(JSON.parse(texto)).every((valor) => typeof valor === "number" || typeof valor === "boolean"));
   });
 });

@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { enviarMensagemEvolution, evolutionConfig } from "@/lib/evolutionApi";
-import { criarRepositorioSupabase, processarLembretesAutomaticos } from "@/lib/lembretesAutomaticos";
+import { contarLembretesElegiveis, criarRepositorioSupabase, processarLembretesAutomaticos } from "@/lib/lembretesAutomaticos";
 import { getSupabaseServerClient, isPushConfigured, sendPushReminders } from "@/lib/pushReminders";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return false;
 
-  // Chamada externa (Vercel Cron ou pg_cron + pg_net): comparacao em tempo constante.
+  // Chamada externa (pg_cron + pg_net no Supabase): comparacao em tempo constante.
   const recebido = Buffer.from(request.headers.get("authorization") || "");
   const esperado = Buffer.from(`Bearer ${cronSecret}`);
   return recebido.length === esperado.length && timingSafeEqual(recebido, esperado);
@@ -30,6 +30,21 @@ export async function GET(request: Request) {
   // WhatsApp e push sao independentes: canal sem configuracao fica de fora, o outro segue.
   const config = evolutionConfig();
   const pushConfigurado = isPushConfigured();
+
+  // ?dryRun (qualquer valor) so conta: nenhuma escrita, nenhum envio. Na duvida, nunca cai no envio real.
+  if (new URL(request.url).searchParams.has("dryRun")) {
+    // Somente metodos de leitura chegam ao dry run.
+    const { buscarAgendamentosComPush, buscarCandidatos, buscarMensagem } = criarRepositorioSupabase(supabase);
+    try {
+      const contagem = await contarLembretesElegiveis({
+        agora: new Date(),
+        repositorio: { buscarAgendamentosComPush, buscarCandidatos, buscarMensagem },
+      });
+      return NextResponse.json({ dryRun: true, ...contagem, pushConfigured: pushConfigurado, whatsappConfigured: Boolean(config) });
+    } catch {
+      return NextResponse.json({ dryRun: true, error: "Falha ao calcular lembretes." }, { status: 500 });
+    }
+  }
 
   try {
     const resumo = await processarLembretesAutomaticos({

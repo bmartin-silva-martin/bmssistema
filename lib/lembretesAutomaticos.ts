@@ -63,6 +63,16 @@ export type RepositorioLembretes = {
   reservarNovamente(id: number, esperado: { tentativas: number }, agoraIso: string): Promise<boolean>;
 };
 
+// Dry run: somente leituras. Recebe apenas estes metodos, entao nao tem como reservar, enviar ou marcar.
+export type RepositorioLeitura = Pick<RepositorioLembretes, "buscarAgendamentosComPush" | "buscarCandidatos" | "buscarMensagem">;
+
+export type ContagemDryRun = {
+  pushEligible: number;
+  reminder2hEligible: number;
+  reminderDayEligible: number;
+  verificados: number;
+};
+
 export type ResumoCanal = {
   ativo: boolean;
   elegiveis: number;
@@ -221,12 +231,36 @@ async function processarCanal(
   return resumo;
 }
 
+// Somente quem marcou o consentimento de WhatsApp neste agendamento.
+function comConsentimentoWhatsApp(itens: Item[]) {
+  return itens.filter((item) => item.agendamento.aceita_lembrete === true);
+}
+
+// Nao depende de aceita_lembrete (consentimento de WhatsApp): a inscricao push ja e a autorizacao.
+async function comInscricaoPush(itens: Item[], repositorio: Pick<RepositorioLembretes, "buscarAgendamentosComPush">) {
+  const porEmpresa = new Map<number, Item[]>();
+  for (const item of itens) porEmpresa.set(item.agendamento.empresa_id, [...(porEmpresa.get(item.agendamento.empresa_id) || []), item]);
+
+  const comPush: Item[] = [];
+  for (const [empresaId, itensEmpresa] of porEmpresa) {
+    const inscritos = await repositorio.buscarAgendamentosComPush(empresaId, itensEmpresa.map((item) => item.agendamento.id));
+    comPush.push(...itensEmpresa.filter((item) => inscritos.has(item.agendamento.id)));
+  }
+  return comPush;
+}
+
+function selecionarItens(candidatos: AgendamentoCandidato[], agora: Date) {
+  return candidatos
+    .map((agendamento) => ({ agendamento, tipo: tipoLembretePorHorario(agendamento, agora) }))
+    .filter((item): item is Item => item.tipo !== null)
+    .sort((a, b) => a.agendamento.data_agendamento.localeCompare(b.agendamento.data_agendamento));
+}
+
 async function processarWhatsApp(todos: Item[], opcoes: OpcoesProcessamento): Promise<ResumoCanal> {
   const { enviar, repositorio } = opcoes;
   if (!enviar) return resumoVazio(false);
 
-  // Somente quem marcou o consentimento de WhatsApp neste agendamento.
-  const itens = todos.filter((item) => item.agendamento.aceita_lembrete === true);
+  const itens = comConsentimentoWhatsApp(todos);
   if (itens.length === 0) return resumoVazio(true);
 
   let nomesEmpresas: Map<number, string>;
@@ -264,17 +298,10 @@ async function processarPush(itens: Item[], opcoes: OpcoesProcessamento): Promis
   const { enviarPush, repositorio } = opcoes;
   if (!enviarPush) return resumoVazio(false);
 
-  // Nao depende de aceita_lembrete (consentimento de WhatsApp): a inscricao push ja e a autorizacao.
   // Reserva apenas quem tem inscricao, para nao criar uma linha "ignorado" por agendamento.
-  const comPush: Item[] = [];
+  let comPush: Item[];
   try {
-    const porEmpresa = new Map<number, Item[]>();
-    for (const item of itens) porEmpresa.set(item.agendamento.empresa_id, [...(porEmpresa.get(item.agendamento.empresa_id) || []), item]);
-
-    for (const [empresaId, itensEmpresa] of porEmpresa) {
-      const inscritos = await repositorio.buscarAgendamentosComPush(empresaId, itensEmpresa.map((item) => item.agendamento.id));
-      comPush.push(...itensEmpresa.filter((item) => inscritos.has(item.agendamento.id)));
-    }
+    comPush = await comInscricaoPush(itens, repositorio);
   } catch {
     return { ...resumoVazio(true), elegiveis: itens.length, interrompido: "falha_consulta" };
   }
@@ -293,10 +320,7 @@ export async function processarLembretesAutomaticos(opcoes: OpcoesProcessamento)
   const { agora, repositorio } = opcoes;
 
   const candidatos = await repositorio.buscarCandidatos(horarioLocalDoInstante(agora).data);
-  const itens = candidatos
-    .map((agendamento) => ({ agendamento, tipo: tipoLembretePorHorario(agendamento, agora) }))
-    .filter((item): item is Item => item.tipo !== null)
-    .sort((a, b) => a.agendamento.data_agendamento.localeCompare(b.agendamento.data_agendamento));
+  const itens = selecionarItens(candidatos, agora);
 
   // Canais independentes: rodam em paralelo e um nao interrompe o outro.
   const [whatsapp, push] = await Promise.all([
@@ -305,6 +329,38 @@ export async function processarLembretesAutomaticos(opcoes: OpcoesProcessamento)
   ]);
 
   return { elegiveis: itens.length, push, verificados: candidatos.length, whatsapp };
+}
+
+// Mesmo criterio de reservar(): sem registro, ou em "erro" com tentativas sobrando, seria enviado agora.
+async function aindaSeriaEnviado(repositorio: RepositorioLeitura, { agendamento, tipo }: Item, canal: Canal) {
+  const existente = await repositorio.buscarMensagem(agendamento.empresa_id, agendamento.id, tipo, canal);
+  return !existente || (existente.status === "erro" && existente.tentativas < MAX_TENTATIVAS);
+}
+
+async function filtrarPendentes(repositorio: RepositorioLeitura, itens: Item[], canal: Canal) {
+  const pendentes = await Promise.all(itens.map((item) => aindaSeriaEnviado(repositorio, item, canal)));
+  return itens.filter((_, indice) => pendentes[indice]);
+}
+
+// Quantos lembretes a execucao real enviaria agora, sem nenhuma escrita e sem chamar Evolution/push.
+// Nao considera o limite por execucao nem se o canal esta configurado (a rota informa isso a parte).
+export async function contarLembretesElegiveis({ agora, repositorio }: { agora: Date; repositorio: RepositorioLeitura }): Promise<ContagemDryRun> {
+  const candidatos = await repositorio.buscarCandidatos(horarioLocalDoInstante(agora).data);
+  const itens = selecionarItens(candidatos, agora);
+
+  const whatsapp = await filtrarPendentes(
+    repositorio,
+    comConsentimentoWhatsApp(itens).filter((item) => telefoneWhatsAppValido(item.agendamento.cliente_telefone)),
+    "whatsapp",
+  );
+  const push = await filtrarPendentes(repositorio, await comInscricaoPush(itens, repositorio), "push");
+
+  return {
+    pushEligible: push.length,
+    reminder2hEligible: whatsapp.filter((item) => item.tipo === "reminder_2h").length,
+    reminderDayEligible: whatsapp.filter((item) => item.tipo === "reminder_day").length,
+    verificados: candidatos.length,
+  };
 }
 
 type Relacao<T> = T | T[] | null;
