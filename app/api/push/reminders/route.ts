@@ -1,14 +1,16 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { authorizeRequest } from "@/lib/serverAuth";
+
+const MAX_AGENDAMENTOS = 100;
 
 type PushSubscriptionRow = {
   endpoint: string;
 };
 
 type ReminderRequest = {
-  agendamentoIds?: number[];
-  empresaId?: number;
+  agendamentoIds?: unknown;
+  empresaId?: unknown;
 };
 
 function base64Url(input: Buffer | string) {
@@ -69,41 +71,48 @@ function getVapidAuthorization(endpoint: string) {
   return `vapid t=${jwt}, k=${publicKey}`;
 }
 
-function getSupabaseServerClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) return null;
-
-  return createClient(supabaseUrl, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
-
 export async function POST(request: Request) {
-  const body = (await request.json()) as ReminderRequest;
+  const body = (await request.json().catch(() => null)) as ReminderRequest | null;
+  const authorization = await authorizeRequest(request, body?.empresaId);
+  if ("response" in authorization) return authorization.response;
 
-  if (!body.empresaId || !body.agendamentoIds?.length) {
+  const { empresaId, supabase } = authorization;
+  const agendamentoIds = Array.isArray(body?.agendamentoIds)
+    ? [...new Set(body.agendamentoIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))]
+    : [];
+
+  if (agendamentoIds.length === 0) {
     return NextResponse.json({ error: "Nenhum agendamento informado." }, { status: 400 });
   }
 
-  const supabase = getSupabaseServerClient();
+  if (agendamentoIds.length > MAX_AGENDAMENTOS) {
+    return NextResponse.json({ error: "Agendamentos demais em uma unica solicitacao." }, { status: 400 });
+  }
 
-  if (!supabase) {
-    return NextResponse.json({ configured: false, sent: 0 });
+  // push_subscriptions.empresa_id vem do navegador do cliente; a posse do agendamento e validada aqui.
+  const { data: agendamentos, error: agendamentosError } = await supabase
+    .from("agendamentos")
+    .select("id")
+    .eq("empresa_id", empresaId)
+    .in("id", agendamentoIds);
+
+  if (agendamentosError) {
+    return NextResponse.json({ error: "Falha ao consultar agendamentos." }, { status: 500 });
+  }
+
+  const idsDaEmpresa = ((agendamentos || []) as { id: number }[]).map((agendamento) => agendamento.id);
+  if (idsDaEmpresa.length === 0) {
+    return NextResponse.json({ configured: Boolean(process.env.VAPID_PRIVATE_KEY), sent: 0 });
   }
 
   const { data, error } = await supabase
     .from("push_subscriptions")
     .select("endpoint")
-    .eq("empresa_id", body.empresaId)
-    .in("agendamento_id", body.agendamentoIds);
+    .eq("empresa_id", empresaId)
+    .in("agendamento_id", idsDaEmpresa);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Falha ao consultar inscricoes push." }, { status: 500 });
   }
 
   const subscriptions = ((data || []) as PushSubscriptionRow[]).filter((item) => item.endpoint);

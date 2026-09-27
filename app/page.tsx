@@ -1022,7 +1022,7 @@ export default function AdminDashboard() {
 
   async function enviarPushLembretes(agendamentoIds: number[]) {
     try {
-      const response = await fetch("/api/push/reminders", {
+      const response = await authenticatedFetch("/api/push/reminders", {
         body: JSON.stringify({ agendamentoIds, empresaId: empresaIdAtual }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -1042,7 +1042,7 @@ export default function AdminDashboard() {
 
   async function enviarWhatsAppAutomatico(agendamentoIds: number[]) {
     try {
-      const response = await fetch("/api/whatsapp/reminders", {
+      const response = await authenticatedFetch("/api/whatsapp/reminders", {
         body: JSON.stringify({ agendamentoIds, empresaId: empresaIdAtual }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -1105,7 +1105,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      await fetch("/api/push/reminders", {
+      await authenticatedFetch("/api/push/reminders", {
         body: JSON.stringify({
           agendamentoIds: pendentes.map((agendamento) => agendamento.id),
           empresaId: empresaIdAtual,
