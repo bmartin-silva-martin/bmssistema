@@ -1689,22 +1689,21 @@ export default function AdminDashboard() {
       </aside>
 
       <section className="admin-main">
+        {activeSection !== "agenda" && (
         <header className="admin-header">
-          {activeSection !== "agenda" && (
-            <div className="mobile-app-topbar">
-              <button aria-label="Voltar" onClick={() => abrirSecao("agenda")} type="button">
-                ←
-              </button>
-              <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
-                ☰
-              </button>
-            </div>
-          )}
+          <div className="mobile-app-topbar">
+            <button aria-label="Voltar" onClick={() => abrirSecao("agenda")} type="button">
+              ←
+            </button>
+            <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
+              ☰
+            </button>
+          </div>
 
           <div>
             <p className="admin-kicker">Painel da barbearia</p>
-            <h1>{activeSection === "agenda" ? `Olá, ${nomeDono || empresa?.nome || "barbeiro"}` : empresa?.nome || "BMS Sistema"}</h1>
-            <p>{activeSection === "agenda" ? "Você está em sua agenda." : "Gerencie sua barbearia em uma tela simples."}</p>
+            <h1>{empresa?.nome || "BMS Sistema"}</h1>
+            <p>Gerencie sua barbearia em uma tela simples.</p>
           </div>
 
           <div className="admin-header-actions">
@@ -1716,6 +1715,7 @@ export default function AdminDashboard() {
             </Link>
           </div>
         </header>
+        )}
 
         <MobileDrawer
           email={session.user.email || ""}
