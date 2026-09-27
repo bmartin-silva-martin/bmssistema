@@ -1691,15 +1691,6 @@ export default function AdminDashboard() {
       <section className="admin-main">
         {activeSection !== "agenda" && (
         <header className="admin-header">
-          <div className="mobile-app-topbar">
-            <button aria-label="Voltar" onClick={() => abrirSecao("agenda")} type="button">
-              ←
-            </button>
-            <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
-              ☰
-            </button>
-          </div>
-
           <div>
             <p className="admin-kicker">Painel da barbearia</p>
             <h1>{empresa?.nome || "BMS Sistema"}</h1>
@@ -1736,6 +1727,8 @@ export default function AdminDashboard() {
         {activeSection === "visao" && (
           <AdminSectionShell
             description="Acompanhe os numeros principais e o que precisa de atencao hoje."
+            onBack={() => abrirSecao("agenda")}
+            onOpenMenu={() => setMobileDrawerOpen(true)}
             title="Visao geral"
           >
             <section className="admin-link-card">
@@ -1906,6 +1899,8 @@ export default function AdminDashboard() {
         {activeSection === "servicos" && (
           <AdminSectionShell
             description="Cadastre os servicos que aparecem no link publico e edite valores ou duracao."
+            onBack={() => abrirSecao("agenda")}
+            onOpenMenu={() => setMobileDrawerOpen(true)}
             title="Servicos"
           >
             <article className="admin-panel">
@@ -1986,6 +1981,8 @@ export default function AdminDashboard() {
         {activeSection === "produtos" && (
           <AdminSectionShell
             description="Controle produtos vendidos na barbearia e mantenha estoque e preco organizados."
+            onBack={() => abrirSecao("agenda")}
+            onOpenMenu={() => setMobileDrawerOpen(true)}
             title="Produtos"
           >
             {produtoAviso && <p className="notice notice-error">{produtoAviso}</p>}
@@ -2097,6 +2094,8 @@ export default function AdminDashboard() {
         {activeSection === "financeiro" && (
           <AdminSectionShell
             description="Controle vendas de servicos e produtos depois que o atendimento for finalizado."
+            onBack={() => abrirSecao("agenda")}
+            onOpenMenu={() => setMobileDrawerOpen(true)}
             title="Financeiro"
           >
             {financeiroAviso && <p className="notice notice-error">{financeiroAviso}</p>}
@@ -2294,6 +2293,8 @@ export default function AdminDashboard() {
         {activeSection === "clientes" && (
           <AdminSectionShell
             description="Cadastro, historico e ranking dos seus clientes."
+            onBack={() => abrirSecao("agenda")}
+            onOpenMenu={() => setMobileDrawerOpen(true)}
             title="Clientes"
           >
             <div className="section-tabs">
@@ -2328,6 +2329,8 @@ export default function AdminDashboard() {
         {activeSection === "inteligencia" && (
           <AdminSectionShell
             description="Analise inteligente dos seus dados: receita, produtos, sugestoes de compra e promocoes."
+            onBack={() => abrirSecao("agenda")}
+            onOpenMenu={() => setMobileDrawerOpen(true)}
             title="Inteligencia"
           >
             <div className="finance-filter" aria-label="Periodo de analise">
@@ -2390,6 +2393,8 @@ export default function AdminDashboard() {
         {activeSection === "configuracoes" && (
           <AdminSectionShell
             description="Defina os dias e horarios que aparecem para o cliente no link publico."
+            onBack={() => abrirSecao("agenda")}
+            onOpenMenu={() => setMobileDrawerOpen(true)}
             title="Configuracoes"
           >
             <article className="admin-panel schedule-settings">
@@ -2727,17 +2732,33 @@ function LicenseStatusChip({ empresa, variant = "chip" }: { empresa: Empresa | n
 function AdminSectionShell({
   children,
   description,
+  onBack,
+  onOpenMenu,
   title,
 }: {
   children: React.ReactNode;
   description: string;
+  onBack?: () => void;
+  onOpenMenu?: () => void;
   title: string;
 }) {
   return (
     <section className="admin-section">
-      <div className="admin-section-heading">
-        <h2>{title}</h2>
-        <p>{description}</p>
+      <div className="admin-section-topbar">
+        {onBack && (
+          <button aria-label="Voltar" className="admin-section-topbar-btn" onClick={onBack} type="button">
+            ←
+          </button>
+        )}
+        <div className="admin-section-heading">
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+        {onOpenMenu && (
+          <button aria-label="Abrir menu" className="admin-section-topbar-btn" onClick={onOpenMenu} type="button">
+            ☰
+          </button>
+        )}
       </div>
       {children}
     </section>

@@ -1659,16 +1659,47 @@ th {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.admin-section-topbar {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.admin-section-topbar-btn {
+  background: #1c2029;
+  border: 0;
+  border-radius: 18px;
+  color: #eef2f7;
+  cursor: pointer;
+  display: grid;
+  flex: 0 0 auto;
+  font-size: 1.3rem;
+  font-weight: 900;
+  height: 2.9rem;
+  place-items: center;
+  width: 2.9rem;
+}
+
 .admin-section-heading {
   display: grid;
-  gap: 0.35rem;
+  flex: 1;
+  gap: 0.1rem;
+  min-width: 0;
+  text-align: left;
 }
 
 .admin-section-heading h2,
 .admin-link-card h2,
 .admin-panel h2 {
   margin: 0;
-  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-size: clamp(1.2rem, 4vw, 1.5rem);
+}
+
+.admin-section-heading p {
+  color: #9aa1b0;
+  font-size: 0.78rem;
+  margin: 0;
 }
 
 .admin-link-card,
@@ -3228,18 +3259,6 @@ th {
     font-weight: 900;
   }
 
-  .admin-section-heading {
-    text-align: center;
-  }
-
-  .admin-section-heading h2 {
-    font-size: clamp(2.1rem, 12vw, 3rem);
-  }
-
-  .admin-section-heading p {
-    max-width: 24rem;
-    margin-inline: auto;
-  }
 
   .admin-header-actions,
   .admin-header-actions .admin-pill-button {
@@ -3504,19 +3523,6 @@ th {
 }
 
 
-.admin-section-heading {
-  text-align: center;
-}
-
-.admin-section-heading h2 {
-  font-size: clamp(2.25rem, 8vw, 3.8rem);
-  line-height: 1.05;
-}
-
-.admin-section-heading p {
-  max-width: 34rem;
-  margin-inline: auto;
-}
 
 .admin-two-columns,
 .admin-metrics-grid {
@@ -3696,10 +3702,6 @@ th {
 @media (max-width: 620px) {
   .admin-main {
     padding: 1rem;
-  }
-
-  .admin-section-heading h2 {
-    font-size: clamp(2.1rem, 12vw, 3rem);
   }
 
   .admin-form,
