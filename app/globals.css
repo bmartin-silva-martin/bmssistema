@@ -5196,6 +5196,7 @@ th {
 .mobile-bottom-nav button.active { background: rgb(255 112 74 / .12); color: #ffad98; }
 .mobile-bottom-nav button.active span { background: linear-gradient(135deg, var(--brand-btn-start), var(--brand-btn-end)); color: #fff; }
 @media (max-width: 760px) { .admin-main:has(.agenda-app-shell) { padding: max(.4rem, env(safe-area-inset-top)) .9rem calc(6.5rem + env(safe-area-inset-bottom)); } .agenda-app-shell { gap: 1.25rem; } .agenda-timeline-panel { padding: .75rem; } .agenda-fixed-actions { right: .8rem; } }
+@media (max-width: 760px) { .admin-main:has(.admin-section-topbar) { padding-top: max(.4rem, env(safe-area-inset-top)); } }
 @media (min-width: 761px) { .mobile-bottom-nav { display: none; } .agenda-app-main { padding: 1.15rem 1.35rem 1.35rem; } .agenda-summary-grid { grid-template-columns: repeat(2, minmax(12rem, 1fr)); } }
 @media (min-width: 1280px) { .agenda-app-shell { max-width: 1240px; } }
 @media (min-width: 1600px) { .agenda-app-shell { max-width: 1280px; } }
