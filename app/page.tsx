@@ -383,6 +383,7 @@ export default function AdminDashboard() {
   const [mesFinanceiro, setMesFinanceiro] = useState<FiltroMes | null>(null);
   const [visaoBalanco, setVisaoBalanco] = useState<VisaoBalanco>("geral");
   const [formaPagamentoDetalhe, setFormaPagamentoDetalhe] = useState<string | null>(null);
+  const [maisFiltrosAberto, setMaisFiltrosAberto] = useState(false);
   const [atendimentoAberto, setAtendimentoAberto] = useState<Agendamento | null>(null);
   const [itensVenda, setItensVenda] = useState<Record<number, string>>({});
   const [formaPagamentoVenda, setFormaPagamentoVenda] = useState("");
@@ -2109,88 +2110,104 @@ export default function AdminDashboard() {
           >
             {financeiroAviso && <p className="notice notice-error">{financeiroAviso}</p>}
 
-            <div className="finance-filter" aria-label="Periodo financeiro">
-              <button
-                className={!mesFinanceiro && periodoFinanceiro === "hoje" ? "active" : ""}
-                onClick={() => {
-                  setPeriodoFinanceiro("hoje");
-                  setMesFinanceiro(null);
+            <div className="finance-month-row">
+              <div className="finance-month-chips" aria-label="Filtrar por mes">
+                {MESES_FILTRO.map((mes, index) => (
+                  <button
+                    className={mesFinanceiro?.month === index + 1 ? "active" : ""}
+                    key={mes}
+                    onClick={() =>
+                      setMesFinanceiro({ month: index + 1, year: mesFinanceiro?.year ?? new Date().getFullYear() })
+                    }
+                    type="button"
+                  >
+                    {mes}
+                  </button>
+                ))}
+              </div>
+              <select
+                aria-label="Ano"
+                className="finance-year-select"
+                disabled={!mesFinanceiro}
+                onChange={(event) => {
+                  const year = Number(event.target.value);
+                  setMesFinanceiro((atual) => (atual ? { ...atual, year } : atual));
                 }}
+                value={mesFinanceiro?.year ?? new Date().getFullYear()}
+              >
+                {anosFinanceiro.map((ano) => (
+                  <option key={ano} value={ano}>
+                    {ano}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="finance-filter-secondary">
+              <button
+                aria-expanded={maisFiltrosAberto}
+                className="finance-more-filters-toggle"
+                onClick={() => setMaisFiltrosAberto((atual) => !atual)}
                 type="button"
               >
-                Hoje
+                Mais filtros <span aria-hidden="true">{maisFiltrosAberto ? "▴" : "▾"}</span>
               </button>
-              <button
-                className={!mesFinanceiro && periodoFinanceiro === "7" ? "active" : ""}
-                onClick={() => {
-                  setPeriodoFinanceiro("7");
-                  setMesFinanceiro(null);
-                }}
-                type="button"
-              >
-                7 dias
-              </button>
-              <button
-                className={!mesFinanceiro && periodoFinanceiro === "30" ? "active" : ""}
-                onClick={() => {
-                  setPeriodoFinanceiro("30");
-                  setMesFinanceiro(null);
-                }}
-                type="button"
-              >
-                30 dias
-              </button>
-              <button
-                className={!mesFinanceiro && periodoFinanceiro === "todos" ? "active" : ""}
-                onClick={() => {
-                  setPeriodoFinanceiro("todos");
-                  setMesFinanceiro(null);
-                }}
-                type="button"
-              >
-                Tudo
+              <button className="finance-pdf-button" onClick={gerarPdfFinanceiro} type="button">
+                <span aria-hidden="true">⭳</span> PDF
               </button>
             </div>
 
-            {/* Controles funcionais provisorios, sem estilo proprio: o visual sera ajustado depois. */}
-            <div aria-label="Filtros do financeiro">
-              <label>
-                Mes
-                <select
-                  onChange={(event) => {
-                    const month = Number(event.target.value);
-                    setMesFinanceiro(month ? { month, year: mesFinanceiro?.year ?? new Date().getFullYear() } : null);
+            {maisFiltrosAberto && (
+              <div className="finance-filter" aria-label="Periodo rapido">
+                <button
+                  className={!mesFinanceiro && periodoFinanceiro === "hoje" ? "active" : ""}
+                  onClick={() => {
+                    setPeriodoFinanceiro("hoje");
+                    setMesFinanceiro(null);
                   }}
-                  value={mesFinanceiro?.month ?? ""}
+                  type="button"
                 >
-                  <option value="">Periodo acima</option>
-                  {MESES_FILTRO.map((mes, index) => (
-                    <option key={mes} value={index + 1}>
-                      {mes}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Ano
-                <select
-                  disabled={!mesFinanceiro}
-                  onChange={(event) => {
-                    const year = Number(event.target.value);
-                    setMesFinanceiro((atual) => (atual ? { ...atual, year } : atual));
+                  Hoje
+                </button>
+                <button
+                  className={!mesFinanceiro && periodoFinanceiro === "7" ? "active" : ""}
+                  onClick={() => {
+                    setPeriodoFinanceiro("7");
+                    setMesFinanceiro(null);
                   }}
-                  value={mesFinanceiro?.year ?? new Date().getFullYear()}
+                  type="button"
                 >
-                  {anosFinanceiro.map((ano) => (
-                    <option key={ano} value={ano}>
-                      {ano}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Meu balanco
+                  7 dias
+                </button>
+                <button
+                  className={!mesFinanceiro && periodoFinanceiro === "30" ? "active" : ""}
+                  onClick={() => {
+                    setPeriodoFinanceiro("30");
+                    setMesFinanceiro(null);
+                  }}
+                  type="button"
+                >
+                  30 dias
+                </button>
+                <button
+                  className={!mesFinanceiro && periodoFinanceiro === "todos" ? "active" : ""}
+                  onClick={() => {
+                    setPeriodoFinanceiro("todos");
+                    setMesFinanceiro(null);
+                  }}
+                  type="button"
+                >
+                  Tudo
+                </button>
+              </div>
+            )}
+
+            <section className="finance-hero-card" aria-label="Balanco">
+              <div className="finance-hero-top">
+                <span>Faturamento</span>
                 <select
+                  aria-label="Meu balanco"
+                  className="finance-balanco-select"
                   onChange={(event) => setVisaoBalanco(event.target.value === "geral" ? "geral" : Number(event.target.value))}
                   value={String(visaoBalanco)}
                 >
@@ -2201,106 +2218,57 @@ export default function AdminDashboard() {
                     </option>
                   ))}
                 </select>
-              </label>
-              <button onClick={gerarPdfFinanceiro} type="button">
-                Gerar PDF
-              </button>
-            </div>
+              </div>
+              <strong className="finance-hero-value">{formatarMoeda(resumoFinanceiro.totalReceita)}</strong>
+              <span className="finance-hero-sub">
+                {vendasFiltradas.length} {vendasFiltradas.length === 1 ? "atendimento" : "atendimentos"} · {intervaloFinanceiro.descricao}
+              </span>
+            </section>
 
             <RevenueBarChart dias={faturamentoPorDia} />
 
             <ServiceTilesRow items={resumoFinanceiro.servicosMaisVendidos} total={resumoFinanceiro.totalServicosRealizados} />
 
-            <section className="finance-highlight-grid" aria-label="Destaques">
-              <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
-              {resumoFinanceiro.taxaOcupacao !== null && (
-                <MetricCard helper="agendamentos vs. horarios disponiveis" label="Taxa de ocupacao" value={`${resumoFinanceiro.taxaOcupacao}%`} />
-              )}
+            <section className="finance-quad-card" aria-label="Mais dados">
+              <h2>Mais dados</h2>
+              <div className="finance-quad-grid">
+                <MetricCard accent helper="valor medio por venda" label="Ticket medio" value={formatarMoeda(resumoFinanceiro.ticketMedio)} />
+                {resumoFinanceiro.taxaOcupacao !== null && (
+                  <MetricCard helper="agendamentos vs. horarios" label="Taxa de ocupacao" value={`${resumoFinanceiro.taxaOcupacao}%`} />
+                )}
+                {resumoFinanceiro.upsellProduto.percentual !== null && (
+                  <MetricCard helper="vendas com produto junto" label="Upsell produto" value={`${resumoFinanceiro.upsellProduto.percentual}%`} />
+                )}
+                {resumoFinanceiro.pendencias.percentual !== null && (
+                  <MetricCard helper={`${resumoFinanceiro.pendencias.parte} em aberto`} label="Pendencias" value={`${resumoFinanceiro.pendencias.percentual}%`} />
+                )}
+              </div>
             </section>
 
             <section aria-label="Resumo financeiro">
               <div className="finance-metric-scroll">
-                <MetricCard
-                  helper={`${vendasFiltradas.length} ${vendasFiltradas.length === 1 ? "atendimento" : "atendimentos"}`}
-                  label="Faturamento"
-                  value={formatarMoeda(resumoFinanceiro.totalReceita)}
-                />
                 <MetricCard helper="vendas registradas" label="Vendas" value={vendasFiltradas.length} />
                 <MetricCard helper="itens com baixo estoque" label="Estoque baixo" value={resumoFinanceiro.estoqueBaixo.length} />
               </div>
-              <p className="scroll-hint">
-                Arraste para o lado para ver mais <span aria-hidden="true">→</span>
-              </p>
             </section>
 
             <section className="finance-card-grid">
-              <PaymentChart items={resumoFinanceiro.formasPagamento} total={resumoFinanceiro.totalReceita} />
+              <PaymentChart
+                detalhes={detalheFormaPagamento}
+                items={resumoFinanceiro.formasPagamento}
+                onSelect={(nome) => setFormaPagamentoDetalhe((atual) => (atual === nome ? null : nome))}
+                selected={formaPagamentoDetalhe}
+                total={resumoFinanceiro.totalReceita}
+              />
               {resumoFinanceiro.distribuicaoHoras && <HoursDistributionBar dados={resumoFinanceiro.distribuicaoHoras} />}
             </section>
 
-            {/* "Ver mais" por forma de pagamento (provisorio, sem estilo proprio). */}
-            <div aria-label="Detalhar forma de pagamento">
-              <label>
-                Ver mais
-                <select onChange={(event) => setFormaPagamentoDetalhe(event.target.value || null)} value={formaPagamentoDetalhe ?? ""}>
-                  <option value="">Forma de pagamento</option>
-                  {resumoFinanceiro.formasPagamento.map((forma) => (
-                    <option key={forma.nome} value={forma.nome}>
-                      {forma.nome}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {formaPagamentoDetalhe && (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th>Cliente</th>
-                      <th>Profissional</th>
-                      <th>Valor</th>
-                      <th>Forma</th>
-                      <th>Venda / agendamento</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detalheFormaPagamento.map((linha) => (
-                      <tr key={linha.id}>
-                        <td>{new Date(linha.data).toLocaleDateString("pt-BR")}</td>
-                        <td>{linha.cliente}</td>
-                        <td>{linha.profissional}</td>
-                        <td>{formatarMoeda(linha.valor)}</td>
-                        <td>{linha.formaPagamento}</td>
-                        <td>
-                          #{linha.id} / {linha.agendamentoId ?? "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            <section className="finance-list-card" aria-label="Mais dados">
-              <h2>Mais dados</h2>
+            <section className="finance-list-card" aria-label="Detalhes">
+              <h2>Detalhes</h2>
               <div className="finance-data-row">
                 <span>Clientes unicos</span>
                 <strong>{resumoFinanceiro.clientesUnicos}</strong>
               </div>
-              {resumoFinanceiro.upsellProduto.percentual !== null && (
-                <div className="finance-data-row">
-                  <span>Upsell produto</span>
-                  <strong>{resumoFinanceiro.upsellProduto.percentual}%</strong>
-                </div>
-              )}
-              {resumoFinanceiro.pendencias.percentual !== null && (
-                <div className="finance-data-row">
-                  <span>Pendencias</span>
-                  <strong>
-                    {resumoFinanceiro.pendencias.percentual}% ({resumoFinanceiro.pendencias.parte})
-                  </strong>
-                </div>
-              )}
               {resumoFinanceiro.atendimentosPorCliente > 0 && (
                 <div className="finance-data-row">
                   <span>Atendimentos por cliente</span>
@@ -3470,7 +3438,19 @@ function HoursDistributionBar({
   );
 }
 
-function PaymentChart({ items, total }: { items: PaymentItem[]; total: number }) {
+function PaymentChart({
+  detalhes,
+  items,
+  onSelect,
+  selected,
+  total,
+}: {
+  detalhes?: ReturnType<typeof detalharFormaPagamento>;
+  items: PaymentItem[];
+  onSelect?: (nome: string) => void;
+  selected?: string | null;
+  total: number;
+}) {
   const maiorValor = Math.max(...items.map((item) => item.valor), 1);
 
   return (
@@ -3485,15 +3465,42 @@ function PaymentChart({ items, total }: { items: PaymentItem[]; total: number })
       ) : (
         <div className="payment-bars">
           {items.map((item) => (
-            <div className="payment-bar-row" key={item.nome}>
-              <span>
-                {item.nome}
-                <em className="payment-bar-percent">{total > 0 ? Math.round((item.valor / total) * 100) : 0}%</em>
-              </span>
-              <div>
-                <em style={{ width: `${Math.max(8, (item.valor / maiorValor) * 100)}%` }} />
-              </div>
-              <strong>{formatarMoeda(item.valor)}</strong>
+            <div className="payment-bar-item" key={item.nome}>
+              <button
+                aria-expanded={selected === item.nome}
+                className="payment-bar-row"
+                onClick={() => onSelect?.(item.nome)}
+                type="button"
+              >
+                <span>
+                  {item.nome}
+                  <em className="payment-bar-percent">{total > 0 ? Math.round((item.valor / total) * 100) : 0}%</em>
+                </span>
+                <div>
+                  <em style={{ width: `${Math.max(8, (item.valor / maiorValor) * 100)}%` }} />
+                </div>
+                <strong>{formatarMoeda(item.valor)}</strong>
+                <span aria-hidden="true" className="payment-bar-chevron">{selected === item.nome ? "︿" : "﹀"}</span>
+              </button>
+              {selected === item.nome && (
+                <div className="payment-detail-list">
+                  {!detalhes || detalhes.length === 0 ? (
+                    <p className="finance-empty">Nenhum lancamento neste periodo.</p>
+                  ) : (
+                    detalhes.map((linha) => (
+                      <div className="payment-detail-row" key={linha.id}>
+                        <div>
+                          <strong>{linha.cliente}</strong>
+                          <span>
+                            {new Date(linha.data).toLocaleDateString("pt-BR")} · {linha.profissional}
+                          </span>
+                        </div>
+                        <strong>{formatarMoeda(linha.valor)}</strong>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
