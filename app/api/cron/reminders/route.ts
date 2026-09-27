@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { enviarMensagemEvolution, evolutionConfig } from "@/lib/evolutionApi";
 import { criarRepositorioSupabase, processarLembretesAutomaticos } from "@/lib/lembretesAutomaticos";
@@ -10,7 +11,10 @@ function isAuthorized(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return false;
 
-  return request.headers.get("authorization") === `Bearer ${cronSecret}`;
+  // Chamada externa (Vercel Cron ou pg_cron + pg_net): comparacao em tempo constante.
+  const recebido = Buffer.from(request.headers.get("authorization") || "");
+  const esperado = Buffer.from(`Bearer ${cronSecret}`);
+  return recebido.length === esperado.length && timingSafeEqual(recebido, esperado);
 }
 
 export async function GET(request: Request) {
