@@ -1690,25 +1690,16 @@ export default function AdminDashboard() {
 
       <section className="admin-main">
         <header className="admin-header">
-          <div className="mobile-app-topbar">
-            {activeSection !== "agenda" ? (
+          {activeSection !== "agenda" && (
+            <div className="mobile-app-topbar">
               <button aria-label="Voltar" onClick={() => abrirSecao("agenda")} type="button">
                 ←
               </button>
-            ) : (
-              <span />
-            )}
-            {activeSection !== "agenda" ? (
-              <div className="topbar-right-group">
-                <LicenseStatusChip empresa={empresa} />
-                <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
-                  ☰
-                </button>
-              </div>
-            ) : (
-              <LicenseStatusChip empresa={empresa} />
-            )}
-          </div>
+              <button aria-label="Abrir menu" onClick={() => setMobileDrawerOpen(true)} type="button">
+                ☰
+              </button>
+            </div>
+          )}
 
           <div>
             <p className="admin-kicker">Painel da barbearia</p>
@@ -1717,7 +1708,6 @@ export default function AdminDashboard() {
           </div>
 
           <div className="admin-header-actions">
-            <LicenseStatusChip empresa={empresa} />
             <button className="admin-pill-button secondary" onClick={copiarLink} type="button">
               Copiar link do cliente
             </button>
@@ -1729,6 +1719,7 @@ export default function AdminDashboard() {
 
         <MobileDrawer
           email={session.user.email || ""}
+          empresa={empresa}
           isOpen={mobileDrawerOpen}
           linkPublico={linkPublico}
           onClose={() => setMobileDrawerOpen(false)}
@@ -2652,7 +2643,7 @@ function AdminMenuButton({
   );
 }
 
-function LicenseStatusChip({ empresa }: { empresa: Empresa | null }) {
+function LicenseStatusChip({ empresa, variant = "chip" }: { empresa: Empresa | null; variant?: "chip" | "row" }) {
   const [aberto, setAberto] = useState(false);
   const diasRestantes = diasRestantesLicenca(empresa);
 
@@ -2661,21 +2652,35 @@ function LicenseStatusChip({ empresa }: { empresa: Empresa | null }) {
   const vencimento = empresa?.licenca_expires_at
     ? new Date(empresa.licenca_expires_at).toLocaleDateString("pt-BR")
     : "";
+  const vencendo = diasRestantes <= 1;
   const statusClass = diasRestantes <= 3 ? "warning" : diasRestantes <= 7 ? "attention" : "";
   const valorClass = diasRestantes <= 3 ? "danger" : diasRestantes <= 7 ? "alert" : "ok";
   const installId = empresa?.licenca_install_id || "ID nao gerado";
 
   return (
     <>
-      <button
-        aria-label="Informacoes da licenca"
-        className={`license-status-chip ${statusClass}`}
-        onClick={() => setAberto(true)}
-        type="button"
-      >
-        <span className="license-dot" aria-hidden="true" />
-        <span className="license-chip-text">{diasRestantes}d</span>
-      </button>
+      {variant === "row" ? (
+        <button
+          aria-label="Informacoes da licenca"
+          className={`license-menu-row ${vencendo ? "vencendo" : ""}`}
+          onClick={() => setAberto(true)}
+          type="button"
+        >
+          Licenca
+          {vencendo && <span className="license-menu-alert">Vence amanha</span>}
+          <span aria-hidden="true" className="license-menu-arrow">›</span>
+        </button>
+      ) : (
+        <button
+          aria-label="Informacoes da licenca"
+          className={`license-status-chip ${vencendo ? statusClass : ""}`}
+          onClick={() => setAberto(true)}
+          type="button"
+        >
+          <span className="license-dot" aria-hidden="true" />
+          <span className="license-chip-text">{diasRestantes}d</span>
+        </button>
+      )}
 
       {aberto && (
         <div className="license-modal-overlay" onClick={() => setAberto(false)}>
@@ -2797,6 +2802,7 @@ function LicenseBlockedPanel({
 
 function MobileDrawer({
   email,
+  empresa,
   isOpen,
   linkPublico,
   onClose,
@@ -2804,6 +2810,7 @@ function MobileDrawer({
   onNavigate,
 }: {
   email: string;
+  empresa: Empresa | null;
   isOpen: boolean;
   linkPublico: string;
   onClose: () => void;
@@ -2842,6 +2849,7 @@ function MobileDrawer({
             Configuracoes
           </button>
           <a href={linkPublico}>Link de agendamento</a>
+          <LicenseStatusChip empresa={empresa} variant="row" />
         </nav>
         <footer>
           <div>
