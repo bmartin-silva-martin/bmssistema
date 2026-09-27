@@ -1,5 +1,6 @@
--- Registro/fila das mensagens automaticas de WhatsApp.
--- A idempotencia vem de UNIQUE(agendamento_id, tipo): quem insere primeiro reserva o envio.
+-- Registro/fila dos lembretes (WhatsApp e push) e log dos lembretes manuais.
+-- A idempotencia vem do indice unico (agendamento_id, tipo, canal) dos lembretes automaticos:
+-- quem insere primeiro reserva o envio. manual_reminder e apenas log (varias linhas permitidas).
 -- Escrita somente server-side (service role). O dono da empresa apenas le as proprias mensagens.
 
 -- O lembrete do dia depende de agendamentos.created_at (nao envia para agendamento criado no dia).
@@ -20,7 +21,9 @@ end $$;
 create table if not exists public.mensagens_whatsapp (
   id bigint generated always as identity primary key,
   empresa_id bigint not null references public.empresas(id) on delete cascade,
-  tipo text not null check (tipo in ('reminder_day', 'reminder_2h', 'waitlist_offer')),
+  tipo text not null check (tipo in ('reminder_day', 'reminder_2h', 'manual_reminder', 'waitlist_offer')),
+  -- Canais independentes: falha/ausencia de um nao bloqueia o outro.
+  canal text not null default 'whatsapp' check (canal in ('whatsapp', 'push')),
   agendamento_id bigint references public.agendamentos(id) on delete cascade,
   -- FK sera adicionada junto com a tabela de ofertas da lista de espera.
   oferta_id bigint,
@@ -32,12 +35,19 @@ create table if not exists public.mensagens_whatsapp (
   enviado_em timestamptz,
   created_at timestamptz not null default now(),
   constraint mensagens_whatsapp_alvo_check check (
-    (tipo in ('reminder_day', 'reminder_2h') and agendamento_id is not null and oferta_id is null)
+    (tipo in ('reminder_day', 'reminder_2h', 'manual_reminder') and agendamento_id is not null and oferta_id is null)
     or (tipo = 'waitlist_offer' and oferta_id is not null and agendamento_id is null)
   ),
-  constraint mensagens_whatsapp_agendamento_tipo_key unique (agendamento_id, tipo),
   constraint mensagens_whatsapp_oferta_key unique (oferta_id)
 );
+
+create unique index if not exists mensagens_whatsapp_lembrete_canal_key
+  on public.mensagens_whatsapp (agendamento_id, tipo, canal)
+  where tipo in ('reminder_day', 'reminder_2h');
+
+create index if not exists mensagens_whatsapp_manual_idx
+  on public.mensagens_whatsapp (agendamento_id, enviado_em desc)
+  where tipo = 'manual_reminder';
 
 create index if not exists mensagens_whatsapp_empresa_created_idx
   on public.mensagens_whatsapp (empresa_id, created_at desc);
@@ -61,4 +71,4 @@ create policy "mensagens_whatsapp_authenticated_select"
   );
 
 comment on table public.mensagens_whatsapp is
-  'Mensagens WhatsApp automaticas (reminder_day, reminder_2h, waitlist_offer). Uma linha por agendamento+tipo.';
+  'Lembretes por canal (reminder_day, reminder_2h: uma linha por agendamento+tipo+canal), log de manual_reminder e waitlist_offer.';

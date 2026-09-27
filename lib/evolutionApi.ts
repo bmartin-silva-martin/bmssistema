@@ -1,13 +1,16 @@
+import { montarMensagemManual, telefoneWhatsAppValido } from "@/lib/lembretesWhatsApp";
 import { getSupabaseServerClient } from "@/lib/pushReminders";
 
 type ClienteRelation = { nome: string | null; telefone: string | null };
-type ServicoRelation = { nome: string | null };
+type NomeRelation = { nome: string | null };
 
 type AgendamentoLembreteRow = {
   id: number;
   data_agendamento: string;
+  status: string | null;
   clientes: ClienteRelation | ClienteRelation[] | null;
-  servicos: ServicoRelation | ServicoRelation[] | null;
+  profissionais: NomeRelation | NomeRelation[] | null;
+  servicos: NomeRelation | NomeRelation[] | null;
 };
 
 export type WhatsAppReminderResult = {
@@ -33,15 +36,6 @@ export type ResultadoEvolution =
 
 function firstRelation<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] || null : value;
-}
-
-function normalizarTelefoneBrasil(value = "") {
-  let digits = value.replace(/\D/g, "");
-
-  while (digits.startsWith("0")) digits = digits.slice(1);
-  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) digits = `55${digits}`;
-
-  return digits;
 }
 
 export function evolutionConfig(): EvolutionConfig | null {
@@ -94,6 +88,8 @@ async function enviarViaEvolution(config: EvolutionConfig, numero: string, texto
   if (resultado.tipo === "rede") throw new Error("Falha ao enviar lembrete pela Evolution API.");
 }
 
+// Lembrete manual (botao do painel). Usa o mesmo horario local e texto do automatico e registra
+// manual_reminder, para o cron nao mandar logo depois um lembrete equivalente.
 export async function sendWhatsAppReminders(empresaId: number, agendamentoIds: number[]): Promise<WhatsAppReminderResult> {
   const config = evolutionConfig();
 
@@ -102,7 +98,7 @@ export async function sendWhatsAppReminders(empresaId: number, agendamentoIds: n
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return {
-      configured: true,
+      configured: false,
       details: [],
       error: "Supabase server-only nao configurado.",
       failed: 0,
@@ -111,17 +107,21 @@ export async function sendWhatsAppReminders(empresaId: number, agendamentoIds: n
     };
   }
 
-  const { data, error } = await supabase
-    .from("agendamentos")
-    .select("id,data_agendamento,clientes(nome,telefone),servicos(nome)")
-    .eq("empresa_id", empresaId)
-    .in("id", agendamentoIds);
+  const [{ data, error }, { data: empresa }] = await Promise.all([
+    supabase
+      .from("agendamentos")
+      .select("id,data_agendamento,status,clientes(nome,telefone),servicos(nome),profissionais(nome)")
+      .eq("empresa_id", empresaId)
+      .in("id", agendamentoIds),
+    supabase.from("empresas").select("nome").eq("id", empresaId).maybeSingle(),
+  ]);
 
   if (error) {
     return { configured: true, details: [], error: "Falha ao consultar agendamentos para WhatsApp.", failed: 0, sent: 0, sentAppointmentIds: [] };
   }
 
   const agendamentos = (data || []) as unknown as AgendamentoLembreteRow[];
+  const nomeEmpresa = (empresa as { nome: string | null } | null)?.nome;
   let sent = 0;
   let failed = 0;
   const details: string[] = [];
@@ -129,12 +129,18 @@ export async function sendWhatsAppReminders(empresaId: number, agendamentoIds: n
 
   await Promise.all(
     agendamentos.map(async (agendamento) => {
-      const cliente = firstRelation(agendamento.clientes);
-      const servico = firstRelation(agendamento.servicos);
-      const numero = normalizarTelefoneBrasil(cliente?.telefone || "");
-      if (!numero) return;
+      const status = (agendamento.status || "").toLowerCase();
+      if (status === "cancelado" || status === "finalizado") return;
 
-      const texto = `Ola, ${cliente?.nome || "tudo bem"}! Passando para lembrar seu agendamento de ${servico?.nome || "servico"} em ${new Date(agendamento.data_agendamento).toLocaleString("pt-BR")}.`;
+      const cliente = firstRelation(agendamento.clientes);
+      const numero = telefoneWhatsAppValido(cliente?.telefone);
+      const texto = montarMensagemManual(agendamento, {
+        cliente: cliente?.nome,
+        empresa: nomeEmpresa,
+        profissional: firstRelation(agendamento.profissionais)?.nome,
+        servico: firstRelation(agendamento.servicos)?.nome,
+      });
+      if (!numero || !texto) return;
 
       try {
         await enviarViaEvolution(config, numero, texto);
@@ -143,7 +149,26 @@ export async function sendWhatsAppReminders(empresaId: number, agendamentoIds: n
       } catch (sendError) {
         failed += 1;
         details.push(sendError instanceof Error ? sendError.message : "Falha no envio WhatsApp.");
+        return;
       }
+
+      // Melhor esforco: o painel tambem grava lembrete_status "enviado", que o cron respeita.
+      await supabase
+        .from("mensagens_whatsapp")
+        .insert({
+          agendamento_id: agendamento.id,
+          canal: "whatsapp",
+          claimed_at: null,
+          empresa_id: empresaId,
+          enviado_em: new Date().toISOString(),
+          status: "enviado",
+          tentativas: 1,
+          tipo: "manual_reminder",
+        })
+        .then(
+          () => undefined,
+          () => undefined,
+        );
     }),
   );
 

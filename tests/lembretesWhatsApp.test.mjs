@@ -15,7 +15,7 @@ registerHooks({
 });
 
 const { horarioLocalDoInstante, lerHorarioLocal, lerInstante, minutosAteHorarioLocal } = await import("../lib/horarioLocal.ts");
-const { classificarResultadoEnvio, montarMensagemLembrete, telefoneWhatsAppValido, tipoLembreteElegivel } = await import(
+const { classificarResultadoEnvio, montarMensagemLembrete, montarMensagemManual, telefoneWhatsAppValido, tipoLembreteElegivel } = await import(
   "../lib/lembretesWhatsApp.ts"
 );
 const { processarLembretesAutomaticos } = await import("../lib/lembretesAutomaticos.ts");
@@ -26,7 +26,7 @@ const AGORA_08H = new Date("2026-09-28T11:00:00Z");
 const CRIADO_ONTEM = "2026-09-27T12:00:00+00:00";
 
 function agendamento(campos = {}) {
-  return { created_at: CRIADO_ONTEM, data_agendamento: "2026-09-28T15:00:00+00:00", status: "confirmado", ...campos };
+  return { aceita_lembrete: true, created_at: CRIADO_ONTEM, data_agendamento: "2026-09-28T15:00:00+00:00", status: "confirmado", ...campos };
 }
 
 describe("fuso America/Sao_Paulo", () => {
@@ -100,7 +100,41 @@ describe("elegibilidade", () => {
     assert.equal(tipoLembreteElegivel(agendamento({ data_agendamento: "2026-09-28 08:29:00" }), AGORA_08H), null);
     assert.equal(tipoLembreteElegivel(agendamento({ data_agendamento: "2026-09-28 07:00:00" }), AGORA_08H), null);
     assert.equal(tipoLembreteElegivel(agendamento({ data_agendamento: "2026-09-29 15:00:00" }), AGORA_08H), null);
-    assert.equal(tipoLembreteElegivel(agendamento({ data_agendamento: "2026-09-28 10:11:00" }), AGORA_08H), "reminder_day");
+    // 131 min: fora do 2h e perto demais dele para o do dia (precisa de 220 min = 130 + 90).
+    assert.equal(tipoLembreteElegivel(agendamento({ data_agendamento: "2026-09-28 10:11:00" }), AGORA_08H), null);
+    assert.equal(tipoLembreteElegivel(agendamento({ data_agendamento: "2026-09-28 11:40:00" }), AGORA_08H), "reminder_day");
+  });
+
+  it("aceita_lembrete precisa ser true", () => {
+    for (const aceita of [false, null, undefined]) {
+      assert.equal(tipoLembreteElegivel(agendamento({ aceita_lembrete: aceita }), AGORA_08H), null, String(aceita));
+      assert.equal(tipoLembreteElegivel(agendamento({ aceita_lembrete: aceita, data_agendamento: "2026-09-28 10:00:00" }), AGORA_08H), null);
+    }
+  });
+
+  it("10:15 nao recebe lembrete do dia as 08:00, somente o de 2h", () => {
+    const item = agendamento({ data_agendamento: "2026-09-28 10:15:00" });
+    assert.equal(tipoLembreteElegivel(item, AGORA_08H), null);
+    assert.equal(tipoLembreteElegivel(item, new Date("2026-09-28T11:05:00Z")), "reminder_2h");
+  });
+
+  it("15:00 recebe o do dia as 08:00 e o de 2h por volta das 13:00", () => {
+    const item = agendamento({ data_agendamento: "2026-09-28 15:00:00" });
+    assert.equal(tipoLembreteElegivel(item, AGORA_08H), "reminder_day");
+    assert.equal(tipoLembreteElegivel(item, new Date("2026-09-28T15:45:00Z")), null);
+    assert.equal(tipoLembreteElegivel(item, new Date("2026-09-28T16:00:00Z")), "reminder_2h");
+  });
+
+  it("lembrete manual recente bloqueia os automaticos; o do dia fica bloqueado no dia inteiro", () => {
+    const manual08h = { ultimo_manual_em: "2026-09-28T11:00:00.000Z" };
+    assert.equal(tipoLembreteElegivel(agendamento(manual08h), new Date("2026-09-28T11:15:00Z")), null);
+    assert.equal(tipoLembreteElegivel(agendamento(manual08h), new Date("2026-09-28T13:00:00Z")), null);
+    // 2h: bloqueado ate 90 min depois do manual.
+    const as10h = agendamento({ ...manual08h, data_agendamento: "2026-09-28 10:00:00" });
+    assert.equal(tipoLembreteElegivel(as10h, new Date("2026-09-28T11:05:00Z")), null);
+    assert.equal(tipoLembreteElegivel({ ...as10h, data_agendamento: "2026-09-28 11:00:00" }, new Date("2026-09-28T12:30:00Z")), "reminder_2h");
+    // Manual de ontem nao bloqueia o do dia de hoje.
+    assert.equal(tipoLembreteElegivel(agendamento({ ultimo_manual_em: CRIADO_ONTEM }), AGORA_08H), "reminder_day");
   });
 
   it("reminder_day nao cobre o que o reminder_2h cobre (<= 130 min)", () => {
@@ -163,8 +197,26 @@ describe("mensagens", () => {
     );
   });
 
+  it("mensagem manual usa horario local mesmo com o servidor em UTC", () => {
+    assert.equal(
+      montarMensagemManual({ data_agendamento: "2026-09-28T15:00:00+00:00" }, base, AGORA_08H),
+      "Olá, Bruno! A Barbearia X lembra que você tem um horário hoje às 15:00 para Corte, com João. Estamos te esperando.",
+    );
+    assert.equal(
+      montarMensagemManual({ data_agendamento: "2026-09-29 09:30:00" }, { cliente: null, empresa: null }, AGORA_08H),
+      "Olá! Passando para lembrar que você tem um horário agendado amanhã às 09:30. Estamos te esperando.",
+    );
+    assert.equal(
+      montarMensagemManual({ data_agendamento: "2026-10-05 09:30:00" }, { empresa: "Barbearia X" }, AGORA_08H),
+      "Olá! A Barbearia X lembra que você tem um horário no dia 05/10 às 09:30. Estamos te esperando.",
+    );
+    // 23:30 locais do dia 27 ja e dia 28 em UTC: "amanhã" continua certo.
+    assert.match(montarMensagemManual({ data_agendamento: "2026-09-28 10:00:00" }, {}, new Date("2026-09-28T02:30:00Z")), /amanhã às 10:00/);
+    assert.equal(montarMensagemManual({ data_agendamento: "lixo" }, {}, AGORA_08H), null);
+  });
+
   it("nunca gera null, undefined ou trecho vazio", () => {
-    for (const tipo of ["reminder_day", "reminder_2h"]) {
+    for (const tipo of ["reminder_day", "reminder_2h", "manual_reminder"]) {
       for (const campos of [{}, { cliente: null, empresa: null, profissional: null, servico: null }, { profissional: "Ana" }]) {
         const texto = montarMensagemLembrete(tipo, { hora: "09:00", ...campos });
         assert.doesNotMatch(texto, /null|undefined|para \.|com \.|  /);
@@ -249,8 +301,8 @@ describe("cliente Evolution (servidor local, sem WhatsApp real)", () => {
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
-// Mesmas garantias do banco: UNIQUE(agendamento_id, tipo) e compare-and-set, sincronos apos o await.
-function criarRepositorioMemoria({ agendamentos, empresas }) {
+// Mesmas garantias do banco: indice unico (agendamento_id, tipo, canal) e compare-and-set, sincronos apos o await.
+function criarRepositorioMemoria({ agendamentos, empresas, comPush = [] }) {
   const mensagens = [];
   const agendamentosEnviados = new Map();
   let sequencia = 0;
@@ -261,14 +313,18 @@ function criarRepositorioMemoria({ agendamentos, empresas }) {
     agendamentosEnviados,
     falharReservaDe,
     mensagens,
+    async buscarAgendamentosComPush(empresaId, ids) {
+      await tick();
+      return new Set(ids.filter((id) => comPush.includes(id) && agendamentos.some((a) => a.id === id && a.empresa_id === empresaId)));
+    },
     async buscarCandidatos(dataLocal) {
       await tick();
       // Nao filtra status de proposito: o processamento tambem precisa barrar cancelado/finalizado.
       return agendamentos.filter((a) => a.data_agendamento.slice(0, 10) === dataLocal).map((a) => ({ ...a }));
     },
-    async buscarMensagem(empresaId, agendamentoId, tipo) {
+    async buscarMensagem(empresaId, agendamentoId, tipo, canal) {
       await tick();
-      const m = mensagens.find((x) => x.empresa_id === empresaId && x.agendamento_id === agendamentoId && x.tipo === tipo);
+      const m = mensagens.find((x) => x.empresa_id === empresaId && x.agendamento_id === agendamentoId && x.tipo === tipo && x.canal === canal);
       return m ? { claimed_at: m.claimed_at, id: m.id, status: m.status, tentativas: m.tentativas } : null;
     },
     async buscarNomesEmpresas(ids) {
@@ -280,12 +336,12 @@ function criarRepositorioMemoria({ agendamentos, empresas }) {
       const m = acharAtiva(id, empresaId);
       if (m?.status === "processando") Object.assign(m, conclusao);
     },
-    async inserirReserva(empresaId, agendamentoId, tipo, agoraIso) {
+    async inserirReserva(empresaId, agendamentoId, tipo, canal, agoraIso) {
       await tick();
       if (falharReservaDe.has(agendamentoId)) throw new Error("banco indisponivel");
-      if (mensagens.some((m) => m.agendamento_id === agendamentoId && m.tipo === tipo)) return null;
+      if (mensagens.some((m) => m.agendamento_id === agendamentoId && m.tipo === tipo && m.canal === canal)) return null;
       sequencia += 1;
-      mensagens.push({ agendamento_id: agendamentoId, claimed_at: agoraIso, empresa_id: empresaId, id: sequencia, status: "processando", tentativas: 1, tipo });
+      mensagens.push({ agendamento_id: agendamentoId, canal, claimed_at: agoraIso, empresa_id: empresaId, id: sequencia, status: "processando", tentativas: 1, tipo });
       return sequencia;
     },
     async marcarAgendamentoEnviado(agendamentoId, empresaId, enviadoEm) {
@@ -309,6 +365,7 @@ function criarRepositorioMemoria({ agendamentos, empresas }) {
 
 function candidato(id, campos = {}) {
   return {
+    aceita_lembrete: true,
     cliente_nome: `Cliente ${id}`,
     cliente_telefone: `11999990${String(id).padStart(3, "0")}`,
     created_at: CRIADO_ONTEM,
@@ -318,6 +375,7 @@ function candidato(id, campos = {}) {
     profissional_nome: "João",
     servico_nome: "Corte",
     status: "confirmado",
+    ultimo_manual_em: null,
     ...campos,
   };
 }
@@ -361,7 +419,7 @@ describe("processamento automatico", () => {
 
     const resumo = await executar(repo, enviar);
 
-    assert.equal(resumo.enviados, 3);
+    assert.equal(resumo.whatsapp.enviados, 3);
     const textos = Object.fromEntries(chamadas.map((c) => [c.numero, c.texto]));
     assert.equal(
       textos[numero(2)],
@@ -410,7 +468,7 @@ describe("processamento automatico", () => {
     const segunda = await executar(repo, enviar);
 
     assert.equal(chamadas.length, 1);
-    assert.equal(segunda.jaProcessados, 1);
+    assert.equal(segunda.whatsapp.jaProcessados, 1);
   });
 
   it("reminder_day enviado nao impede o reminder_2h depois", async () => {
@@ -432,8 +490,8 @@ describe("processamento automatico", () => {
 
     assert.equal(chamadas.length, 5);
     assert.equal(new Set(chamadas.map((c) => c.numero)).size, 5);
-    assert.equal(a.enviados + b.enviados, 5);
-    assert.equal(a.jaProcessados + b.jaProcessados, 5);
+    assert.equal(a.whatsapp.enviados + b.whatsapp.enviados, 5);
+    assert.equal(a.whatsapp.jaProcessados + b.whatsapp.jaProcessados, 5);
   });
 
   it("telefone invalido vira ignorado, sem chamar Evolution e sem retry", async () => {
@@ -443,7 +501,7 @@ describe("processamento automatico", () => {
     const resumo = await executar(repo, enviar);
     await executar(repo, enviar);
 
-    assert.equal(resumo.ignorados, 1);
+    assert.equal(resumo.whatsapp.ignorados, 1);
     assert.deepEqual(chamadas.map((c) => c.numero), [numero(2)]);
     assert.equal(repo.mensagens.find((m) => m.agendamento_id === 1).status, "ignorado");
   });
@@ -482,7 +540,7 @@ describe("processamento automatico", () => {
     const resumo = await executar(repo, enviar);
     await executar(repo, enviar);
 
-    assert.equal(resumo.incertos, 1);
+    assert.equal(resumo.whatsapp.incertos, 1);
     assert.equal(chamadas.length, 1);
     assert.equal(repo.mensagens[0].status, "incerto");
     assert.equal(repo.agendamentosEnviados.size, 0);
@@ -507,13 +565,13 @@ describe("processamento automatico", () => {
 
       const resumo = await executar(repo, enviar);
 
-      assert.equal(resumo.interrompido, "configuracao");
-      assert.equal(resumo.statusConfiguracao, status);
+      assert.equal(resumo.whatsapp.interrompido, "configuracao");
+      assert.equal(resumo.whatsapp.statusConfiguracao, status);
       assert.equal(chamadas.length, 1);
       assert.deepEqual(pick(repo.mensagens[0]), { status: "erro", tentativas: 0 });
 
       const depois = await executar(repo, enviar);
-      assert.equal(depois.enviados, 3);
+      assert.equal(depois.whatsapp.enviados, 3);
       assert.deepEqual(pick(repo.mensagens.find((m) => m.agendamento_id === 1)), { status: "enviado", tentativas: 1 });
     });
   }
@@ -529,8 +587,8 @@ describe("processamento automatico", () => {
 
     const resumo = await executar(repo, enviar);
 
-    assert.equal(resumo.enviados, 1);
-    assert.equal(resumo.erros, 2);
+    assert.equal(resumo.whatsapp.enviados, 1);
+    assert.equal(resumo.whatsapp.erros, 2);
     assert.deepEqual(chamadas.map((c) => c.numero), [numero(1), numero(2)]);
     assert.equal(repo.mensagens.find((m) => m.agendamento_id === 1).status, "erro");
   });
@@ -542,15 +600,15 @@ describe("processamento automatico", () => {
 
     const resumo = await executar(repo, enviar);
 
-    assert.equal(resumo.interrompido, "indisponivel");
+    assert.equal(resumo.whatsapp.interrompido, "indisponivel");
     assert.equal(chamadas.length, 3);
   });
 
   it("processando travado ha mais de 10 min vira incerto e nao reenvia", async () => {
     const repo = criarRepositorioMemoria({ agendamentos: [candidato(1), candidato(2)], empresas: EMPRESAS });
     repo.mensagens.push(
-      { agendamento_id: 1, claimed_at: "2026-09-28T10:45:00.000Z", empresa_id: 1, id: 100, status: "processando", tentativas: 1, tipo: "reminder_day" },
-      { agendamento_id: 2, claimed_at: "2026-09-28T10:55:00.000Z", empresa_id: 1, id: 101, status: "processando", tentativas: 1, tipo: "reminder_day" },
+      { agendamento_id: 1, claimed_at: "2026-09-28T10:45:00.000Z", empresa_id: 1, id: 100, status: "processando", tentativas: 1, tipo: "reminder_day", canal: "whatsapp" },
+      { agendamento_id: 2, claimed_at: "2026-09-28T10:55:00.000Z", empresa_id: 1, id: 101, status: "processando", tentativas: 1, tipo: "reminder_day", canal: "whatsapp" },
     );
     const { chamadas, enviar } = criarEnvio();
 
@@ -567,29 +625,161 @@ describe("processamento automatico", () => {
 
     const resumo = await executar(repo, enviar, { limiteEnvios: 2 });
 
-    assert.equal(resumo.interrompido, "limite");
+    assert.equal(resumo.whatsapp.interrompido, "limite");
     assert.equal(chamadas.length, 2);
   });
 
-  it("push acompanha somente a primeira reserva do reminder_2h, por empresa", async () => {
+  it("agendamento sem aceita_lembrete nao recebe em nenhum canal", async () => {
     const repo = criarRepositorioMemoria({
-      agendamentos: [
-        candidato(1, { cliente_telefone: null, data_agendamento: "2026-09-28 10:00:00" }),
-        candidato(2, { data_agendamento: "2026-09-28 10:00:00", empresa_id: 2 }),
-        candidato(3),
-      ],
+      agendamentos: [candidato(1, { aceita_lembrete: false }), candidato(2, { aceita_lembrete: null })],
+      comPush: [1, 2],
       empresas: EMPRESAS,
     });
     const pushes = [];
-    const { enviar } = criarEnvio({ [numero(2)]: { tipo: "rede" } });
+    const { chamadas, enviar } = criarEnvio();
 
-    await executar(repo, enviar, { enviarPush: async (empresaId, ids) => pushes.push([empresaId, ids]) });
-    await executar(repo, enviar, { enviarPush: async (empresaId, ids) => pushes.push([empresaId, ids]) });
+    await executar(repo, enviar, { enviarPush: async (empresaId, id) => (pushes.push(id), "enviado") });
 
+    assert.deepEqual(chamadas, []);
+    assert.deepEqual(pushes, []);
+    assert.deepEqual(repo.mensagens, []);
+  });
+
+  it("lembrete manual recente impede o automatico em seguida", async () => {
+    const repo = criarRepositorioMemoria({
+      agendamentos: [candidato(1, { ultimo_manual_em: "2026-09-28T10:50:00.000Z" }), candidato(2)],
+      empresas: EMPRESAS,
+    });
+    const { chamadas, enviar } = criarEnvio();
+
+    await executar(repo, enviar);
+
+    assert.deepEqual(chamadas.map((c) => c.numero), [numero(2)]);
+  });
+
+  it("do dia e de 2h saem com pelo menos 90 min de intervalo (cron a cada 15 min)", async () => {
+    const horarios = [];
+    for (let minutos = 8 * 60 + 30; minutos <= 21 * 60; minutos += 5) {
+      horarios.push(`${String(Math.floor(minutos / 60)).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}`);
+    }
+    const repo = criarRepositorioMemoria({
+      agendamentos: horarios.map((hora, indice) => candidato(indice + 1, { data_agendamento: `2026-09-28 ${hora}:00` })),
+      empresas: EMPRESAS,
+    });
+    const envios = new Map();
+    const { enviar } = criarEnvio();
+
+    for (let passo = 0; passo * 15 <= 14 * 60; passo += 1) {
+      const agora = new Date(Date.UTC(2026, 8, 28, 10, passo * 15));
+      const antes = repo.mensagens.length;
+      await processarLembretesAutomaticos({ agora, enviar, limiteEnvios: 500, repositorio: repo });
+      for (const m of repo.mensagens.slice(antes)) envios.set(`${m.agendamento_id}:${m.tipo}`, agora.getTime());
+    }
+
+    let comAmbos = 0;
+    for (let id = 1; id <= horarios.length; id += 1) {
+      assert.ok(envios.has(`${id}:reminder_2h`), `2h de ${horarios[id - 1]}`);
+      if (!envios.has(`${id}:reminder_day`)) continue;
+      comAmbos += 1;
+      const intervalo = (envios.get(`${id}:reminder_2h`) - envios.get(`${id}:reminder_day`)) / 60000;
+      assert.ok(intervalo >= 90, `${horarios[id - 1]}: ${intervalo} min`);
+    }
+    assert.ok(comAmbos > 0);
+    assert.ok(!envios.has(`${horarios.indexOf("10:15") + 1}:reminder_day`));
+    assert.ok(envios.has(`${horarios.indexOf("15:00") + 1}:reminder_day`));
+  });
+
+  it("push funciona sem Evolution configurada", async () => {
+    const repo = criarRepositorioMemoria({
+      agendamentos: [candidato(1), candidato(2, { data_agendamento: "2026-09-28 10:00:00", empresa_id: 2 }), candidato(3)],
+      comPush: [1, 2],
+      empresas: EMPRESAS,
+    });
+    const pushes = [];
+
+    const resumo = await processarLembretesAutomaticos({
+      agora: AGORA_08H,
+      enviarPush: async (empresaId, id) => (pushes.push([empresaId, id]), "enviado"),
+      repositorio: repo,
+    });
+
+    assert.equal(resumo.whatsapp.ativo, false);
+    assert.equal(resumo.push.enviados, 2);
     assert.deepEqual(pushes.sort(), [
-      [1, [1]],
-      [2, [2]],
+      [1, 1],
+      [2, 2],
     ]);
+    assert.deepEqual(
+      repo.mensagens.map((m) => [m.agendamento_id, m.tipo, m.canal, m.status]).sort(),
+      [
+        [1, "reminder_day", "push", "enviado"],
+        [2, "reminder_2h", "push", "enviado"],
+      ],
+    );
+    // Push nao marca o agendamento: o botao manual de WhatsApp continua disponivel.
+    assert.equal(repo.agendamentosEnviados.size, 0);
+  });
+
+  it("push segue mesmo com a Evolution recusando a configuracao", async () => {
+    const repo = criarRepositorioMemoria({ agendamentos: [candidato(1), candidato(2)], comPush: [1, 2], empresas: EMPRESAS });
+    const { enviar } = criarEnvio({ [numero(1)]: { status: 401, tipo: "http" } });
+    const pushes = [];
+
+    const resumo = await executar(repo, enviar, { enviarPush: async (empresaId, id) => (pushes.push(id), "enviado") });
+
+    assert.equal(resumo.whatsapp.interrompido, "configuracao");
+    assert.equal(resumo.push.enviados, 2);
+    assert.deepEqual(pushes.sort(), [1, 2]);
+  });
+
+  it("WhatsApp funciona com push indisponivel", async () => {
+    const falhas = [
+      async () => "erro",
+      async () => {
+        throw new Error("push fora");
+      },
+    ];
+
+    for (const enviarPush of falhas) {
+      const repo = criarRepositorioMemoria({ agendamentos: [candidato(1), candidato(2)], comPush: [1, 2], empresas: EMPRESAS });
+      const { chamadas, enviar } = criarEnvio();
+
+      const resumo = await executar(repo, enviar, { enviarPush });
+
+      assert.equal(resumo.whatsapp.enviados, 2);
+      assert.equal(chamadas.length, 2);
+      assert.equal(resumo.push.enviados, 0);
+      assert.ok(repo.mensagens.filter((m) => m.canal === "push").every((m) => m.status === "erro"));
+    }
+
+    const repo = criarRepositorioMemoria({ agendamentos: [candidato(1)], comPush: [1], empresas: EMPRESAS });
+    repo.buscarAgendamentosComPush = async () => {
+      throw new Error("consulta falhou");
+    };
+    const { chamadas, enviar } = criarEnvio();
+    const resumo = await executar(repo, enviar, { enviarPush: async () => "enviado" });
+    assert.equal(resumo.push.interrompido, "falha_consulta");
+    assert.equal(chamadas.length, 1);
+  });
+
+  it("push so reserva quem tem inscricao, reenvia erro e nao duplica", async () => {
+    const repo = criarRepositorioMemoria({ agendamentos: [candidato(1), candidato(2)], comPush: [1], empresas: EMPRESAS });
+    const respostas = ["erro", "enviado"];
+    const pushes = [];
+    const enviarPush = async (empresaId, id) => (pushes.push(id), respostas.shift() ?? "enviado");
+    const { enviar } = criarEnvio();
+
+    await executar(repo, enviar, { enviarPush });
+    await executar(repo, enviar, { enviarPush });
+    await executar(repo, enviar, { enviarPush });
+
+    assert.deepEqual(pushes, [1, 1]);
+    assert.deepEqual(
+      repo.mensagens.filter((m) => m.canal === "push").map((m) => [m.agendamento_id, m.status, m.tentativas]),
+      [[1, "enviado", 2]],
+    );
+    // WhatsApp de cada agendamento saiu uma vez, independente do push.
+    assert.equal(repo.mensagens.filter((m) => m.canal === "whatsapp" && m.status === "enviado").length, 2);
   });
 });
 

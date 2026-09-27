@@ -25,6 +25,7 @@ import {
   type PeriodoFinanceiro,
   type VisaoBalanco,
 } from "@/lib/financeiro";
+import { montarMensagemManual } from "@/lib/lembretesWhatsApp";
 import { gerarRelatorioFinanceiroPdf } from "@/lib/pdfRelatorio";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -1079,9 +1080,12 @@ export default function AdminDashboard() {
 
     if (!enviadoAutomaticamente) {
       const texto = encodeURIComponent(
-      `Ola, ${cliente?.nome || "tudo bem"}! Passando para lembrar seu agendamento de ${servico?.nome || "servico"} em ${new Date(
-        agendamento.data_agendamento,
-      ).toLocaleString("pt-BR")}.`,
+        montarMensagemManual(agendamento, {
+          cliente: cliente?.nome,
+          empresa: empresa?.nome,
+          profissional: firstRelation(agendamento.profissionais ?? null)?.nome,
+          servico: servico?.nome,
+        }) || `Olá, ${cliente?.nome || "tudo bem"}! Passando para lembrar do seu horário.`,
       );
       window.open(`https://wa.me/${telefoneLimpo}?text=${texto}`, "_blank", "noopener,noreferrer");
     }

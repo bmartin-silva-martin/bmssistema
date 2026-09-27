@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { enviarMensagemEvolution, evolutionConfig } from "@/lib/evolutionApi";
 import { criarRepositorioSupabase, processarLembretesAutomaticos } from "@/lib/lembretesAutomaticos";
-import { getSupabaseServerClient, sendPushReminders } from "@/lib/pushReminders";
+import { getSupabaseServerClient, isPushConfigured, sendPushReminders } from "@/lib/pushReminders";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,24 +23,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Supabase server-only nao configurado.", sent: 0 }, { status: 500 });
   }
 
+  // WhatsApp e push sao independentes: canal sem configuracao fica de fora, o outro segue.
   const config = evolutionConfig();
-  if (!config) {
-    return NextResponse.json({ whatsappConfigured: false });
-  }
+  const pushConfigurado = isPushConfigured();
 
   try {
     const resumo = await processarLembretesAutomaticos({
       agora: new Date(),
-      enviar: (numero, texto) => enviarMensagemEvolution(config, numero, texto),
-      enviarPush: (empresaId, agendamentoIds) => sendPushReminders(empresaId, agendamentoIds),
+      enviar: config ? (numero, texto) => enviarMensagemEvolution(config, numero, texto) : undefined,
+      enviarPush: pushConfigurado
+        ? async (empresaId, agendamentoId) => {
+            const resultado = await sendPushReminders(empresaId, [agendamentoId]);
+            if (resultado.sent > 0) return "enviado";
+            if (resultado.configured && !resultado.error && resultado.subscriptions === 0) return "sem_inscricao";
+            return "erro";
+          }
+        : undefined,
       repositorio: criarRepositorioSupabase(supabase),
     });
 
-    if (resumo.interrompido === "configuracao") {
-      console.error(`[lembretes] Evolution API recusou a configuracao (HTTP ${resumo.statusConfiguracao}). Execucao interrompida.`);
+    if (resumo.whatsapp.interrompido === "configuracao") {
+      console.error(`[lembretes] Evolution API recusou a configuracao (HTTP ${resumo.whatsapp.statusConfiguracao}). WhatsApp interrompido.`);
     }
 
-    return NextResponse.json({ ...resumo, whatsappConfigured: true });
+    return NextResponse.json({ ...resumo, pushConfigured: pushConfigurado, whatsappConfigured: Boolean(config) });
   } catch {
     return NextResponse.json({ error: "Falha ao processar lembretes." }, { status: 500 });
   }

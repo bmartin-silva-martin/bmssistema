@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ResultadoEvolution } from "@/lib/evolutionApi";
-import { horarioLocalDoInstante, lerHorarioLocal } from "@/lib/horarioLocal";
+import { horarioLocalDoInstante, lerHorarioLocal, lerInstante } from "@/lib/horarioLocal";
 import {
+  type ClasseResultadoEnvio,
   classificarResultadoEnvio,
   MAX_TENTATIVAS,
   montarMensagemLembrete,
@@ -16,7 +17,10 @@ const LIMITE_ENVIOS_POR_EXECUCAO = 50;
 const ORCAMENTO_EXECUCAO_MS = 45_000;
 const FALHAS_SEGUIDAS_PARA_INTERROMPER = 3;
 
+export type Canal = "whatsapp" | "push";
+
 export type AgendamentoCandidato = {
+  aceita_lembrete: boolean | null;
   cliente_nome: string | null;
   cliente_telefone: string | null;
   created_at: string | null;
@@ -26,6 +30,7 @@ export type AgendamentoCandidato = {
   profissional_nome: string | null;
   servico_nome: string | null;
   status: string | null;
+  ultimo_manual_em: string | null;
 };
 
 export type MensagemRegistrada = {
@@ -42,54 +47,78 @@ export type ConclusaoMensagem = {
   ultimo_erro: string | null;
 };
 
+export type ResultadoPush = "enviado" | "sem_inscricao" | "erro";
+
 // Toda escrita que reserva uma mensagem precisa ser atomica no banco:
-// inserir depende de UNIQUE(agendamento_id, tipo); reivindicar novamente e um compare-and-set.
+// inserir depende do indice unico (agendamento_id, tipo, canal); reivindicar novamente e um compare-and-set.
 export type RepositorioLembretes = {
+  buscarAgendamentosComPush(empresaId: number, agendamentoIds: number[]): Promise<Set<number>>;
   buscarCandidatos(dataLocal: string): Promise<AgendamentoCandidato[]>;
-  buscarMensagem(empresaId: number, agendamentoId: number, tipo: TipoLembrete): Promise<MensagemRegistrada | null>;
+  buscarMensagem(empresaId: number, agendamentoId: number, tipo: TipoLembrete, canal: Canal): Promise<MensagemRegistrada | null>;
   buscarNomesEmpresas(empresaIds: number[]): Promise<Map<number, string>>;
   concluirMensagem(id: number, empresaId: number, conclusao: ConclusaoMensagem): Promise<void>;
-  inserirReserva(empresaId: number, agendamentoId: number, tipo: TipoLembrete, agoraIso: string): Promise<number | null>;
+  inserirReserva(empresaId: number, agendamentoId: number, tipo: TipoLembrete, canal: Canal, agoraIso: string): Promise<number | null>;
   marcarAgendamentoEnviado(agendamentoId: number, empresaId: number, enviadoEm: string): Promise<void>;
   marcarTravadaComoIncerta(id: number, limiteIso: string): Promise<void>;
   reservarNovamente(id: number, esperado: { tentativas: number }, agoraIso: string): Promise<boolean>;
 };
 
-export type ResumoLembretes = {
+export type ResumoCanal = {
+  ativo: boolean;
   elegiveis: number;
   enviados: number;
   erros: number;
   falhasDefinitivas: number;
   ignorados: number;
   incertos: number;
-  interrompido: null | "configuracao" | "indisponivel" | "limite";
+  interrompido: null | "configuracao" | "indisponivel" | "limite" | "falha_consulta";
   jaProcessados: number;
-  pushAgendamentos: number;
   statusConfiguracao?: number;
+};
+
+export type ResumoLembretes = {
+  elegiveis: number;
+  push: ResumoCanal;
   verificados: number;
+  whatsapp: ResumoCanal;
 };
 
 type OpcoesProcessamento = {
   agora: Date;
-  enviar: (numero: string, texto: string) => Promise<ResultadoEvolution>;
-  enviarPush?: (empresaId: number, agendamentoIds: number[]) => Promise<unknown>;
+  // Canal ausente = nao configurado; o outro canal segue normalmente.
+  enviar?: (numero: string, texto: string) => Promise<ResultadoEvolution>;
+  enviarPush?: (empresaId: number, agendamentoId: number) => Promise<ResultadoPush>;
   limiteEnvios?: number;
   orcamentoMs?: number;
   relogio?: () => number;
   repositorio: RepositorioLembretes;
 };
 
-async function reservar(
-  repositorio: RepositorioLembretes,
-  agendamento: AgendamentoCandidato,
-  tipo: TipoLembrete,
-  agora: Date,
-) {
+type Item = { agendamento: AgendamentoCandidato; tipo: TipoLembrete };
+
+type Entrega = { classe: ClasseResultadoEnvio | "ignorado"; detalhe: string | null; statusHttp?: number };
+
+function resumoVazio(ativo: boolean): ResumoCanal {
+  return {
+    ativo,
+    elegiveis: 0,
+    enviados: 0,
+    erros: 0,
+    falhasDefinitivas: 0,
+    ignorados: 0,
+    incertos: 0,
+    interrompido: null,
+    jaProcessados: 0,
+  };
+}
+
+async function reservar(repositorio: RepositorioLembretes, item: Item, canal: Canal, agora: Date) {
+  const { agendamento, tipo } = item;
   const agoraIso = agora.toISOString();
-  const novoId = await repositorio.inserirReserva(agendamento.empresa_id, agendamento.id, tipo, agoraIso);
+  const novoId = await repositorio.inserirReserva(agendamento.empresa_id, agendamento.id, tipo, canal, agoraIso);
   if (novoId !== null) return { id: novoId, tentativas: 1 };
 
-  const existente = await repositorio.buscarMensagem(agendamento.empresa_id, agendamento.id, tipo);
+  const existente = await repositorio.buscarMensagem(agendamento.empresa_id, agendamento.id, tipo, canal);
   if (!existente) return null;
 
   if (existente.status === "erro" && existente.tentativas < MAX_TENTATIVAS) {
@@ -107,105 +136,74 @@ async function reservar(
   return null;
 }
 
-export async function processarLembretesAutomaticos(opcoes: OpcoesProcessamento): Promise<ResumoLembretes> {
-  const { agora, enviar, enviarPush, repositorio } = opcoes;
+async function processarCanal(
+  canal: Canal,
+  itens: Item[],
+  entregar: (item: Item) => Promise<Entrega>,
+  aoEnviar: ((item: Item, enviadoEm: string) => Promise<void>) | null,
+  opcoes: OpcoesProcessamento,
+): Promise<ResumoCanal> {
+  const { agora, repositorio } = opcoes;
   const limiteEnvios = opcoes.limiteEnvios ?? LIMITE_ENVIOS_POR_EXECUCAO;
   const orcamentoMs = opcoes.orcamentoMs ?? ORCAMENTO_EXECUCAO_MS;
   const relogio = opcoes.relogio ?? Date.now;
   const inicio = relogio();
-
-  const candidatos = await repositorio.buscarCandidatos(horarioLocalDoInstante(agora).data);
-  const elegiveis = candidatos
-    .map((agendamento) => ({ agendamento, tipo: tipoLembreteElegivel(agendamento, agora) }))
-    .filter((item): item is { agendamento: AgendamentoCandidato; tipo: TipoLembrete } => item.tipo !== null)
-    .sort((a, b) => a.agendamento.data_agendamento.localeCompare(b.agendamento.data_agendamento));
-
-  const resumo: ResumoLembretes = {
-    elegiveis: elegiveis.length,
-    enviados: 0,
-    erros: 0,
-    falhasDefinitivas: 0,
-    ignorados: 0,
-    incertos: 0,
-    interrompido: null,
-    jaProcessados: 0,
-    pushAgendamentos: 0,
-    verificados: candidatos.length,
-  };
-  if (elegiveis.length === 0) return resumo;
-
-  const nomesEmpresas = await repositorio.buscarNomesEmpresas([...new Set(elegiveis.map((item) => item.agendamento.empresa_id))]);
-  const pushPorEmpresa = new Map<number, number[]>();
+  const resumo = { ...resumoVazio(true), elegiveis: itens.length };
   let reservas = 0;
   let falhasSeguidas = 0;
 
-  for (const { agendamento, tipo } of elegiveis) {
+  for (const item of itens) {
     if (reservas >= limiteEnvios || relogio() - inicio > orcamentoMs) {
       resumo.interrompido = "limite";
       break;
     }
 
     try {
-      const reserva = await reservar(repositorio, agendamento, tipo, agora);
+      const reserva = await reservar(repositorio, item, canal, agora);
       if (!reserva) {
         resumo.jaProcessados += 1;
         continue;
       }
       reservas += 1;
 
-      // Push acompanha o lembrete de 2h uma unica vez (na primeira reserva), independente do WhatsApp.
-      if (tipo === "reminder_2h" && reserva.tentativas === 1) {
-        pushPorEmpresa.set(agendamento.empresa_id, [...(pushPorEmpresa.get(agendamento.empresa_id) || []), agendamento.id]);
-      }
-
-      const numero = telefoneWhatsAppValido(agendamento.cliente_telefone);
-      if (!numero) {
-        await repositorio.concluirMensagem(reserva.id, agendamento.empresa_id, { status: "ignorado", ultimo_erro: "Telefone invalido." });
-        resumo.ignorados += 1;
-        continue;
-      }
-
-      const texto = montarMensagemLembrete(tipo, {
-        cliente: agendamento.cliente_nome,
-        empresa: nomesEmpresas.get(agendamento.empresa_id),
-        hora: lerHorarioLocal(agendamento.data_agendamento)?.hora || "",
-        profissional: agendamento.profissional_nome,
-        servico: agendamento.servico_nome,
-      });
-
-      const resultado = await enviar(numero, texto).catch((): ResultadoEvolution => ({ tipo: "rede" }));
-      const classe = classificarResultadoEnvio(resultado);
-      const detalhe = resultado.tipo === "http" ? `HTTP ${resultado.status}.` : resultado.tipo === "ok" ? null : `Falha: ${resultado.tipo}.`;
+      const empresaId = item.agendamento.empresa_id;
+      const { classe, detalhe, statusHttp } = await entregar(item).catch((): Entrega => ({ classe: "erro", detalhe: "Falha: rede." }));
 
       if (classe === "enviado") {
         const enviadoEm = new Date().toISOString();
-        await repositorio.concluirMensagem(reserva.id, agendamento.empresa_id, { enviado_em: enviadoEm, status: "enviado", ultimo_erro: null });
-        await repositorio.marcarAgendamentoEnviado(agendamento.id, agendamento.empresa_id, enviadoEm);
+        await repositorio.concluirMensagem(reserva.id, empresaId, { enviado_em: enviadoEm, status: "enviado", ultimo_erro: null });
+        if (aoEnviar) await aoEnviar(item, enviadoEm);
         resumo.enviados += 1;
         falhasSeguidas = 0;
         continue;
       }
 
+      if (classe === "ignorado") {
+        await repositorio.concluirMensagem(reserva.id, empresaId, { status: "ignorado", ultimo_erro: detalhe });
+        resumo.ignorados += 1;
+        continue;
+      }
+
       if (classe === "configuracao") {
-        // Chave/instancia errada afeta todos: devolve a tentativa e para a execucao.
-        await repositorio.concluirMensagem(reserva.id, agendamento.empresa_id, {
+        // Chave/instancia errada afeta todos: devolve a tentativa e para este canal.
+        await repositorio.concluirMensagem(reserva.id, empresaId, {
           status: "erro",
           tentativas: reserva.tentativas - 1,
-          ultimo_erro: `Configuracao Evolution recusada (${detalhe})`,
+          ultimo_erro: `Configuracao recusada (${detalhe})`,
         });
         resumo.interrompido = "configuracao";
-        resumo.statusConfiguracao = resultado.tipo === "http" ? resultado.status : undefined;
+        resumo.statusConfiguracao = statusHttp;
         break;
       }
 
       if (classe === "incerto") {
-        await repositorio.concluirMensagem(reserva.id, agendamento.empresa_id, { status: "incerto", ultimo_erro: detalhe });
+        await repositorio.concluirMensagem(reserva.id, empresaId, { status: "incerto", ultimo_erro: detalhe });
         resumo.incertos += 1;
       } else if (classe === "falha_definitiva" || reserva.tentativas >= MAX_TENTATIVAS) {
-        await repositorio.concluirMensagem(reserva.id, agendamento.empresa_id, { status: "falha_definitiva", ultimo_erro: detalhe });
+        await repositorio.concluirMensagem(reserva.id, empresaId, { status: "falha_definitiva", ultimo_erro: detalhe });
         resumo.falhasDefinitivas += 1;
       } else {
-        await repositorio.concluirMensagem(reserva.id, agendamento.empresa_id, { status: "erro", ultimo_erro: detalhe });
+        await repositorio.concluirMensagem(reserva.id, empresaId, { status: "erro", ultimo_erro: detalhe });
         resumo.erros += 1;
       }
 
@@ -220,28 +218,102 @@ export async function processarLembretesAutomaticos(opcoes: OpcoesProcessamento)
     }
   }
 
-  if (enviarPush) {
-    for (const [empresaId, ids] of pushPorEmpresa) {
-      try {
-        await enviarPush(empresaId, ids);
-        resumo.pushAgendamentos += ids.length;
-      } catch {
-        // Push e complementar; falha nao altera o estado do WhatsApp.
-      }
-    }
+  return resumo;
+}
+
+async function processarWhatsApp(itens: Item[], opcoes: OpcoesProcessamento): Promise<ResumoCanal> {
+  const { enviar, repositorio } = opcoes;
+  if (!enviar) return resumoVazio(false);
+  if (itens.length === 0) return resumoVazio(true);
+
+  let nomesEmpresas: Map<number, string>;
+  try {
+    nomesEmpresas = await repositorio.buscarNomesEmpresas([...new Set(itens.map((item) => item.agendamento.empresa_id))]);
+  } catch {
+    return { ...resumoVazio(true), elegiveis: itens.length, interrompido: "falha_consulta" };
   }
 
-  return resumo;
+  const entregar = async ({ agendamento, tipo }: Item): Promise<Entrega> => {
+    const numero = telefoneWhatsAppValido(agendamento.cliente_telefone);
+    if (!numero) return { classe: "ignorado", detalhe: "Telefone invalido." };
+
+    const texto = montarMensagemLembrete(tipo, {
+      cliente: agendamento.cliente_nome,
+      empresa: nomesEmpresas.get(agendamento.empresa_id),
+      hora: lerHorarioLocal(agendamento.data_agendamento)?.hora || "",
+      profissional: agendamento.profissional_nome,
+      servico: agendamento.servico_nome,
+    });
+
+    const resultado = await enviar(numero, texto).catch((): ResultadoEvolution => ({ tipo: "rede" }));
+    const detalhe = resultado.tipo === "http" ? `HTTP ${resultado.status}.` : resultado.tipo === "ok" ? null : `Falha: ${resultado.tipo}.`;
+    return { classe: classificarResultadoEnvio(resultado), detalhe, statusHttp: resultado.tipo === "http" ? resultado.status : undefined };
+  };
+
+  // Compatibilidade com a UI atual; a duplicidade e controlada por mensagens_whatsapp.
+  const aoEnviar = ({ agendamento }: Item, enviadoEm: string) =>
+    repositorio.marcarAgendamentoEnviado(agendamento.id, agendamento.empresa_id, enviadoEm);
+
+  return processarCanal("whatsapp", itens, entregar, aoEnviar, opcoes);
+}
+
+async function processarPush(itens: Item[], opcoes: OpcoesProcessamento): Promise<ResumoCanal> {
+  const { enviarPush, repositorio } = opcoes;
+  if (!enviarPush) return resumoVazio(false);
+
+  // Reserva apenas quem tem inscricao push, para nao criar uma linha "ignorado" por agendamento.
+  const comPush: Item[] = [];
+  try {
+    const porEmpresa = new Map<number, Item[]>();
+    for (const item of itens) porEmpresa.set(item.agendamento.empresa_id, [...(porEmpresa.get(item.agendamento.empresa_id) || []), item]);
+
+    for (const [empresaId, itensEmpresa] of porEmpresa) {
+      const inscritos = await repositorio.buscarAgendamentosComPush(empresaId, itensEmpresa.map((item) => item.agendamento.id));
+      comPush.push(...itensEmpresa.filter((item) => inscritos.has(item.agendamento.id)));
+    }
+  } catch {
+    return { ...resumoVazio(true), elegiveis: itens.length, interrompido: "falha_consulta" };
+  }
+
+  const entregar = async ({ agendamento }: Item): Promise<Entrega> => {
+    const resultado = await enviarPush(agendamento.empresa_id, agendamento.id);
+    if (resultado === "enviado") return { classe: "enviado", detalhe: null };
+    if (resultado === "sem_inscricao") return { classe: "ignorado", detalhe: "Sem inscricao push valida." };
+    return { classe: "erro", detalhe: "Falha no envio push." };
+  };
+
+  return processarCanal("push", comPush, entregar, null, opcoes);
+}
+
+export async function processarLembretesAutomaticos(opcoes: OpcoesProcessamento): Promise<ResumoLembretes> {
+  const { agora, repositorio } = opcoes;
+
+  const candidatos = await repositorio.buscarCandidatos(horarioLocalDoInstante(agora).data);
+  const itens = candidatos
+    .map((agendamento) => ({ agendamento, tipo: tipoLembreteElegivel(agendamento, agora) }))
+    .filter((item): item is Item => item.tipo !== null)
+    .sort((a, b) => a.agendamento.data_agendamento.localeCompare(b.agendamento.data_agendamento));
+
+  // Canais independentes: rodam em paralelo e um nao interrompe o outro.
+  const [whatsapp, push] = await Promise.all([
+    processarWhatsApp(itens, opcoes).catch(() => ({ ...resumoVazio(true), interrompido: "falha_consulta" as const })),
+    processarPush(itens, opcoes).catch(() => ({ ...resumoVazio(true), interrompido: "falha_consulta" as const })),
+  ]);
+
+  return { elegiveis: itens.length, push, verificados: candidatos.length, whatsapp };
 }
 
 type Relacao<T> = T | T[] | null;
 
 type AgendamentoLinha = {
+  aceita_lembrete: boolean | null;
   clientes: Relacao<{ nome: string | null; telefone: string | null }>;
   created_at: string | null;
   data_agendamento: string;
   empresa_id: number;
   id: number;
+  lembrete_enviado_em: string | null;
+  lembrete_status: string | null;
   profissionais: Relacao<{ nome: string | null }>;
   servicos: Relacao<{ nome: string | null }>;
   status: string | null;
@@ -251,13 +323,32 @@ function primeira<T>(valor: Relacao<T>) {
   return Array.isArray(valor) ? valor[0] || null : valor;
 }
 
+function maisRecente(...valores: (string | null | undefined)[]) {
+  const instantes = valores.map((valor) => lerInstante(valor)).filter((valor): valor is Date => valor !== null);
+  if (instantes.length === 0) return null;
+  return new Date(Math.max(...instantes.map((valor) => valor.getTime()))).toISOString();
+}
+
 export function criarRepositorioSupabase(supabase: SupabaseClient): RepositorioLembretes {
   return {
+    async buscarAgendamentosComPush(empresaId, agendamentoIds) {
+      const { data, error } = await supabase
+        .from("push_subscriptions")
+        .select("agendamento_id")
+        .eq("empresa_id", empresaId)
+        .in("agendamento_id", agendamentoIds);
+
+      if (error) throw new Error("Falha ao consultar inscricoes push.");
+      return new Set(((data || []) as { agendamento_id: number }[]).map((linha) => linha.agendamento_id));
+    },
+
     async buscarCandidatos(dataLocal) {
       // Mesmo formato sem fuso usado na gravacao, para o banco comparar no mesmo referencial.
       const { data, error } = await supabase
         .from("agendamentos")
-        .select("id,empresa_id,data_agendamento,created_at,status,clientes(nome,telefone),servicos(nome),profissionais(nome)")
+        .select(
+          "id,empresa_id,data_agendamento,created_at,status,aceita_lembrete,lembrete_enviado_em,lembrete_status,clientes(nome,telefone),servicos(nome),profissionais(nome)",
+        )
         .eq("aceita_lembrete", true)
         .eq("status", "confirmado")
         .gte("data_agendamento", `${dataLocal} 00:00:00`)
@@ -265,8 +356,24 @@ export function criarRepositorioSupabase(supabase: SupabaseClient): RepositorioL
         .order("data_agendamento");
 
       if (error) throw new Error("Falha ao consultar agendamentos.");
+      const linhas = (data || []) as unknown as AgendamentoLinha[];
+      if (linhas.length === 0) return [];
 
-      return ((data || []) as unknown as AgendamentoLinha[]).map((linha) => ({
+      const { data: manuais, error: manuaisError } = await supabase
+        .from("mensagens_whatsapp")
+        .select("agendamento_id,enviado_em")
+        .eq("tipo", "manual_reminder")
+        .eq("status", "enviado")
+        .in("agendamento_id", linhas.map((linha) => linha.id));
+
+      if (manuaisError) throw new Error("Falha ao consultar lembretes manuais.");
+      const manualPorAgendamento = new Map<number, string | null>();
+      for (const manual of (manuais || []) as { agendamento_id: number; enviado_em: string | null }[]) {
+        manualPorAgendamento.set(manual.agendamento_id, maisRecente(manualPorAgendamento.get(manual.agendamento_id), manual.enviado_em));
+      }
+
+      return linhas.map((linha) => ({
+        aceita_lembrete: linha.aceita_lembrete,
         cliente_nome: primeira(linha.clientes)?.nome ?? null,
         cliente_telefone: primeira(linha.clientes)?.telefone ?? null,
         created_at: linha.created_at,
@@ -276,16 +383,22 @@ export function criarRepositorioSupabase(supabase: SupabaseClient): RepositorioL
         profissional_nome: primeira(linha.profissionais)?.nome ?? null,
         servico_nome: primeira(linha.servicos)?.nome ?? null,
         status: linha.status,
+        // "enviado" e gravado somente pelo painel (inclusive no link wa.me, que nao passa pelo servidor).
+        ultimo_manual_em: maisRecente(
+          manualPorAgendamento.get(linha.id),
+          linha.lembrete_status === "enviado" ? linha.lembrete_enviado_em : null,
+        ),
       }));
     },
 
-    async buscarMensagem(empresaId, agendamentoId, tipo) {
+    async buscarMensagem(empresaId, agendamentoId, tipo, canal) {
       const { data, error } = await supabase
         .from("mensagens_whatsapp")
         .select("id,status,tentativas,claimed_at")
         .eq("empresa_id", empresaId)
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", tipo)
+        .eq("canal", canal)
         .maybeSingle();
 
       if (error) throw new Error("Falha ao consultar mensagem.");
@@ -310,10 +423,10 @@ export function criarRepositorioSupabase(supabase: SupabaseClient): RepositorioL
       if (error) throw new Error("Falha ao concluir mensagem.");
     },
 
-    async inserirReserva(empresaId, agendamentoId, tipo, agoraIso) {
+    async inserirReserva(empresaId, agendamentoId, tipo, canal, agoraIso) {
       const { data, error } = await supabase
         .from("mensagens_whatsapp")
-        .insert({ agendamento_id: agendamentoId, claimed_at: agoraIso, empresa_id: empresaId, status: "processando", tentativas: 1, tipo })
+        .insert({ agendamento_id: agendamentoId, canal, claimed_at: agoraIso, empresa_id: empresaId, status: "processando", tentativas: 1, tipo })
         .select("id")
         .single();
 
@@ -323,7 +436,6 @@ export function criarRepositorioSupabase(supabase: SupabaseClient): RepositorioL
     },
 
     async marcarAgendamentoEnviado(agendamentoId, empresaId, enviadoEm) {
-      // Compatibilidade com a UI atual; a duplicidade e controlada por mensagens_whatsapp.
       await supabase
         .from("agendamentos")
         .update({ lembrete_enviado_em: enviadoEm, lembrete_status: "whatsapp_automatico" })

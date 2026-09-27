@@ -1,3 +1,6 @@
+// Simula o runtime da Vercel (UTC): o horario do lembrete manual nao pode depender do fuso do processo.
+process.env.TZ = "UTC";
+
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import http from "node:http";
@@ -21,19 +24,22 @@ const usuariosPorToken = { "token-dono-a": "user-a", "token-dono-b": "user-b" };
 let baseUrl = "";
 let tabelas = {};
 let enviosWhatsApp = [];
+let textosWhatsApp = [];
 let enviosPush = [];
 
 function fixtures() {
   return {
     empresas: [
-      { id: 1, owner_user_id: "user-a" },
-      { id: 2, owner_user_id: "user-b" },
+      { id: 1, nome: "Barbearia Alfa", owner_user_id: "user-a" },
+      { id: 2, nome: "Barbearia Beta", owner_user_id: "user-b" },
     ],
     agendamentos: [
-      { id: 10, empresa_id: 1, data_agendamento: "2026-09-28T15:00:00", clientes: { nome: "Ana", telefone: "11999990000" }, servicos: { nome: "Corte" } },
-      { id: 11, empresa_id: 1, data_agendamento: "2026-09-28T16:00:00", clientes: { nome: "Falha", telefone: "11900000000" }, servicos: { nome: "Barba" } },
-      { id: 20, empresa_id: 2, data_agendamento: "2026-09-28T15:00:00", clientes: { nome: "Bia", telefone: "21988887777" }, servicos: { nome: "Corte" } },
+      agendamentoFixture(10, 1, "2026-09-28 15:00:00", "Ana", "11999990000", "Corte", "João"),
+      agendamentoFixture(11, 1, "2026-09-28 16:00:00", "Falha", "11900000000", "Barba", null),
+      agendamentoFixture(12, 1, "2026-09-28 17:00:00", "Fim", "11977776666", "Corte", null, "finalizado"),
+      agendamentoFixture(20, 2, "2026-09-28 15:00:00", "Bia", "21988887777", "Corte", null),
     ],
+    mensagens_whatsapp: [],
     push_subscriptions: [
       { empresa_id: 1, agendamento_id: 10, endpoint: `${baseUrl}/push/a` },
       { empresa_id: 2, agendamento_id: 20, endpoint: `${baseUrl}/push/b` },
@@ -43,12 +49,30 @@ function fixtures() {
   };
 }
 
+function agendamentoFixture(id, empresaId, data, cliente, telefone, servico, profissional, status = "confirmado") {
+  return {
+    aceita_lembrete: true,
+    clientes: { nome: cliente, telefone },
+    created_at: "2026-09-20T12:00:00+00:00",
+    data_agendamento: data,
+    empresa_id: empresaId,
+    id,
+    lembrete_enviado_em: null,
+    lembrete_status: null,
+    profissionais: profissional ? { nome: profissional } : null,
+    servicos: { nome: servico },
+    status,
+  };
+}
+
 function filtrar(linhas, params) {
   return linhas.filter((linha) =>
     [...params].every(([coluna, valor]) => {
       if (["select", "order", "limit", "offset"].includes(coluna)) return true;
       if (valor.startsWith("eq.")) return String(linha[coluna]) === valor.slice(3);
       if (valor.startsWith("in.(")) return valor.slice(4, -1).split(",").includes(String(linha[coluna]));
+      if (valor.startsWith("gte.")) return String(linha[coluna]) >= valor.slice(4);
+      if (valor.startsWith("lte.")) return String(linha[coluna]) <= valor.slice(4);
       throw new Error(`Filtro nao suportado no fake: ${coluna}=${valor}`);
     }),
   );
@@ -74,13 +98,25 @@ const servidor = http.createServer(async (req, res) => {
   if (url.pathname.startsWith("/rest/v1/")) {
     assert.equal(req.headers.apikey, SEGREDO_SERVICE);
     const tabela = url.pathname.slice("/rest/v1/".length);
-    return responder(res, 200, filtrar(tabelas[tabela] || [], url.searchParams));
+
+    if (req.method === "POST") {
+      tabelas[tabela] = [...(tabelas[tabela] || []), ...[JSON.parse(corpo)].flat()];
+      res.writeHead(201);
+      return res.end();
+    }
+
+    const linhas = filtrar(tabelas[tabela] || [], url.searchParams);
+    if (req.headers.accept?.includes("vnd.pgrst.object")) {
+      return linhas.length === 1 ? responder(res, 200, linhas[0]) : responder(res, 406, { code: "PGRST116" });
+    }
+    return responder(res, 200, linhas);
   }
 
   if (url.pathname === "/evo/message/sendText/instancia") {
     assert.equal(req.headers.apikey, SEGREDO_EVOLUTION);
     const payload = JSON.parse(corpo);
     enviosWhatsApp.push(payload.number);
+    textosWhatsApp.push(payload.text);
     if (payload.number === "5511900000000") return responder(res, 500, { error: "falha simulada" });
     return responder(res, 201, {});
   }
@@ -136,6 +172,7 @@ after(() => servidor.close());
 beforeEach(() => {
   tabelas = fixtures();
   enviosWhatsApp = [];
+  textosWhatsApp = [];
   enviosPush = [];
 });
 
@@ -188,6 +225,51 @@ describe("POST /api/whatsapp/reminders", () => {
     const res = await whatsappPost(requisicao(caminho, { agendamentoIds: ["x", -1], empresaId: 1 }, "token-dono-a"));
     assert.equal(res.status, 400);
     assert.deepEqual(enviosWhatsApp, []);
+  });
+
+  it("texto manual usa horario local, empresa, servico e profissional", async () => {
+    await whatsappPost(requisicao(caminho, { agendamentoIds: [10, 11], empresaId: 1 }, "token-dono-a"));
+    const texto = textosWhatsApp[enviosWhatsApp.indexOf("5511999990000")];
+
+    assert.match(texto, /^Olá, Ana! A Barbearia Alfa lembra que você tem um horário (hoje|amanhã|no dia 28\/09) às 15:00 para Corte, com João\. Estamos te esperando\.$/);
+    for (const enviado of textosWhatsApp) assert.doesNotMatch(enviado, /null|undefined|12:00|Invalid/);
+  });
+
+  it("nao envia lembrete manual para agendamento finalizado", async () => {
+    const res = await whatsappPost(requisicao(caminho, { agendamentoIds: [12], empresaId: 1 }, "token-dono-a"));
+    const dados = await res.json();
+    assert.deepEqual(dados.sentAppointmentIds, []);
+    assert.deepEqual(enviosWhatsApp, []);
+  });
+
+  it("registra manual_reminder somente para o envio que deu certo", async () => {
+    await whatsappPost(requisicao(caminho, { agendamentoIds: [10, 11], empresaId: 1 }, "token-dono-a"));
+
+    assert.deepEqual(
+      tabelas.mensagens_whatsapp.map((m) => [m.agendamento_id, m.empresa_id, m.tipo, m.canal, m.status, Boolean(m.enviado_em)]),
+      [[10, 1, "manual_reminder", "whatsapp", "enviado", true]],
+    );
+  });
+
+  it("envio manual impede o automatico equivalente logo depois", async () => {
+    await whatsappPost(requisicao(caminho, { agendamentoIds: [10], empresaId: 1 }, "token-dono-a"));
+
+    const { criarRepositorioSupabase } = await import("../lib/lembretesAutomaticos.ts");
+    const { getSupabaseServerClient } = await import("../lib/pushReminders.ts");
+    const { tipoLembreteElegivel } = await import("../lib/lembretesWhatsApp.ts");
+    const candidatos = await criarRepositorioSupabase(getSupabaseServerClient()).buscarCandidatos("2026-09-28");
+    const manual = candidatos.find((c) => c.id === 10);
+    const semManual = candidatos.find((c) => c.id === 11);
+
+    assert.ok(manual.ultimo_manual_em);
+    assert.equal(semManual.ultimo_manual_em, null);
+    assert.equal(manual.profissional_nome, "João");
+
+    // Manual as 08:00 locais: sem lembrete do dia em seguida; o de 2h (13:00) so sai por estar 5h depois do manual.
+    const cenario = { ...manual, ultimo_manual_em: "2026-09-28T11:00:00.000Z" };
+    assert.equal(tipoLembreteElegivel({ ...semManual, data_agendamento: "2026-09-28 15:00:00" }, new Date("2026-09-28T11:15:00Z")), "reminder_day");
+    assert.equal(tipoLembreteElegivel(cenario, new Date("2026-09-28T11:15:00Z")), null);
+    assert.equal(tipoLembreteElegivel(cenario, new Date("2026-09-28T16:00:00Z")), "reminder_2h");
   });
 
   it("resposta nao expoe segredos", async () => {
