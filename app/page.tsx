@@ -4721,7 +4721,7 @@ function HistoricoClientePanel({
                 return (
                   <article className="historico-item" key={ag.id}>
                     <div className="historico-item-data">
-                      {new Date(ag.data_agendamento + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                      {new Date(ag.data_agendamento).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
                     </div>
                     <div className="historico-item-corpo">
                       <strong>{servico?.nome || "Servico nao informado"}</strong>
@@ -4853,7 +4853,7 @@ function RankingClientePanel({
   for (const ag of agendamentos) {
     const cliente = firstRelation(ag.clientes);
     if (!cliente) continue;
-    const data = new Date(ag.data_agendamento + "T12:00:00");
+    const data = new Date(ag.data_agendamento);
     const atual = mapaClientes.get(cliente.id);
     if (!atual) {
       mapaClientes.set(cliente.id, { nome: cliente.nome, telefone: cliente.telefone, total: 1, ultimaVisita: data });
@@ -5062,7 +5062,7 @@ function InteligenciaPanel({
   for (const ag of agendamentos) {
     const cliente = firstRelation(ag.clientes);
     if (!cliente) continue;
-    const data = new Date(ag.data_agendamento + "T12:00:00");
+    const data = new Date(ag.data_agendamento);
     const atual = ultimaVisitaMap.get(cliente.id);
     if (!atual || data > atual) ultimaVisitaMap.set(cliente.id, data);
   }
