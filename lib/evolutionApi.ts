@@ -19,11 +19,17 @@ export type WhatsAppReminderResult = {
   sentAppointmentIds: number[];
 };
 
-type EvolutionConfig = {
+export type EvolutionConfig = {
   apiKey: string;
   baseUrl: string;
   instance: string;
 };
+
+export type ResultadoEvolution =
+  | { tipo: "ok" }
+  | { status: number; tipo: "http" }
+  | { tipo: "timeout" }
+  | { tipo: "rede" };
 
 function firstRelation<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] || null : value;
@@ -38,7 +44,7 @@ function normalizarTelefoneBrasil(value = "") {
   return digits;
 }
 
-function evolutionConfig(): EvolutionConfig | null {
+export function evolutionConfig(): EvolutionConfig | null {
   const baseUrl = process.env.EVOLUTION_API_URL;
   const apiKey = process.env.EVOLUTION_API_KEY;
   const instance = process.env.EVOLUTION_API_INSTANCE;
@@ -52,9 +58,15 @@ export function isEvolutionConfigured() {
   return evolutionConfig() !== null;
 }
 
-async function enviarViaEvolution(config: EvolutionConfig, numero: string, texto: string) {
+// Nunca lanca: devolve o tipo de falha para quem chama decidir retry. Payload no formato Evolution v2.
+export async function enviarMensagemEvolution(
+  config: EvolutionConfig,
+  numero: string,
+  texto: string,
+  timeoutMs = 12_000,
+): Promise<ResultadoEvolution> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${config.baseUrl}/message/sendText/${config.instance}`, {
@@ -64,16 +76,22 @@ async function enviarViaEvolution(config: EvolutionConfig, numero: string, texto
       signal: controller.signal,
     });
 
-    if (!response.ok) throw new Error(`Evolution API respondeu com status ${response.status}.`);
+    await response.body?.cancel().catch(() => undefined);
+    return response.ok ? { tipo: "ok" } : { status: response.status, tipo: "http" };
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("Timeout ao enviar lembrete pela Evolution API.");
-    }
-
-    throw error instanceof Error ? error : new Error("Falha ao enviar lembrete pela Evolution API.");
+    if (error instanceof DOMException && error.name === "AbortError") return { tipo: "timeout" };
+    return { tipo: "rede" };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function enviarViaEvolution(config: EvolutionConfig, numero: string, texto: string) {
+  const resultado = await enviarMensagemEvolution(config, numero, texto);
+
+  if (resultado.tipo === "http") throw new Error(`Evolution API respondeu com status ${resultado.status}.`);
+  if (resultado.tipo === "timeout") throw new Error("Timeout ao enviar lembrete pela Evolution API.");
+  if (resultado.tipo === "rede") throw new Error("Falha ao enviar lembrete pela Evolution API.");
 }
 
 export async function sendWhatsAppReminders(empresaId: number, agendamentoIds: number[]): Promise<WhatsAppReminderResult> {
